@@ -1,0 +1,113 @@
+{
+  "illustrations": [
+    {
+      "id": "meadow",
+      "label": "Padang bunga",
+      "art": "/illustrations/meadow.svg",
+      "foil": "/illustrations/meadow-foil.svg",
+      "ratio": 0.72
+    },
+    {
+      "id": "sprig",
+      "label": "Ranting",
+      "art": "/illustrations/sprig.svg",
+      "foil": "/illustrations/sprig-foil.svg",
+      "ratio": 0.72
+    },
+    {
+      "id": "night",
+      "label": "Malam berbintang",
+      "art": "/illustrations/night.svg",
+      "foil": "/illustrations/night-foil.svg",
+      "ratio": 0.72
+    }
+  ],
+  "shapes": [
+    { "id": "original", "label": "Asli" },
+    { "id": "portrait", "label": "Portrait", "ratio": 0.75 },
+    { "id": "square", "label": "Square", "ratio": 1 },
+    { "id": "landscape", "label": "Landscape", "ratio": 1.3333 }
+  ],
+  "foilModes": [
+    {
+      "id": "design",
+      "label": "Sesuai desain",
+      "hint": "Foil bawaan kartu, persis seperti desainnya."
+    },
+    { "id": "detail", "label": "Detail", "hint": "Garis dan tepi gambar berubah jadi foil." },
+    { "id": "shadow", "label": "Bayangan", "hint": "Bagian gelap gambar berubah jadi foil." },
+    { "id": "color", "label": "Satu warna", "hint": "Satu warna di gambar berubah jadi foil." }
+  ],
+  "foilColors": [
+    {
+      "id": "gold",
+      "label": "Emas",
+      "base": "#c9a227",
+      "shade": "#6f5112",
+      "light": "#fff1b8",
+      "sheen": 0.9
+    },
+    {
+      "id": "silver",
+      "label": "Perak",
+      "base": "#b7bac3",
+      "shade": "#565a64",
+      "light": "#ffffff",
+      "sheen": 0.95
+    },
+    {
+      "id": "rose-gold",
+      "label": "Rose gold",
+      "base": "#d49d8b",
+      "shade": "#7d4a3c",
+      "light": "#ffe4da",
+      "sheen": 0.85
+    },
+    {
+      "id": "copper",
+      "label": "Tembaga",
+      "base": "#b8703f",
+      "shade": "#592f13",
+      "light": "#f7c99e",
+      "sheen": 0.85
+    },
+    {
+      "id": "pink",
+      "label": "Pink",
+      "base": "#e38caf",
+      "shade": "#923a5d",
+      "light": "#ffe2ef",
+      "sheen": 0.85
+    },
+    {
+      "id": "holo",
+      "label": "Holografik",
+      "base": "#d8d8e8",
+      "shade": "#85869e",
+      "light": "#ffffff",
+      "sheen": 1,
+      "iridescent": true,
+      "spectrum": ["#ffd3ec", "#c7f1ff", "#d4ffcf", "#fff3c4", "#e5d2ff"]
+    }
+  ],
+  "papers": [
+    { "id": "white", "label": "Putih", "color": "#f6f5f2", "textColor": "#111114" },
+    { "id": "cream", "label": "Krem", "color": "#f2eadb", "textColor": "#2b2219" },
+    { "id": "blush", "label": "Blush", "color": "#efcfcb", "textColor": "#3a1f1c" },
+    { "id": "sage", "label": "Sage", "color": "#cbd6c3", "textColor": "#1f2a1c" },
+    { "id": "sky", "label": "Biru muda", "color": "#cad8e8", "textColor": "#17233a" },
+    { "id": "navy", "label": "Navy", "color": "#1e2335", "textColor": "#f3efe6" }
+  ],
+  "templates": [
+    { "id": "text", "label": "Teks saja", "photos": 0 },
+    { "id": "photo-1", "label": "1 foto + teks", "photos": 1 },
+    { "id": "photo-2", "label": "2 foto + teks", "photos": 2 },
+    { "id": "collage-4", "label": "Kolase 4 foto", "photos": 4 }
+  ],
+  "surpriseRules": [
+    { "paper": "navy", "excludeFoil": ["silver"] },
+    { "paper": "white", "excludeFoil": ["silver"] },
+    { "paper": "sky", "excludeFoil": ["silver"] },
+    { "paper": "blush", "excludeFoil": ["pink", "rose-gold"] }
+  ]
+}

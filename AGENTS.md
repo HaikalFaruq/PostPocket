@@ -23,7 +23,7 @@ Aturan ini dicek berlapis, jadi pelanggaran berhenti sebelum masuk `main`:
 | Workflow `No AI attribution` | Sama seperti pre-push, plus judul dan deskripsi PR | Setiap PR dan push ke `main` |
 | Branch protection `main` | Hanya menerima commit yang lolos cek `no-ai-attribution`, termasuk dari admin. Force push dan hapus `main` diblokir | Di GitHub |
 
-Hook harus diaktifkan sekali di setiap clone:
+Hook aktif otomatis setelah `pnpm install` (script `prepare`). Tanpa pnpm, aktifkan sekali per clone:
 
 ```sh
 git config core.hooksPath .githooks
@@ -89,38 +89,52 @@ Setiap mulai sesi, termasuk sesi AI agent:
 | `supabase/functions/` | Bintang | Edge Functions: letters, publish, og |
 | `docs/api/openapi.yaml` | Bintang menulis, Kall me-review | Kontrak API antara frontend dan backend |
 | `packages/presets/` | Kall | Preset desain dalam JSON. Backend hanya menyimpan id-nya |
-| `docs/` | Berdua | PRD, panduan peran, screenshot referensi, lisensi aset |
+| `docs/` | Berdua | PRD, panduan peran, catatan referensi, lisensi aset |
 
 - **Agent untuk Bintang** bekerja sebagai backend engineer. Mulai dari [docs/backend.md](docs/backend.md): cakupan, keputusan yang menunggu, checklist per sprint, data model, endpoint, dan syarat keamanan.
-- **Agent untuk Kall** bekerja sebagai frontend engineer. Mulai dari PRD bagian Modul 1 sampai 3, Design system, dan Tech stack.
+- **Agent untuk Kall** bekerja sebagai frontend engineer. Mulai dari [docs/frontend.md](docs/frontend.md): cara menjalankan, aturan token dan preset, komponen bersama, dan checklist per sprint.
 - Kontrak dulu, kode kemudian. Endpoint baru atau perubahan bentuk data masuk ke `docs/api/openapi.yaml` lewat PR yang di-review pasangan, baru diimplementasikan. Frontend boleh jalan dengan mock dari kontrak itu.
 - Jangan mengubah area pasangan tanpa bilang dulu. Kalau butuh perubahan di sana, tulis di bagian **Selanjutnya** PR kamu.
 - Secret (service role key, token) tidak pernah di-commit. Pakai `.env` dan sediakan `.env.example`.
 
 ## 6. Perintah
 
+Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
+
 | Perintah | Fungsi |
 | --- | --- |
-| `git config core.hooksPath .githooks` | Aktifkan hook, sekali per clone |
+| `pnpm install` | Pasang dependensi dan aktifkan hook git |
+| `pnpm dev` | Server development frontend (`apps/web`) |
+| `pnpm lint` | ESLint (warning dianggap gagal) dan Prettier |
+| `pnpm typecheck` | Cek tipe semua package |
+| `pnpm test` | Unit test Vitest semua package |
+| `pnpm test:e2e` | E2E Playwright di build production (Android, iPhone, desktop) |
+| `pnpm check` | `lint`, `typecheck`, dan `test` sekaligus |
 | `scripts/check-no-ai.sh --revs origin/main..HEAD` | Cek atribusi AI di commit yang belum masuk `main` |
 | `scripts/test-check-no-ai.sh` | Uji pola cek atribusi AI, wajib lolos setelah polanya diubah |
+| `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`) |
+| `scripts/test-check-secrets.sh` | Uji pola cek rahasia, wajib lolos setelah polanya diubah |
 
-Siapa pun yang membuat `apps/web` atau `supabase/` wajib menambahkan perintah dev, lint, dan test ke tabel ini, beserta job CI-nya. Begitu ada `package.json` di root, tambahkan `"prepare": "git config core.hooksPath .githooks"` supaya hook aktif otomatis setelah install.
+Sebelum push, pastikan `pnpm check` dan `pnpm test:e2e` lolos. Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. CI menjalankan semuanya di setiap PR (workflow `Web` dan `No AI attribution`).
+
+Siapa pun yang membuat `supabase/` wajib menambahkan perintahnya ke tabel ini, beserta job CI-nya.
 
 ## 7. Struktur repo
 
 Yang bertanda *(belum)* dibuat oleh pemiliknya di Sprint 0.
 
 ```text
-apps/web/               Nuxt, dipegang Kall (belum)
+apps/web/               Nuxt, dipegang Kall
 supabase/migrations/    skema SQL dan RLS, dipegang Bintang (belum)
 supabase/functions/     Edge Functions, dipegang Bintang (belum)
-packages/presets/       preset JSON kertas, foil, kantong, stiker, filter (belum)
+packages/presets/       preset JSON kertas, foil, kantong, bingkai, filter + helper
 docs/prd/               PRD (Markdown dan PDF) beserta gambarnya
+docs/frontend.md        panduan frontend
 docs/backend.md         panduan backend
+docs/spikes/            hasil spike Sprint 0 (kartu foil, Safari)
 docs/api/openapi.yaml   kontrak API (belum)
-docs/reference/         screenshot tiga web referensi (belum)
-docs/assets.md          sumber dan lisensi aset (belum)
+docs/reference/         ukuran dan catatan tiga web referensi (screenshot di luar repo)
+docs/assets.md          sumber dan lisensi aset
 scripts/                cek atribusi AI (dipakai hook dan CI) beserta ujinya
 .githooks/              hook commit-msg dan pre-push
 .github/                workflow CI dan template PR
@@ -132,3 +146,15 @@ scripts/                cek atribusi AI (dipakai hook dan CI) beserta ujinya
 - Aset visual dari web referensi (kantong, stiker, ilustrasi, desain TV) tidak boleh disalin ke repo. Catat sumber dan lisensi setiap aset di `docs/assets.md`.
 - Warna, radius, font, dan bayangan adalah design token. Pilihan desain (kertas, foil, kantong, stiker, bingkai, filter) adalah preset JSON di `packages/presets/`, bukan hardcode di komponen.
 - Bukan target rilis 1: aplikasi native, editor ilustrasi sendiri, pembayaran, fitur sosial, kolaborasi real-time.
+
+## 9. Rahasia dan data pribadi
+
+Repo ini public: commit, PR, issue, dan komentar bisa dibaca siapa saja.
+
+- Secret key, token, password, dan isi `.env` tidak pernah masuk commit, PR, issue, maupun komentar. Kirim lewat jalur privat.
+- Frontend hanya memakai URL Supabase dan publishable key (aman di browser) lewat `apps/web/.env`, dengan contoh di `apps/web/.env.example`. Secret key Supabase hanya ada di dashboard dan secrets Edge Function.
+- Key yang sempat terkirim lewat chat atau tertempel di tempat publik dianggap bocor: rotate di dashboard, tidak cukup dihapus dari commit.
+- Commit memakai email noreply GitHub supaya email pribadi tidak tampil. Alamatnya sama dengan tabel co-author di bagian 2: `git config user.email <id>+<username>@users.noreply.github.com`.
+- Screenshot web referensi tidak disimpan di repo; `docs/reference/` hanya berisi ukuran dan catatan.
+
+Penjaganya berlapis. Hook `.githooks/pre-commit` (`scripts/check-secrets.sh`) menolak file `.env` dan pola secret sebelum commit. Setelah itu, secret scanning dan push protection GitHub menolak push yang memuat secret yang dikenali.

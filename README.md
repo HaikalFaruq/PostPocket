@@ -14,26 +14,31 @@ Foto dari mana pun bisa mengalir ke modul lain, lalu dikirim ke orang lain lewat
 [![Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=3ECF8E&labelColor=141414)](https://supabase.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white&labelColor=141414)](https://www.typescriptlang.org)
 
-[PRD](docs/prd/PRD-PostPocket.md) · [Panduan backend](docs/backend.md) · [Aturan kerja](AGENTS.md)
+[PRD](docs/prd/PRD-PostPocket.md) · [Panduan frontend](docs/frontend.md) · [Panduan backend](docs/backend.md) · [Aturan kerja](AGENTS.md)
 
 </div>
 
 > [!NOTE]
-> **Masih Sprint 0.** Repo ini baru berisi PRD dan aturan kerja. Kode frontend (`apps/web`) dan backend (`supabase/`) dibuat oleh pemiliknya masing-masing.
+> **Masih Sprint 0.** Fondasi frontend (`apps/web`: token, komponen bersama, kartu foil 3D) sudah ada dan bisa dicoba di `/lab`. Backend (`supabase/`) menyusul dari Bintang.
 
 ## Mulai dari sini
 
 | Kamu | Baca dulu | Lalu |
 | --- | --- | --- |
 | **Bintang** (backend) | [docs/backend.md](docs/backend.md) | Checklist Sprint 0: proyek Supabase, migrasi `letters` + `letter_assets`, `openapi.yaml` |
-| **Kall** (frontend) | [PRD](docs/prd/PRD-PostPocket.md) bagian Modul 1–3 dan Design system | Scaffold `apps/web`, token, dan komponen bersama |
+| **Kall** (frontend) | [docs/frontend.md](docs/frontend.md) | Checklist Sprint 1: halaman Letter langkah 1–4, Surprise me, draf di IndexedDB |
 | **AI agent** | [AGENTS.md](AGENTS.md) | Ikuti peran orang yang menjalankanmu |
 
-Setelah clone, aktifkan hook sekali:
+## Mulai lokal
+
+Butuh Node 24 dan pnpm 9.
 
 ```sh
-git config core.hooksPath .githooks
+pnpm install   # sekalian mengaktifkan hook git
+pnpm dev       # http://localhost:3000, lalu buka /lab
 ```
+
+`pnpm check` menjalankan lint, typecheck, dan unit test; `pnpm test:e2e` menjalankan Playwright di build production. Daftar lengkapnya ada di [AGENTS.md](AGENTS.md#6-perintah).
 
 ## Apa itu PostPocket
 
@@ -58,6 +63,8 @@ Rilis 1 hanya butuh server untuk surat yang dikirim. Pocket, TV, dan Booth berja
 ## Aturan repo
 
 Commit dan PR tercatat atas nama orang yang menjalankannya, tanpa atribusi AI. Aturan ini dicek oleh git hook, CI, dan branch protection di `main`. Detail dan cara memperbaiki commit yang ditolak ada di [AGENTS.md](AGENTS.md#1-tanpa-atribusi-ai).
+
+Repo ini public, jadi secret key dan file `.env` juga tidak boleh masuk repo. Hook `pre-commit` menolaknya sebelum commit, dan GitHub menolaknya saat push ([AGENTS.md bagian 9](AGENTS.md#9-rahasia-dan-data-pribadi)).
 
 ## Tim
 

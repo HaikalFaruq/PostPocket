@@ -1,0 +1,135 @@
+@import 'tailwindcss';
+
+/*
+ * Design token PostPocket (PRD bagian Design system).
+ * Nilai awal meniru tiga referensi; fase polish cukup mengganti nilai di sini.
+ * Warna bawaan Tailwind dimatikan supaya komponen hanya memakai token.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Dasar netral, dipakai semua halaman */
+  --color-canvas: #f5f5f3;
+  --color-surface: #ffffff;
+  --color-panel: #fcfcfb;
+  --color-ink: #111114;
+  --color-ink-muted: rgb(17 17 20 / 0.55);
+  --color-ink-subtle: rgb(17 17 20 / 0.45);
+  --color-line: rgb(17 17 20 / 0.14);
+  --color-line-soft: rgb(17 17 20 / 0.08);
+  --color-fill: rgb(17 17 20 / 0.05);
+
+  /* Aksen Pocket: warna kantong ada di preset, di sini hanya teks dan kayu jepitan */
+  --color-pocket-ink: #4a3b30;
+  --color-pocket-muted: #a8927f;
+  --color-pocket-wood: #ead2a4;
+  --color-pocket-ok: #a6d08f;
+
+  /* Aksen TV: clay pink dan panel gelap */
+  --color-tv-accent: #e91e8c;
+  --color-tv-clay: #e48ba1;
+  --color-tv-panel: #2a2a2a;
+  --color-tv-panel-ink: rgb(255 255 255 / 0.92);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-letter: 'Caveat', cursive;
+  --font-tv: 'VT323', ui-monospace, monospace;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 1.45;
+  --text-chip: 12.5px;
+  --text-chip--line-height: 1;
+  --text-body: 13px;
+  --text-body--line-height: 1.5;
+  --text-title: 22px;
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: -0.025em;
+  --text-display: 42px;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.03em;
+
+  --radius-control: 12px;
+  --radius-card: 24px;
+
+  --shadow-raised: 0 0 0 1px rgb(17 17 20 / 0.08), 0 6px 14px -8px rgb(17 17 20 / 0.35);
+  --shadow-float: 0 1px 3px rgb(17 17 20 / 0.06), 0 8px 24px -12px rgb(17 17 20 / 0.3);
+  --shadow-sheet: 0 -12px 30px -18px rgb(17 17 20 / 0.25);
+  --shadow-modal: 0 40px 80px -40px rgb(17 17 20 / 0.45);
+
+  --ease-card: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-fade-in: fade-in 200ms ease-out;
+  --animate-fade-out: fade-out 160ms ease-in forwards;
+  --animate-rise-in: rise-in 280ms var(--ease-sheet);
+  --animate-rise-out: rise-out 180ms ease-in forwards;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px) scale(0.985);
+    }
+  }
+
+  @keyframes rise-out {
+    to {
+      opacity: 0;
+      transform: translateY(16px) scale(0.985);
+    }
+  }
+}
+
+:root {
+  /* Serat kertas: noise SVG feTurbulence, dipakai kartu dan bingkai foto */
+  --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Butiran kilau foil */
+  --texture-glitter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.6 -.75'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --card-open-ms: 520ms;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

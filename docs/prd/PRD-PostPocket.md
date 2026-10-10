@@ -44,7 +44,7 @@ Tim berisi dua engineer tanpa desainer UI/UX, 3D, atau ilustrator, jadi aturan k
 
 **Prinsip "tiru dulu, poles nanti"**
 
-1. Layout, urutan langkah, jarak, dan interaksi dibuat semirip mungkin dengan referensi. Screenshot referensi ditaruh di folder `docs/reference/` di repo sebagai acuan.
+1. Layout, urutan langkah, jarak, dan interaksi dibuat semirip mungkin dengan referensi. Ukuran dan catatan referensi ada di `docs/reference/`; screenshot-nya disimpan di folder bersama di luar repo karena repo public.
 2. Aset visual (kantong snack, stiker, ilustrasi kartu, bentuk TV) tidak diambil dari web referensi. Pakai aset berlisensi bebas atau buatan sendiri (lihat bagian Design system dan aset).
 3. Semua warna, radius, font, dan bayangan disimpan sebagai design token, supaya fase polish cukup mengganti token tanpa membongkar komponen.
 4. Setiap pilihan desain (kertas, foil, kantong, stiker, bingkai, filter) adalah data preset JSON, bukan hardcode di komponen. Desainer bisa menambah preset nanti tanpa kode baru.
@@ -404,7 +404,7 @@ postpocket/
 │  └─ functions/        # Edge Functions (letters, publish, og)
 ├─ packages/presets/    # JSON preset kertas, foil, kantong, stiker, filter
 ├─ docs/
-│  ├─ reference/        # screenshot 3 web referensi
+│  ├─ reference/        # ukuran dan catatan 3 web referensi
 │  ├─ api/openapi.yaml  # kontrak API
 │  └─ assets.md         # sumber dan lisensi aset
 └─ .github/workflows/   # lint, test, preview deploy
@@ -412,4 +412,4 @@ postpocket/
 
 1. Bintang membuat repo dan proyek Supabase, menulis migrasi `letters` dan `letter_assets`, serta `openapi.yaml`.
 2. Kall men-scaffold `apps/web`, memasang token dan komponen bersama, lalu mulai halaman Letter dengan data mock.
-3. Keduanya mengisi `docs/reference/` dengan screenshot referensi sebagai acuan layout.
+3. Keduanya mengisi `docs/reference/` dengan ukuran dan catatan referensi sebagai acuan layout; screenshot disimpan di folder bersama di luar repo.

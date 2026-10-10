@@ -1,0 +1,46 @@
+{
+  "filters": [
+    { "id": "normal", "label": "Normal", "css": "none", "effects": [] },
+    {
+      "id": "kodak",
+      "label": "Kodak",
+      "css": "sepia(0.25) contrast(1.1) saturate(1.35) brightness(1.05)",
+      "effects": []
+    },
+    {
+      "id": "noir",
+      "label": "Noir",
+      "css": "grayscale(1) contrast(1.35) brightness(0.95)",
+      "effects": []
+    },
+    {
+      "id": "glitch",
+      "label": "Glitch",
+      "css": "saturate(1.8) hue-rotate(-12deg) contrast(1.2)",
+      "effects": ["rgb-split"]
+    },
+    {
+      "id": "vhs",
+      "label": "VHS",
+      "css": "sepia(0.15) saturate(1.3) contrast(0.9) brightness(1.08) blur(0.4px)",
+      "effects": ["scanlines", "noise"]
+    },
+    {
+      "id": "cyan",
+      "label": "Cyan",
+      "css": "hue-rotate(160deg) saturate(1.2) brightness(1.05)",
+      "effects": []
+    },
+    { "id": "velvia", "label": "Velvia", "css": "saturate(1.7) contrast(1.15)", "effects": [] }
+  ],
+  "clayColors": [
+    { "id": "pink", "label": "Pink", "color": "#e48ba1" },
+    { "id": "coral", "label": "Koral", "color": "#e59a7f" },
+    { "id": "apricot", "label": "Aprikot", "color": "#e9b47c" },
+    { "id": "sage", "label": "Sage", "color": "#9db99b" },
+    { "id": "periwinkle", "label": "Periwinkle", "color": "#8d9fd6" },
+    { "id": "lilac", "label": "Lilac", "color": "#b48ad6" },
+    { "id": "orchid", "label": "Orchid", "color": "#d88ac4" },
+    { "id": "cocoa", "label": "Kakao", "color": "#b98a7d" }
+  ]
+}
