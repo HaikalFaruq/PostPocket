@@ -290,7 +290,7 @@ Frontend memakai Nuxt + TypeScript karena Kall sudah menguasai Vue; backend defa
 | Kilau foil (rilis 1) | CSS 3D transform + gradien yang mengikuti sudut kartu | [pokemon-cards-css](https://github.com/simeydotme/pokemon-cards-css), [hover-tilt](https://hover-tilt.simey.me/) |
 | Kartu 3D WebGL (bila CSS tidak cukup) | TresJS + shader metalik | [TresJS](https://tresjs.org) |
 | Peta foil dari gambar (Detail, Bayangan) | Canvas/WebGL: threshold dan deteksi tepi di browser | — |
-| Editor isi surat | vue-konva (drag, resize, rotate, export gambar) | [vue-konva](https://konvajs.org/docs/vue/index.html) |
+| Editor isi surat | DOM + pointer events, satu renderer dengan kartu dan halaman penerima (drag, resize, rotate). Awalnya vue-konva, diganti karena alasan di [keputusan editor](../spikes/editor-isi-surat.md) | — |
 | Kalender | Reka UI Calendar sebagai dasar logika tanggal | [Reka UI Calendar](https://reka-ui.com/docs/components/calendar) |
 | Rak CD coverflow | Swiper efek coverflow (Swiper Element) | [Swiper API](https://swiperjs.com/swiper-api) |
 | Filter foto | Preset gaya CSSgram; diterapkan ke canvas saat ekspor | [CSSgram](https://una.github.io/CSSgram/) |
@@ -366,7 +366,7 @@ Setiap fase hanya lanjut bila gerbangnya lolos: kartu foil lancar di HP murah, l
 | --- | --- | --- |
 | 0 | Scaffold Nuxt, token, komponen bersama (`StepCard`, `PillChip`, `Swatch`, `StickyCTA`, `BottomSheet`, `Modal`); spike kartu foil CSS vs TresJS; uji `ctx.filter` dan kamera di Safari | Buat repo dan proyek Supabase, CI, migrasi `letters` + `letter_assets`, `openapi.yaml`, keputusan bucket publik atau bertanda tangan |
 | 1 | Halaman Letter langkah 1 sampai 4, kartu 3D bisa diputar dan dibuka, Surprise me, draf otomatis di IndexedDB | `POST /letters`, URL upload bertanda tangan, rate limit anonim, hapus EXIF di sisi server sebagai lapis kedua |
-| 2 | Editor isi surat (vue-konva + 4 template), alur Buat link termasuk render gambar OG, halaman penerima `/l/:slug` (plus placeholder foto kedaluwarsa), tombol Bikin balasan | `publish`, `GET /l/:slug`, `open`, `DELETE`, validasi gambar OG, job pembersihan file, `noindex` |
+| 2 | Editor isi surat (4 template), alur Buat link termasuk render gambar OG, halaman penerima `/l/:slug` (plus placeholder foto kedaluwarsa), tombol Bikin balasan | `publish`, `GET /l/:slug`, `open`, `DELETE`, validasi gambar OG, job pembersihan file, `noindex` |
 | 3 | Halaman TV (clay, filter, coverflow, slideshow), Booth (hitung mundur, strip, unduh), kirim hasil Booth ke Letter | Event analitik (surat dibuat, dibuka, dibalas), monitoring error, review keamanan endpoint |
 | 4 | Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV; uji di 3 HP | Desain skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) dan RLS; siapkan lingkungan beta |
 | Beta | Perbaikan bug dari tester | Perbaikan bug, pantau kuota storage dan error |

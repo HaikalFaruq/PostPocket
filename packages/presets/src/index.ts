@@ -3,6 +3,7 @@ import pocketData from '../pocket.json'
 import tvData from '../tv.json'
 
 export * from './letter-content'
+export * from './letter-template'
 
 export interface Option {
   id: string
@@ -43,8 +44,32 @@ export interface Paper extends Option {
   textColor: string
 }
 
+/**
+ * Satu kotak di tata letak template, dalam pecahan lebar (`x`, `width`) dan tinggi (`y`,
+ * `height`) halaman. `size` teks adalah pecahan sisi pendek halaman. Bentuknya dicek
+ * `normalizeContent()` waktu dipakai.
+ */
+export interface TemplateSlot {
+  kind: string
+  x: number
+  y: number
+  width: number
+  /** Khusus foto. */
+  height?: number
+  /** Khusus teks. */
+  size?: number
+  align?: string
+  rotation?: number
+}
+
 export interface Template extends Option {
   photos: number
+  /** `tall` untuk halaman portrait sampai persegi, `wide` untuk halaman landscape. */
+  layout: { tall: TemplateSlot[]; wide: TemplateSlot[] }
+}
+
+export interface Sticker extends Option {
+  src: string
 }
 
 export interface SurpriseRule {
@@ -59,6 +84,7 @@ export interface LetterPresets {
   foilColors: FoilColor[]
   papers: Paper[]
   templates: Template[]
+  stickers: Sticker[]
   surpriseRules: SurpriseRule[]
 }
 

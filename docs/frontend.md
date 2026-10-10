@@ -37,7 +37,7 @@ Pertama kali menjalankan E2E di mesin baru: `pnpm --filter @postpocket/web exec 
 apps/web/
   app/assets/css/main.css   design token (@theme Tailwind) dan gaya dasar
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
-  app/components/letter/    komponen khusus Letter: FoilCard, FoilSwatchIcon
+  app/components/letter/    komponen khusus Letter: FoilCard, LetterPage, LetterEditor, FrontPicker, dll.
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/stores/               useLetterDraft: draf surat di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, color, foil, icons) dan
@@ -59,6 +59,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 - **`mask` dijalankan setelah `filter`.** Kalau elemen ber-mask butuh bayangan, taruh `drop-shadow` di pembungkusnya.
 - **Foto user selalu lewat `preparePhoto()`**: diputar sesuai EXIF, diperkecil ke 2048 px, lalu disimpan ulang sebagai JPEG supaya metadata lokasi hilang (PRD bagian Privasi).
 - **Draf di IndexedDB menyimpan foto sebagai byte (`ArrayBuffer`), bukan `Blob`**: Safari Private Browsing menolak Blob di IndexedDB. Foto disimpan di key terpisah supaya mengetik isi surat tidak menulis ulang foto.
+- **Isi surat hanya dirender `LetterElementView`**, di editor, kartu, maupun halaman penerima. Jangan bikin renderer kedua, supaya yang dilihat penerima sama dengan yang disusun pengirim ([keputusan](spikes/editor-isi-surat.md)).
 - **Ekspor foto berfilter lewat `drawFiltered()`**, jangan `ctx.filter` langsung: Safari tidak mendukung `ctx.filter` dan filternya hilang diam-diam ([hasil spike](spikes/safari.md)).
 
 ## Komponen bersama
@@ -155,7 +156,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 2 (minggu 4–5)**
 
-- [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker
+- [x] Editor isi surat dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker. Editornya DOM, bukan vue-konva ([keputusan](spikes/editor-isi-surat.md))
 - [ ] Alur "Buat link": kompres tiap foto sampai di bawah 500 KB (JPEG atau WebP), hapus EXIF lokasi, upload ke URL bertanda tangan, lalu publish (kontrak dari `docs/api/openapi.yaml`)
 - [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: JPEG 1200×630 maksimal 300.000 byte, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
 - [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
