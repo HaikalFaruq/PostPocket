@@ -129,5 +129,7 @@ export default defineNuxtConfig({
   routeRules: {
     // Halaman lab hanya alat uji: tidak perlu SSR dan tidak boleh diindeks.
     '/lab/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    // Editor surat bekerja dengan draf di IndexedDB, jadi cukup dirender di browser.
+    '/letter/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
   },
 })
