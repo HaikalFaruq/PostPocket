@@ -11,3 +11,10 @@ test('Beranda menampilkan tiga pintu masuk dan contoh surat yang bisa dibuka', a
   await card.press('Enter')
   await expect(card).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('pintu Letter membuka editor surat', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('link', { name: /Letter/ }).click()
+  await expect(page).toHaveURL(/\/letter\/new$/)
+  await expect(page.getByRole('heading', { name: 'Surat foil' })).toBeVisible()
+})
