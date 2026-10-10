@@ -121,7 +121,7 @@ Bahan kontrak `docs/api/openapi.yaml`: apa yang dikirim frontend saat "Buat link
 | --- | --- | --- |
 | Cover | Kalau `design.illustration` bernilai `upload` | JPEG atau WebP, maksimal 500.000 byte, sisi panjang maksimal 2048 px |
 | `photos` | Satu per kunci `photo` di `content`, maksimal 4 | Sama dengan cover |
-| Gambar OG | Selalu | PNG 1200×630, di bawah sekitar 300 KB |
+| Gambar OG | Selalu | JPEG 1200×630, maksimal 300.000 byte. PNG dari foto bisa lebih dari 750 KB |
 
 Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `height`, dan `size`. Server mengembalikan URL upload bertanda tangan untuk tiap foto, cover, dan gambar OG. `replyTo` berisi slug surat yang dibalas lewat "Bikin balasan".
 
@@ -157,9 +157,9 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker
 - [ ] Alur "Buat link": kompres tiap foto sampai di bawah 500 KB (JPEG atau WebP), hapus EXIF lokasi, upload ke URL bertanda tangan, lalu publish (kontrak dari `docs/api/openapi.yaml`)
-- [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: PNG 1200×630 di bawah sekitar 300 KB, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
-- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka)
-- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`
+- [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: JPEG 1200×630 maksimal 300.000 byte, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
+- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
+- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`, atau gambar OG bawaan kalau sudah dihapus
 - [x] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore ([Deploy](#deploy))
 - [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
 
