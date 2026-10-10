@@ -3,11 +3,19 @@ import { byId, letter } from '@postpocket/presets'
 import { NuxtLink } from '#components'
 import type { IconName } from '~/utils/icons'
 
+// Crawler WhatsApp hanya membaca URL gambar OG yang absolut.
+const site = useRequestURL().origin
 useSeoMeta({
   title: 'PostPocket',
   description: 'Tangkap momen, simpan per hari, kirim sebagai surat foil 3D.',
   ogTitle: 'PostPocket',
   ogDescription: 'Tangkap momen, simpan per hari, kirim sebagai surat foil 3D.',
+  ogImage: `${site}/og-beranda.jpg`,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageType: 'image/jpeg',
+  ogImageAlt: 'PostPocket: kirim surat foil lewat satu link',
+  twitterCard: 'summary_large_image',
 })
 
 const doors: { title: string; text: string; icon: IconName; to?: string }[] = [
