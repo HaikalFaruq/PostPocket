@@ -47,7 +47,8 @@ export interface AlbumView {
   emoji: string
   color: string
   moments: string[]
-  kind: 'month' | 'custom'
+  /** `day` adalah isi satu kantong Pocket yang sedang diputar (`/tv?hari=`), tidak disimpan. */
+  kind: 'month' | 'custom' | 'day'
 }
 
 export interface MemoryData {
@@ -194,6 +195,22 @@ export function normalizeMemories(raw: unknown): MemoryData {
     }
   }
   return data
+}
+
+/** CD sementara berisi satu kantong Pocket, untuk tombol "Putar di TV". */
+export function dayAlbum(day: PocketDay): AlbumView {
+  return {
+    id: `hari-${day.day}`,
+    title: parseDay(day.day).toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }),
+    emoji: '👝',
+    color: byId(pocket.packetColors, day.packet)?.color ?? SPINE_COLORS[0]!,
+    moments: day.moments,
+    kind: 'day',
+  }
 }
 
 /** Semua album untuk rak CD: album bulanan otomatis dulu, lalu album buatan user. */

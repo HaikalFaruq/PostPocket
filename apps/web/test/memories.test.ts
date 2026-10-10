@@ -2,6 +2,7 @@ import { letter, pocket } from '@postpocket/presets'
 import { describe, expect, it } from 'vitest'
 import {
   albumShelf,
+  dayAlbum,
   dayKey,
   monthAlbums,
   monthTitle,
@@ -106,5 +107,27 @@ describe('albumShelf', () => {
       ['bulan-2026-10', 'month'],
       ['liburan', 'custom'],
     ])
+  })
+})
+
+describe('dayAlbum', () => {
+  it('isi satu kantong jadi CD sementara berwarna kantongnya', () => {
+    const packet = pocket.packetColors[1]!
+    const album = dayAlbum({
+      day: '2026-10-05',
+      packet: packet.id,
+      sticker: letter.stickers[0]!.id,
+      frame: pocket.frames[0]!.id,
+      frameColor: pocket.frameColors[0]!.id,
+      moments: ['b', 'a'],
+      savedAt: '2026-10-05T10:00:00.000Z',
+    })
+    expect(album).toMatchObject({
+      id: 'hari-2026-10-05',
+      title: '5 Oktober 2026',
+      color: packet.color,
+      moments: ['b', 'a'],
+      kind: 'day',
+    })
   })
 })
