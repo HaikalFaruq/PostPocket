@@ -1,0 +1,6 @@
+.nuxt
+.output
+public/illustrations
+public/samples
+playwright-report
+test-results
