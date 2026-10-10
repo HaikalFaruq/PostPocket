@@ -112,6 +112,8 @@ Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
 | `pnpm check` | `lint`, `typecheck`, dan `test` sekaligus |
 | `scripts/check-no-ai.sh --revs origin/main..HEAD` | Cek atribusi AI di commit yang belum masuk `main` |
 | `scripts/test-check-no-ai.sh` | Uji pola cek atribusi AI, wajib lolos setelah polanya diubah |
+| `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`) |
+| `scripts/test-check-secrets.sh` | Uji pola cek rahasia, wajib lolos setelah polanya diubah |
 
 Sebelum push, pastikan `pnpm check` dan `pnpm test:e2e` lolos. Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. CI menjalankan semuanya di setiap PR (workflow `Web` dan `No AI attribution`).
 
@@ -144,3 +146,15 @@ scripts/                cek atribusi AI (dipakai hook dan CI) beserta ujinya
 - Aset visual dari web referensi (kantong, stiker, ilustrasi, desain TV) tidak boleh disalin ke repo. Catat sumber dan lisensi setiap aset di `docs/assets.md`.
 - Warna, radius, font, dan bayangan adalah design token. Pilihan desain (kertas, foil, kantong, stiker, bingkai, filter) adalah preset JSON di `packages/presets/`, bukan hardcode di komponen.
 - Bukan target rilis 1: aplikasi native, editor ilustrasi sendiri, pembayaran, fitur sosial, kolaborasi real-time.
+
+## 9. Rahasia dan data pribadi
+
+Repo ini public: commit, PR, issue, dan komentar bisa dibaca siapa saja.
+
+- Secret key, token, password, dan isi `.env` tidak pernah masuk commit, PR, issue, maupun komentar. Kirim lewat jalur privat.
+- Frontend hanya memakai URL Supabase dan publishable key (aman di browser) lewat `apps/web/.env`, dengan contoh di `apps/web/.env.example`. Secret key Supabase hanya ada di dashboard dan secrets Edge Function.
+- Key yang sempat terkirim lewat chat atau tertempel di tempat publik dianggap bocor: rotate di dashboard, tidak cukup dihapus dari commit.
+- Commit memakai email noreply GitHub supaya email pribadi tidak tampil. Alamatnya sama dengan tabel co-author di bagian 2: `git config user.email <id>+<username>@users.noreply.github.com`.
+- Screenshot web referensi tidak disimpan di repo; `docs/reference/` hanya berisi ukuran dan catatan.
+
+Penjaganya berlapis. Hook `.githooks/pre-commit` (`scripts/check-secrets.sh`) menolak file `.env` dan pola secret sebelum commit. Setelah itu, secret scanning dan push protection GitHub menolak push yang memuat secret yang dikenali.

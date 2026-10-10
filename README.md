@@ -64,6 +64,8 @@ Rilis 1 hanya butuh server untuk surat yang dikirim. Pocket, TV, dan Booth berja
 
 Commit dan PR tercatat atas nama orang yang menjalankannya, tanpa atribusi AI. Aturan ini dicek oleh git hook, CI, dan branch protection di `main`. Detail dan cara memperbaiki commit yang ditolak ada di [AGENTS.md](AGENTS.md#1-tanpa-atribusi-ai).
 
+Repo ini public, jadi secret key dan file `.env` juga tidak boleh masuk repo. Hook `pre-commit` menolaknya sebelum commit, dan GitHub menolaknya saat push ([AGENTS.md bagian 9](AGENTS.md#9-rahasia-dan-data-pribadi)).
+
 ## Tim
 
 <table>

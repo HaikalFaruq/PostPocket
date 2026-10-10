@@ -28,6 +28,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Uji cek rahasia
+        run: scripts/test-check-secrets.sh
+
       - name: Lint
         run: pnpm lint
 
