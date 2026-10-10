@@ -16,6 +16,7 @@ import { defineStore } from 'pinia'
 import { uniqueId } from '~/utils/letter-gesture'
 import {
   PHOTO_FRONT,
+  SLUG_PATTERN,
   cardRatio,
   emptyDraft,
   normalizeDraft,
@@ -42,6 +43,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   const content = ref<LetterContent>(initial.content)
   /** Foto isi surat per kunci. */
   const photos = shallowRef<Record<string, DraftPhoto>>({})
+  /** Slug surat yang sedang dibalas. */
+  const replyTo = ref<string | null>(null)
   const ready = ref(false)
   const saveFailed = ref(false)
   let photoDirty = false
@@ -91,6 +94,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       photo.value = draft.photo
       content.value = draft.content
       photos.value = draft.photos
+      replyTo.value = draft.replyTo
       savedPhotoKeys = new Set(Object.keys(draft.photos))
       await nextTick()
       photoDirty = false
@@ -115,6 +119,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       design: { ...design.value },
       // Salinan biasa: proxy Vue tidak bisa disimpan di IndexedDB.
       content: JSON.parse(JSON.stringify(content.value)) as LetterContent,
+      replyTo: replyTo.value,
       updatedAt: Date.now(),
     }
     try {
@@ -146,7 +151,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
 
   let timer: ReturnType<typeof setTimeout> | undefined
   watch(
-    [design, photo, content, photos],
+    [design, photo, content, photos, replyTo],
     () => {
       if (!ready.value) return
       clearTimeout(timer)
@@ -305,6 +310,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     if (template) setContent(applyTemplate(content.value, template, ratio.value))
   }
 
+  /** Tandai draf ini sebagai balasan untuk surat `slug`, atau `null` untuk batal membalas. */
+  function setReplyTo(slug: string | null) {
+    replyTo.value = slug && SLUG_PATTERN.test(slug) ? slug : null
+  }
+
   async function reset() {
     clearTimeout(timer)
     const fresh = emptyDraft()
@@ -313,6 +323,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     photo.value = null
     content.value = fresh.content
     photos.value = {}
+    replyTo.value = null
     savedPhotoKeys = new Set()
     dirtyPhotos.clear()
     try {
@@ -335,6 +346,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     content,
     photos,
     photoUrls,
+    replyTo,
     message,
     ready,
     saveFailed,
@@ -350,6 +362,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     addSticker,
     addPhoto,
     setTemplate,
+    setReplyTo,
     surpriseMe,
     reset,
   }

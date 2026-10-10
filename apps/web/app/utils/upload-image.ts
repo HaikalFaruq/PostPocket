@@ -85,6 +85,9 @@ export async function compressPhoto(
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
   const image = new Image()
+  // Foto surat yang diterima datang dari Storage (domain lain). Tanpa ini kanvas jadi
+  // "tercemar" dan peta foil maupun gambar OG gagal dibuat.
+  image.crossOrigin = 'anonymous'
   image.decoding = 'async'
   image.src = url
   await image.decode()

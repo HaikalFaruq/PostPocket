@@ -7,7 +7,17 @@ import { MESSAGE_LIMIT } from '~/utils/letter-draft'
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
 
 const draft = useLetterDraft()
-onMounted(() => draft.load())
+// Dibuka dari tombol "Bikin balasan" di halaman penerima: /letter/new?balas=<slug>.
+const route = useRoute()
+const router = useRouter()
+onMounted(async () => {
+  await draft.load()
+  const reply = route.query.balas
+  if (typeof reply === 'string') {
+    draft.setReplyTo(reply)
+    router.replace({ query: {} })
+  }
+})
 
 const isDesktop = useMediaQuery('(min-width: 1024px)')
 const open = ref(false)
@@ -16,26 +26,11 @@ const card = ref<{ turnBy: (degrees: number) => void } | null>(null)
 const busy = ref(false)
 const error = ref('')
 
-const illustration = computed(
-  () => byId(letter.illustrations, draft.design.illustration) ?? letter.illustrations[0]!,
+const { foil, paper, art, mask, maskBusy } = useCardFront(
+  computed(() => draft.design),
+  computed(() => (draft.isPhotoFront ? draft.photoUrl : null)),
 )
-const foil = computed(
-  () => byId(letter.foilColors, draft.design.foilColor) ?? letter.foilColors[0]!,
-)
-const paper = computed(() => byId(letter.papers, draft.design.paper) ?? letter.papers[0]!)
 const mode = computed(() => byId(letter.foilModes, draft.design.foilMode) ?? letter.foilModes[0]!)
-const frontSource = computed(() =>
-  draft.isPhotoFront
-    ? draft.photoUrl
-      ? { art: draft.photoUrl }
-      : undefined
-    : { art: illustration.value.art, foil: illustration.value.foil },
-)
-const designMask = computed(() => (draft.isPhotoFront ? undefined : illustration.value.foil))
-const foilMode = computed(() => draft.design.foilMode)
-const ink = computed(() => paper.value.textColor)
-const art = usePrintArt(frontSource, ink, foilMode)
-const { mask, busy: maskBusy } = useFoilMask(art, designMask, foilMode)
 
 const ratio = computed(() => draft.ratio)
 
@@ -126,6 +121,17 @@ const contentSummary = computed(() => {
   return parts.length ? parts.join(' · ') : 'Belum ada foto atau stiker.'
 })
 
+// "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG.
+const sending = ref(false)
+const ogCard = computed(() => ({
+  art: art.value,
+  foilMask: mask.value,
+  foil: foil.value,
+  paper: paper.value,
+  ratio: ratio.value,
+  foilBorder: draft.design.foilBorder,
+}))
+
 // Editor isi surat layar penuh. Setelah ditutup, kartu dibuka supaya hasilnya langsung terlihat.
 const editing = ref(false)
 const editorButton = ref<HTMLButtonElement | null>(null)
@@ -209,6 +215,20 @@ async function startOver() {
         <p class="mt-1 text-ink-muted">
           Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu kirim lewat link.
         </p>
+        <div
+          v-if="draft.replyTo"
+          class="mt-3 flex items-center justify-between gap-3 rounded-control bg-fill px-3 py-2 text-caption"
+          data-testid="reply-banner"
+        >
+          <span>Membalas surat yang kamu terima.</span>
+          <button
+            type="button"
+            class="font-medium underline underline-offset-2"
+            @click="draft.setReplyTo(null)"
+          >
+            Batal membalas
+          </button>
+        </div>
         <p
           v-if="draft.saveFailed"
           role="alert"
@@ -319,7 +339,7 @@ async function startOver() {
       </div>
 
       <template #footer>
-        <StickyCTA disabled note="Kirim lewat link segera hadir."
+        <StickyCTA :disabled="!draft.ready || maskBusy" @click="sending = true"
           >Buat link untuk dikirim</StickyCTA
         >
       </template>
@@ -327,6 +347,7 @@ async function startOver() {
 
     <Teleport to="body">
       <LetterEditor v-if="editing" @close="closeEditor" />
+      <SendLetter v-if="sending" :card="ogCard" @close="sending = false" />
     </Teleport>
   </div>
 </template>
