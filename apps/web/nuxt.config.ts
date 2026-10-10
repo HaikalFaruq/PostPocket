@@ -40,10 +40,14 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Mock API surat di /mock-api untuk development dan E2E (NUXT_MOCK_API=1). Mati di produksi.
+    mockApi: false,
     public: {
       // Diisi dari .env (lihat .env.example). Secret key Supabase tidak pernah dipakai di sini.
       supabaseUrl: '',
       supabasePublishableKey: '',
+      // Kosong berarti fungsi Supabase (<supabaseUrl>/functions/v1); `/mock-api` untuk mock.
+      apiBase: '',
     },
   },
 

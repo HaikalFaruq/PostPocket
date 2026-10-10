@@ -56,6 +56,11 @@ const frameVariant = computed(() => frame.value as 'polaroid' | 'stamp' | 'ticke
           class="inline-flex h-9 items-center rounded-full bg-surface px-4 text-body font-medium inset-ring inset-ring-line"
           >Cek Safari</NuxtLink
         >
+        <NuxtLink
+          to="/lab/kirim"
+          class="inline-flex h-9 items-center rounded-full bg-surface px-4 text-body font-medium inset-ring inset-ring-line"
+          >Uji kirim</NuxtLink
+        >
       </nav>
     </header>
 
