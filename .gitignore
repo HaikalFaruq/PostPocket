@@ -1,0 +1,28 @@
+# OS dan editor
+.DS_Store
+Thumbs.db
+.idea/
+
+# Node dan Nuxt
+node_modules/
+.nuxt/
+.output/
+.data/
+dist/
+*.log
+
+# Env dan secret
+.env
+.env.*
+!.env.example
+
+# Supabase lokal
+supabase/.branches/
+supabase/.temp/
+
+# Deploy
+.vercel/
+.wrangler/
+
+# Setting pribadi agent
+.claude/settings.local.json
