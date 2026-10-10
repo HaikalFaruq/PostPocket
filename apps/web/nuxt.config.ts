@@ -39,6 +39,14 @@ export default defineNuxtConfig({
     ],
   },
 
+  runtimeConfig: {
+    public: {
+      // Diisi dari .env (lihat .env.example). Secret key Supabase tidak pernah dipakai di sini.
+      supabaseUrl: '',
+      supabasePublishableKey: '',
+    },
+  },
+
   routeRules: {
     // Halaman lab hanya alat uji: tidak perlu SSR dan tidak boleh diindeks.
     '/lab/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },

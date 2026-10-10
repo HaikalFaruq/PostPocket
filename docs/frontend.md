@@ -8,8 +8,11 @@ Butuh Node 24 (lihat `.nvmrc`) dan pnpm 9.
 
 ```sh
 pnpm install   # sekali per clone, sekalian mengaktifkan hook git
+cp apps/web/.env.example apps/web/.env   # isi URL dan publishable key Supabase dari Bintang
 pnpm dev       # http://localhost:3000
 ```
+
+Frontend hanya memakai URL proyek dan **publishable key** Supabase (aman dipakai di browser). Secret key tidak pernah masuk frontend, `.env`, atau commit.
 
 | Perintah | Fungsi |
 | --- | --- |
@@ -96,7 +99,10 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto, dan stiker
 - [ ] Alur "Buat link": kompres foto, hapus EXIF lokasi, upload ke URL bertanda tangan, publish (kontrak dari `docs/api/openapi.yaml`)
-- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms, `noindex`, dan tombol Bikin balasan
+- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan
+- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, karena crawler WhatsApp tidak menjalankan JavaScript
+- [ ] Meta tag OG memakai URL gambar OG dari `GET /l/:slug` (dirender backend saat publish, di bawah sekitar 300 KB); jangan pasang Nuxt OG Image
+- [ ] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore
 - [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
 
 **Sprint 3 (minggu 6–7)**
