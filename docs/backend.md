@@ -9,7 +9,7 @@ Untuk Bintang dan agent-nya. Baca [AGENTS.md](../AGENTS.md) dulu; detail produk 
 
 Bintang memegang auth, database, storage foto, API surat dan share link, gambar OG untuk preview link, kompresi dan pembersihan file, rate limit, dan deploy backend.
 
-Default-nya Supabase (Postgres, Auth, Storage, Edge Functions) supaya MVP cepat. Keputusan tetap Supabase atau stack sendiri ada di tangan Bintang, paling lambat sebelum Sprint 1.
+Backend memakai Supabase (Postgres, Auth, Storage, Edge Functions); keputusan ini sudah final dan proyeknya sudah dibuat. Frontend di-deploy ke Vercel Hobby.
 
 Area kode: `supabase/migrations/`, `supabase/functions/`, dan `docs/api/openapi.yaml`.
 
@@ -42,10 +42,27 @@ Catat jawabannya di PRD bagian Pertanyaan terbuka (centang dan tulis keputusanny
 
 | Keputusan | Batas | Catatan |
 | --- | --- | --- |
-| Tetap Supabase atau stack sendiri | Sebelum Sprint 1 | Kalau ganti, perbarui PRD bagian Tech stack dan tabel area kode di AGENTS.md |
 | Bucket `letter-assets` publik atau URL bertanda tangan | Sprint 0 | Path acak tak tertebak per surat tetap wajib |
-| Batas ukuran per file dan jumlah foto per surat | Sebelum Sprint 2 | Frontend sudah mengompres foto ke sisi panjang maksimal 2048 px |
-| Surat berlaku selamanya atau kedaluwarsa | Bareng Kall | Menentukan perlu tidaknya job pembersihan file |
+| Batas ukuran per file dan jumlah foto per surat | Sprint 0 | Frontend sudah mengompres foto ke sisi panjang maksimal 2048 px. Storage gratis Supabase cuma 1 GB, jadi batas ini menentukan berapa surat yang muat |
+| Surat berlaku selamanya atau kedaluwarsa | Bareng Kall, Sprint 0 | Menentukan perlu tidaknya job pembersihan file; alasan kuotanya sama seperti baris di atas |
+
+Sudah diputuskan:
+
+- **Supabase**, bukan stack sendiri. Kalau storage 1 GB tidak cukup, foto dipindah ke Cloudflare R2 dan database tetap di Supabase.
+- **Gambar OG** dirender sekali di `POST /letters/:id/publish`, disimpan sebagai PNG kecil (di bawah sekitar 300 KB) di storage dan dicatat di `og_path`. Halaman `/l/:slug` di-SSR oleh frontend dan hanya memasang URL-nya.
+- **Repo public**, supaya Vercel Hobby mau men-deploy commit dari kita berdua.
+
+## Batasan free tier
+
+| Layanan | Batas yang berpengaruh | Akibatnya |
+| --- | --- | --- |
+| Supabase Free | Storage 1 GB, 2 proyek aktif | Batas foto dan kedaluwarsa surat diputuskan di Sprint 0. Satu proyek untuk produksi, satu untuk staging |
+| Supabase Free | Proyek di-pause setelah 7 hari tanpa request | Selama beta yang sepi, link surat bisa mati; pasang ping terjadwal |
+| Vercel Hobby | Body fungsi sekitar 4,5 MB, durasi pendek | Foto selalu diunggah langsung ke storage lewat URL bertanda tangan, tidak lewat fungsi Vercel |
+| Vercel Hobby | Hanya untuk non-komersial | Kalau nanti ada monetisasi, pindah ke Pro atau host lain |
+| Vercel Hobby | Custom event analitik dan cron terbatas | Event analitik disimpan di tabel Postgres; job pembersihan memakai `pg_cron` |
+
+Draf yang tidak pernah di-publish ikut menghabiskan storage, jadi perlu job `pg_cron` yang menghapus draf beserta fotonya setelah 24 jam.
 | Login masuk rilis 1 atau fase 2 | Bareng Kall | PRD menaruh login di fase 2 |
 
 ## Checklist per sprint
@@ -132,8 +149,9 @@ Tabel fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) ada d
 
 - `docs/api/openapi.yaml` lebih dulu, supaya Kall bisa membangun UI dengan mock.
 - URL proyek dan anon key untuk `.env` (lewat jalur privat).
-- CORS untuk domain frontend, termasuk URL preview deploy.
-- Gambar OG yang bisa diambil crawler WhatsApp tanpa login.
+- CORS untuk domain frontend, termasuk URL preview deploy Vercel yang berubah-ubah (`*.vercel.app` milik proyek kita).
+- Gambar OG yang bisa diambil crawler WhatsApp tanpa login, lewat URL yang dikembalikan `GET /l/:slug`.
+- Region Supabase di Singapore; fungsi Vercel diset ke `sin1` supaya SSR `/l/:slug` tidak bolak-balik ke US.
 
 ## Di luar cakupan rilis 1
 

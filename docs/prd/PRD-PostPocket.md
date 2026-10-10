@@ -117,7 +117,7 @@ Letter mengubah gambar jadi kartu lipat bercetak foil 3D yang bisa diputar, dibu
 **Kirim dan buka**
 
 1. Tap "Buat link" → gambar dikompres di browser → diunggah → server mengembalikan link pendek (contoh `postpocket.app/l/x7Kp2q`).
-2. Link punya gambar preview (OG image) berisi sampul kartu, supaya terlihat menarik saat dibagikan di WhatsApp.
+2. Link punya gambar preview (OG image) berisi sampul kartu, supaya terlihat menarik saat dibagikan di WhatsApp. Gambar dirender sekali saat publish (PNG kecil, di bawah sekitar 300 KB), dan halaman `/l/:slug` di-SSR karena crawler WhatsApp tidak menjalankan JavaScript.
 3. Halaman penerima menampilkan kartu tertutup. Tap untuk membuka; isi surat muncul dengan animasi.
 4. Di bawah kartu ada tombol "Bikin balasan" yang membawa penerima ke editor Letter.
 
@@ -296,9 +296,9 @@ Frontend memakai Nuxt + TypeScript karena Kall sudah menguasai Vue; backend defa
 | Kamera Booth | `getUserMedia` lewat VueUse | [useUserMedia](https://vueuse.org/core/useUserMedia/) |
 | Foto di browser | exifr (tanggal), heic2any (HEIC), browser-image-compression | [exifr](https://github.com/MikeKovarik/exifr), [heic2any](https://github.com/alexcorvi/heic2any), [browser-image-compression](https://github.com/Donaldcwl/browser-image-compression) |
 | Simpan lokal | IndexedDB lewat idb-keyval | [idb-keyval](https://github.com/jakearchibald/idb-keyval) |
-| Preview link | Gambar OG dinamis per surat | [Nuxt OG Image](https://nuxtseo.com/docs/og-image) |
+| Preview link | Gambar OG dirender sekali oleh backend saat publish, disimpan sebagai PNG di storage; halaman `/l/:slug` di-SSR dan memasang URL-nya di meta tag | [Supabase OG image](https://supabase.com/docs/guides/functions/examples/og-image) |
 | Backend | Supabase: Postgres, Auth, Storage, Edge Functions | [Supabase](https://supabase.com/docs) |
-| Hosting | Vercel atau Cloudflare Pages (FE), Supabase Cloud (BE) | — |
+| Hosting | Vercel Hobby (FE, repo public supaya commit dari kita berdua bisa ter-deploy), Supabase Cloud (BE) | — |
 | Kualitas | ESLint, Prettier, Vitest, Playwright untuk alur utama | — |
 
 Satu jebakan yang perlu diuji awal: filter CSS hanya mengubah tampilan di layar. Saat menyimpan strip Booth atau ekspor surat, filter harus diterapkan ulang ke kanvas (`ctx.filter` atau shader WebGL), dan dukungan `ctx.filter` di Safari perlu dicek di minggu pertama.
@@ -385,7 +385,9 @@ Risiko terbesar ada di performa kartu 3D di HP murah dan di Safari iOS yang bisa
 **Pertanyaan terbuka**
 
 - [ ] Domain dan handle sosial untuk PostPocket (nama sudah final); cek ketersediaan.
-- [ ] Backend tetap Supabase atau stack sendiri? Bintang yang memutuskan sebelum sprint 1.
+- [x] Backend tetap Supabase atau stack sendiri? **Diputuskan: tetap Supabase**, proyeknya sudah dibuat. Kalau storage gratis 1 GB tidak cukup, foto dipindah ke Cloudflare R2 tanpa mengganti database.
+- [x] Gambar OG dirender di mana? **Diputuskan: backend saat publish**, disimpan di storage (`og_path`). Frontend tidak memakai Nuxt OG Image; `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`.
+- [x] Repo public atau private? **Diputuskan: public**, karena Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private.
 - [ ] Surat yang dikirim berlaku selamanya atau kedaluwarsa (misalnya 1 tahun)?
 - [ ] Maksimal foto per surat dan ukuran file.
 - [ ] Bahasa UI: Indonesia, Inggris, atau keduanya.
