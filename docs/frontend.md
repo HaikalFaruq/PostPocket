@@ -35,9 +35,11 @@ apps/web/
   app/assets/css/main.css   design token (@theme Tailwind) dan gaya dasar
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
   app/components/letter/    komponen khusus Letter: FoilCard, FoilSwatchIcon
-  app/composables/          useCardMotion: drag, pegas, kilau, benchmark kartu
-  app/utils/                logika murni (card-motion, color, foil, icons), diuji di test/
-  app/pages/                / (Beranda), /lab, /lab/foil, /lab/safari
+  app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
+  app/stores/               useLetterDraft: draf surat di IndexedDB
+  app/utils/                logika murni (card-motion, foil-map, letter-draft, color, foil, icons) dan
+                            util browser (front-image, photo-filter), diuji di test/
+  app/pages/                / (Beranda), /letter/new (editor surat), /lab, /lab/foil, /lab/safari
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
   test/                     unit test Vitest
@@ -52,6 +54,8 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 - **Ilustrasi milik sendiri.** Ubah `scripts/illustrations.mjs`, lalu jalankan `node scripts/illustrations.mjs`. Aset dari web referensi tidak boleh masuk repo.
 - **Cek efek 3D di Safari sungguhan.** Screenshot Playwright WebKit tidak memakai compositing 3D, jadi `backface-visibility` terlihat rusak padahal di Safari benar. E2E kartu memeriksa state DOM; tampilannya dicek di simulator iOS atau iPhone.
 - **`mask` dijalankan setelah `filter`.** Kalau elemen ber-mask butuh bayangan, taruh `drop-shadow` di pembungkusnya.
+- **Foto user selalu lewat `preparePhoto()`**: diputar sesuai EXIF, diperkecil ke 2048 px, lalu disimpan ulang sebagai JPEG supaya metadata lokasi hilang (PRD bagian Privasi).
+- **Draf di IndexedDB menyimpan foto sebagai byte (`ArrayBuffer`), bukan `Blob`**: Safari Private Browsing menolak Blob di IndexedDB. Foto disimpan di key terpisah supaya mengetik isi surat tidak menulis ulang foto.
 - **Ekspor foto berfilter lewat `drawFiltered()`**, jangan `ctx.filter` langsung: Safari tidak mendukung `ctx.filter` dan filternya hilang diam-diam ([hasil spike](spikes/safari.md)).
 
 ## Komponen bersama
@@ -88,11 +92,11 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 1 (minggu 2–3)**
 
-- [ ] Halaman `/letter/new` dengan langkah 1 sampai 4 (gambar depan, bagian foil, warna foil, kertas), kartu berubah langsung tanpa reload
-- [ ] Upload, drop, dan paste foto sendiri untuk gambar depan; bentuk Asli, Portrait, Square, Landscape
-- [ ] Peta foil dari gambar di browser: Detail (deteksi tepi), Bayangan (threshold), Satu warna
-- [ ] Surprise me memakai `surprise()` dari preset, dengan animasi kartu berputar sekali
-- [ ] Draf otomatis di IndexedDB; refresh tidak menghilangkan isi
+- [x] Halaman `/letter/new` dengan langkah 1 sampai 4 (gambar depan, bagian foil, warna foil, kertas), kartu berubah langsung tanpa reload. Langkah 5 sementara berupa kolom teks sampai editor Sprint 2 siap
+- [x] Upload, drop, dan paste foto sendiri untuk gambar depan; bentuk Asli, Portrait, Square, Landscape
+- [x] Peta foil dari gambar di browser: Detail (deteksi tepi), Bayangan (threshold), Satu warna
+- [x] Surprise me memakai `surprise()` dari preset, dengan animasi kartu berputar sekali
+- [x] Draf otomatis di IndexedDB; refresh tidak menghilangkan isi
 - [ ] Gerbang: kartu foil di atas 50 fps di HP Android kelas menengah
 
 **Sprint 2 (minggu 4–5)**
