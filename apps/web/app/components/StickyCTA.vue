@@ -1,12 +1,13 @@
 <script setup lang="ts">
-/** Tombol utama hitam selebar panel yang menempel di bawah. */
-defineProps<{ disabled?: boolean; loading?: boolean }>()
+/** Tombol utama hitam selebar panel yang menempel di bawah. `note` tampil kecil di atasnya. */
+defineProps<{ disabled?: boolean; loading?: boolean; note?: string }>()
 </script>
 
 <template>
   <div
     class="sticky bottom-0 z-10 border-t border-line-soft bg-panel/95 px-6 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] backdrop-blur-sm"
   >
+    <p v-if="note" class="mb-2 text-center text-caption text-ink-muted">{{ note }}</p>
     <button
       type="button"
       :disabled="disabled || loading"
