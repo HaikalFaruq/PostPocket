@@ -38,11 +38,12 @@ apps/web/
   app/assets/css/main.css   design token (@theme Tailwind) dan gaya dasar
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
   app/components/letter/    komponen khusus Letter: FoilCard, LetterPage, LetterEditor, FrontPicker, dll.
+  app/components/tv/        TvSet, CdShelf, TvSlideshow, BoothCamera, BoothResult
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
-  app/stores/               useLetterDraft: draf surat di IndexedDB
+  app/stores/               useLetterDraft (draf surat) dan useMemories (momen, hari Pocket, album CD) di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, color, foil, icons) dan
                             util browser (front-image, photo-filter), diuji di test/
-  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /lab, /lab/foil, /lab/safari, /lab/kirim
+  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /lab, /lab/foil, /lab/safari, /lab/kirim
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
   server/routes/mock-api/   mock API surat untuk development dan E2E (NUXT_MOCK_API=1)
@@ -169,9 +170,9 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 3 (minggu 6–7)**
 
-- [ ] Halaman TV: badan clay dengan 8 warna, panel filter, arsip CD coverflow, slideshow
-- [ ] Booth: hitung mundur, strip 1×4 / 2×2 / satu foto, unduh PNG dengan filter yang sama dengan layar
-- [ ] Kirim hasil Booth ke Letter
+- [x] Halaman TV: badan clay dengan 8 warna, panel filter, arsip CD coverflow, slideshow
+- [x] Booth: hitung mundur, strip 1×4 / 2×2 / satu foto, unduh PNG dengan filter yang sama dengan layar
+- [x] Kirim hasil Booth ke Letter
 
 **Sprint 4 dan beta (minggu 8–10)**
 
