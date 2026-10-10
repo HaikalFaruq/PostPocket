@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { byId, tv } from '@postpocket/presets'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
+import { BOOTH_LAYOUTS, beep, captureShot, type BoothLayout } from '~/utils/booth'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { dayKey, type AlbumView } from '~/utils/memories'
 
@@ -127,10 +128,95 @@ async function removeAlbum() {
   editing.value = false
 }
 
+// Booth (PRD): layar TV jadi kamera dengan filter aktif. /tv?booth=1 langsung membukanya.
+const route = useRoute()
+const booth = ref(false)
+const facing = ref<'user' | 'environment'>('user')
+const cameraReady = ref(false)
+const cameraError = ref('')
+const layout = ref<BoothLayout>('strip')
+const layoutOptions = BOOTH_LAYOUTS.map(({ value, label }) => ({ value, label }))
+const recording = ref(false)
+const countdown = ref<number | null>(null)
+const flash = ref(0)
+const shots = ref<HTMLCanvasElement[] | null>(null)
+const camera = ref<{ video: HTMLVideoElement | null } | null>(null)
+const boothInput = ref<HTMLInputElement | null>(null)
+onMounted(() => {
+  if (route.query.booth !== undefined) openBooth()
+})
+
+function openBooth() {
+  booth.value = true
+  cameraReady.value = false
+  cameraError.value = ''
+}
+
+function closeBooth() {
+  booth.value = false
+  cameraReady.value = false
+}
+
+function switchCamera() {
+  facing.value = facing.value === 'user' ? 'environment' : 'user'
+  cameraReady.value = false
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Hitung mundur 3-2-1 dengan bunyi klik, lalu jepret berjeda 1 detik (PRD). */
+async function record() {
+  const video = camera.value?.video
+  if (!video || recording.value) return
+  recording.value = true
+  try {
+    for (const second of [3, 2, 1]) {
+      countdown.value = second
+      beep(660)
+      await sleep(1000)
+    }
+    countdown.value = null
+    const total = BOOTH_LAYOUTS.find((item) => item.value === layout.value)?.shots ?? 4
+    const taken: HTMLCanvasElement[] = []
+    for (let shot = 0; shot < total; shot++) {
+      flash.value++
+      beep(1320, 0.05)
+      taken.push(captureShot(video, filter.value, facing.value === 'user'))
+      if (shot < total - 1) await sleep(1000)
+    }
+    shots.value = taken
+  } finally {
+    recording.value = false
+    countdown.value = null
+  }
+}
+
+/** Kamera ditolak: foto dari galeri dipakai sebagai jepretan, dengan filter yang sama. */
+async function onBoothFiles(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = [...(input.files ?? [])].slice(0, 4)
+  input.value = ''
+  const taken: HTMLCanvasElement[] = []
+  for (const file of files) {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      taken.push(captureShot(bitmap, filter.value, false))
+      bitmap.close()
+    } catch {
+      // Lewati foto yang tidak bisa dibaca.
+    }
+  }
+  if (!taken.length) return
+  if (taken.length === 1) layout.value = 'single'
+  shots.value = taken
+}
+
 const marquee = computed(() =>
-  playing.value
-    ? `♪ SEDANG DIPUTAR · ${playing.value.title.toUpperCase()} · ${playing.value.moments.length} FOTO ♪`
-    : 'BELUM ADA CD · PILIH ALBUM DI ARSIP LALU MASUKKAN',
+  booth.value
+    ? '● PHOTO BOOTH · PILIH TATA LETAK LALU TEKAN REKAM'
+    : playing.value
+      ? `♪ SEDANG DIPUTAR · ${playing.value.title.toUpperCase()} · ${playing.value.moments.length} FOTO ♪`
+      : 'BELUM ADA CD · PILIH ALBUM DI ARSIP LALU MASUKKAN',
 )
 </script>
 
@@ -157,7 +243,38 @@ const marquee = computed(() =>
 
       <TvSet class="mt-6" :clay="clayColor">
         <template #screen>
-          <TvSlideshow v-if="playing" :album="playing" :filter="filter" />
+          <template v-if="booth">
+            <BoothCamera
+              v-if="!cameraError"
+              ref="camera"
+              :filter="filter"
+              :facing="facing"
+              :countdown="countdown"
+              :flash="flash"
+              @ready="cameraReady = true"
+              @error="cameraError = $event"
+            />
+            <div
+              v-else
+              class="absolute inset-0 grid place-items-center p-6 text-center"
+              data-testid="booth-denied"
+            >
+              <div>
+                <p class="font-tv text-[30px] tracking-[0.14em] text-white">KAMERA MATI</p>
+                <p class="mt-2 text-caption text-white/80">
+                  {{ cameraError }} Kamu tetap bisa pakai foto dari galeri.
+                </p>
+                <button
+                  type="button"
+                  class="mt-4 h-10 rounded-control bg-white px-4 text-body font-semibold text-ink"
+                  @click="boothInput?.click()"
+                >
+                  Pilih foto dari galeri
+                </button>
+              </div>
+            </div>
+          </template>
+          <TvSlideshow v-else-if="playing" :album="playing" :filter="filter" />
           <TvIdle v-else />
         </template>
         <template #panel>
@@ -184,14 +301,57 @@ const marquee = computed(() =>
             </RadioGroupItem>
           </RadioGroupRoot>
           <div class="mt-auto flex flex-col gap-2">
-            <button
-              v-if="playing"
-              type="button"
-              class="h-10 rounded-[12px] font-tv text-[18px] tracking-[0.14em] text-tv-panel-ink/80 inset-ring inset-ring-white/25 hover:bg-white/5"
-              @click="playingId = null"
-            >
-              KELUARKAN CD
-            </button>
+            <template v-if="booth">
+              <RadioGroupRoot
+                v-model="layout"
+                aria-label="Tata letak Booth"
+                class="grid grid-cols-3 gap-1.5"
+                loop
+              >
+                <RadioGroupItem
+                  v-for="item in layoutOptions"
+                  :key="item.value"
+                  :value="item.value"
+                  class="tv-filter h-9 rounded-[10px] font-tv text-[15px] tracking-[0.06em] uppercase"
+                >
+                  {{ item.label }}
+                </RadioGroupItem>
+              </RadioGroupRoot>
+              <button
+                type="button"
+                class="h-11 rounded-[12px] bg-tv-accent font-tv text-[20px] tracking-[0.16em] text-white disabled:opacity-50"
+                :disabled="!cameraReady || recording"
+                data-testid="booth-record"
+                @click="record"
+              >
+                ● {{ recording ? 'MEREKAM' : 'REKAM' }}
+              </button>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  class="tv-control"
+                  :disabled="recording || !!cameraError"
+                  @click="switchCamera"
+                >
+                  GANTI KAMERA
+                </button>
+                <button type="button" class="tv-control" :disabled="recording" @click="closeBooth">
+                  KELUAR
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <button v-if="playing" type="button" class="tv-control" @click="playingId = null">
+                KELUARKAN CD
+              </button>
+              <button
+                type="button"
+                class="inline-flex h-11 items-center justify-center gap-2 rounded-[12px] font-tv text-[20px] tracking-[0.16em] text-tv-accent inset-ring-2 inset-ring-tv-accent hover:bg-tv-accent/10"
+                @click="openBooth"
+              >
+                <Icon name="camera" :size="18" /> PHOTO BOOTH
+              </button>
+            </template>
           </div>
         </template>
       </TvSet>
@@ -278,6 +438,26 @@ const marquee = computed(() =>
       </section>
 
       <input
+        ref="boothInput"
+        type="file"
+        accept="image/*"
+        multiple
+        class="sr-only"
+        tabindex="-1"
+        aria-label="Pilih foto untuk Booth"
+        data-testid="booth-upload"
+        @change="onBoothFiles"
+      />
+      <Teleport to="body">
+        <BoothResult
+          v-if="shots"
+          :shots="shots"
+          :layout="layout"
+          @close="shots = null"
+          @retake="shots = null"
+        />
+      </Teleport>
+      <input
         ref="fileInput"
         type="file"
         accept="image/*"
@@ -316,6 +496,24 @@ const marquee = computed(() =>
 
 .tv-filter:hover {
   background-color: rgb(255 255 255 / 0.12);
+}
+
+.tv-control {
+  height: 40px;
+  border-radius: 12px;
+  font-family: var(--font-tv);
+  font-size: 17px;
+  letter-spacing: 0.12em;
+  color: var(--color-tv-panel-ink);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
+}
+
+.tv-control:hover:not(:disabled) {
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+.tv-control:disabled {
+  opacity: 0.45;
 }
 
 .tv-filter[data-state='checked'] {

@@ -2,6 +2,11 @@ import { defineConfig, devices } from '@playwright/test'
 
 const port = 4320
 
+// Kamera palsu Chromium untuk uji Booth. WebKit tidak punya, jadi di sana diuji jalur tanpa kamera.
+const fakeCamera = {
+  args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+}
+
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
@@ -13,11 +18,15 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'android', use: { ...devices['Pixel 7'] } },
+    { name: 'android', use: { ...devices['Pixel 7'], launchOptions: fakeCamera } },
     { name: 'iphone', use: { ...devices['iPhone 15'] } },
     {
       name: 'desktop',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        launchOptions: fakeCamera,
+      },
     },
   ],
   // E2E selalu jalan di build production, sama seperti yang nanti di-deploy.

@@ -1,0 +1,210 @@
+<script setup lang="ts">
+import { byId, letter, pocket } from '@postpocket/presets'
+import { canvasBlob, composeStrip, SHOT_HEIGHT, SHOT_WIDTH, type BoothLayout } from '~/utils/booth'
+import { isDark } from '~/utils/color'
+import { dayKey } from '~/utils/memories'
+
+/**
+ * Hasil Booth (PRD): strip berbingkai dengan tanggal. Simpan ke Pocket hari ini, masukkan ke CD,
+ * pakai di surat, unduh PNG, atau ulangi. Jepretan disimpan sekali sebagai momen dan dipakai
+ * bersama oleh Pocket dan CD.
+ */
+const props = defineProps<{ shots: HTMLCanvasElement[]; layout: BoothLayout }>()
+const emit = defineEmits<{ close: []; retake: [] }>()
+const memories = useMemories()
+const draft = useLetterDraft()
+const router = useRouter()
+
+const frameColor = ref(pocket.frameColors[0]!.id)
+const frameOptions = pocket.frameColors.map((item) => ({
+  value: item.id,
+  label: item.label,
+  color: item.color,
+}))
+const stripUrl = ref<string | null>(null)
+let strip: HTMLCanvasElement | null = null
+const today = dayKey(new Date())
+const saved = reactive({ pocket: false, cd: false })
+const busy = ref(false)
+const message = ref('')
+let momentIds: string[] | null = null
+
+async function render() {
+  const hex = byId(pocket.frameColors, frameColor.value)?.color ?? '#fbf6ec'
+  const ink = isDark(hex)
+    ? '#ffffff'
+    : getComputedStyle(document.documentElement).getPropertyValue('--color-pocket-ink').trim() ||
+      '#4a3b30'
+  strip = await composeStrip(props.shots, props.layout, { frameColor: hex, ink, date: new Date() })
+  const url = URL.createObjectURL(await canvasBlob(strip, 'image/png'))
+  if (stripUrl.value) URL.revokeObjectURL(stripUrl.value)
+  stripUrl.value = url
+}
+watch(frameColor, render, { immediate: true })
+onBeforeUnmount(() => stripUrl.value && URL.revokeObjectURL(stripUrl.value))
+
+/** Jepretan sebagai momen hari ini, disimpan sekali saja. */
+async function moments(): Promise<string[]> {
+  if (momentIds) return momentIds
+  const photos = await Promise.all(
+    props.shots.map(async (shot) => ({
+      photo: {
+        blob: await canvasBlob(shot, 'image/jpeg', 0.9),
+        width: SHOT_WIDTH,
+        height: SHOT_HEIGHT,
+      },
+    })),
+  )
+  momentIds = await memories.addMoments(photos, { day: today, source: 'booth' })
+  return momentIds
+}
+
+async function run(action: () => Promise<void>) {
+  busy.value = true
+  message.value = ''
+  try {
+    await action()
+  } catch {
+    message.value = 'Gagal menyimpan di perangkat ini. Coba lagi.'
+  } finally {
+    busy.value = false
+  }
+}
+
+const saveToPocket = () =>
+  run(async () => {
+    const ids = await moments()
+    const day = memories.data.days[today]
+    await memories.saveDay(
+      day
+        ? { ...day, moments: [...day.moments, ...ids.filter((id) => !day.moments.includes(id))] }
+        : {
+            day: today,
+            packet: pocket.packetColors[0]!.id,
+            sticker: letter.stickers[0]!.id,
+            frame: pocket.frames[0]!.id,
+            frameColor: frameColor.value,
+            moments: ids,
+            savedAt: new Date().toISOString(),
+          },
+    )
+    saved.pocket = true
+    message.value = 'Tersimpan di kantong hari ini.'
+  })
+
+const putInCd = () =>
+  run(async () => {
+    const ids = await moments()
+    const album =
+      memories.data.albums.find((item) => item.title === 'Photo Booth') ??
+      (await memories.createAlbum('Photo Booth', '📸'))
+    await memories.addToAlbum(album.id, ids)
+    saved.cd = true
+    message.value = 'Masuk ke CD Photo Booth.'
+  })
+
+const useInLetter = () =>
+  run(async () => {
+    if (!strip) return
+    const blob = await canvasBlob(strip, 'image/jpeg', 0.9)
+    await draft.load()
+    if (!draft.addPhoto({ blob, width: strip.width, height: strip.height })) {
+      message.value = 'Surat sudah berisi 4 foto. Hapus satu dulu di editor isi surat.'
+      return
+    }
+    await draft.save()
+    await router.push('/letter/new')
+  })
+
+const download = () =>
+  run(async () => {
+    if (!strip) return
+    const url = URL.createObjectURL(await canvasBlob(strip, 'image/png'))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `postpocket-booth-${today}.png`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  })
+</script>
+
+<template>
+  <div
+    class="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4"
+    data-testid="booth-result"
+    @click.self="emit('close')"
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="booth-result-title"
+      class="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-[24px] bg-surface p-5"
+    >
+      <div class="flex items-center justify-between">
+        <h2 id="booth-result-title" class="text-title font-semibold">Hasil Booth</h2>
+        <IconButton label="Tutup" size="sm" variant="ghost" @click="emit('close')">
+          <Icon name="close" :size="15" />
+        </IconButton>
+      </div>
+      <div class="mt-3 grid place-items-center rounded-[16px] bg-fill p-3">
+        <img
+          v-if="stripUrl"
+          :src="stripUrl"
+          alt="Strip hasil Booth"
+          class="max-h-[44vh] w-auto rounded-[4px] shadow-raised"
+          data-testid="booth-strip"
+        />
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <span class="text-caption text-ink-muted">Bingkai</span>
+        <SwatchGroup v-model="frameColor" label="Warna bingkai" :options="frameOptions" />
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          class="booth-action"
+          :disabled="busy || saved.pocket"
+          @click="saveToPocket"
+        >
+          {{ saved.pocket ? '✓ Di Pocket' : 'Simpan ke Pocket' }}
+        </button>
+        <button type="button" class="booth-action" :disabled="busy || saved.cd" @click="putInCd">
+          {{ saved.cd ? '✓ Di CD' : 'Masukkan ke CD' }}
+        </button>
+        <button type="button" class="booth-action" :disabled="busy" @click="useInLetter">
+          Pakai di surat
+        </button>
+        <button type="button" class="booth-action" :disabled="busy" @click="download">
+          Unduh PNG
+        </button>
+      </div>
+      <p v-if="message" role="status" class="mt-3 text-caption text-ink-muted">{{ message }}</p>
+      <button
+        type="button"
+        class="mt-4 h-10 w-full rounded-control bg-ink text-body font-semibold text-white"
+        @click="emit('retake')"
+      >
+        Ulangi
+      </button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.booth-action {
+  height: 40px;
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.booth-action:hover:not(:disabled) {
+  background-color: var(--color-panel);
+}
+
+.booth-action:disabled {
+  opacity: 0.55;
+}
+</style>
