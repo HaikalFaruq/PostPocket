@@ -99,10 +99,92 @@
     { "id": "navy", "label": "Navy", "color": "#1e2335", "textColor": "#f3efe6" }
   ],
   "templates": [
-    { "id": "text", "label": "Teks saja", "photos": 0 },
-    { "id": "photo-1", "label": "1 foto + teks", "photos": 1 },
-    { "id": "photo-2", "label": "2 foto + teks", "photos": 2 },
-    { "id": "collage-4", "label": "Kolase 4 foto", "photos": 4 }
+    {
+      "id": "text",
+      "label": "Teks saja",
+      "photos": 0,
+      "layout": {
+        "tall": [
+          { "kind": "text", "x": 0.5, "y": 0.46, "width": 0.82, "size": 0.075, "align": "left" }
+        ],
+        "wide": [
+          { "kind": "text", "x": 0.5, "y": 0.46, "width": 0.84, "size": 0.07, "align": "left" }
+        ]
+      }
+    },
+    {
+      "id": "photo-1",
+      "label": "1 foto + teks",
+      "photos": 1,
+      "layout": {
+        "tall": [
+          { "kind": "photo", "x": 0.5, "y": 0.35, "width": 0.74, "height": 0.44, "rotation": -2 },
+          { "kind": "text", "x": 0.5, "y": 0.8, "width": 0.8, "size": 0.06, "align": "center" }
+        ],
+        "wide": [
+          { "kind": "photo", "x": 0.3, "y": 0.5, "width": 0.44, "height": 0.74, "rotation": -2 },
+          { "kind": "text", "x": 0.74, "y": 0.5, "width": 0.4, "size": 0.06, "align": "left" }
+        ]
+      }
+    },
+    {
+      "id": "photo-2",
+      "label": "2 foto + teks",
+      "photos": 2,
+      "layout": {
+        "tall": [
+          { "kind": "photo", "x": 0.3, "y": 0.33, "width": 0.44, "height": 0.4, "rotation": -4 },
+          { "kind": "photo", "x": 0.7, "y": 0.37, "width": 0.44, "height": 0.4, "rotation": 3 },
+          { "kind": "text", "x": 0.5, "y": 0.81, "width": 0.8, "size": 0.058, "align": "center" }
+        ],
+        "wide": [
+          { "kind": "photo", "x": 0.2, "y": 0.46, "width": 0.3, "height": 0.6, "rotation": -4 },
+          { "kind": "photo", "x": 0.49, "y": 0.52, "width": 0.3, "height": 0.6, "rotation": 3 },
+          { "kind": "text", "x": 0.82, "y": 0.5, "width": 0.3, "size": 0.055, "align": "left" }
+        ]
+      }
+    },
+    {
+      "id": "collage-4",
+      "label": "Kolase 4 foto",
+      "photos": 4,
+      "layout": {
+        "tall": [
+          { "kind": "photo", "x": 0.29, "y": 0.23, "width": 0.42, "height": 0.31, "rotation": -3 },
+          { "kind": "photo", "x": 0.71, "y": 0.24, "width": 0.42, "height": 0.31, "rotation": 2 },
+          { "kind": "photo", "x": 0.3, "y": 0.57, "width": 0.42, "height": 0.31, "rotation": 2 },
+          { "kind": "photo", "x": 0.7, "y": 0.58, "width": 0.42, "height": 0.31, "rotation": -2 },
+          { "kind": "text", "x": 0.5, "y": 0.87, "width": 0.8, "size": 0.05, "align": "center" }
+        ],
+        "wide": [
+          { "kind": "photo", "x": 0.17, "y": 0.3, "width": 0.28, "height": 0.4, "rotation": -3 },
+          { "kind": "photo", "x": 0.45, "y": 0.3, "width": 0.28, "height": 0.4, "rotation": 2 },
+          { "kind": "photo", "x": 0.17, "y": 0.72, "width": 0.28, "height": 0.4, "rotation": 2 },
+          { "kind": "photo", "x": 0.45, "y": 0.72, "width": 0.28, "height": 0.4, "rotation": -2 },
+          { "kind": "text", "x": 0.8, "y": 0.5, "width": 0.32, "size": 0.05, "align": "left" }
+        ]
+      }
+    }
+  ],
+  "stickers": [
+    { "id": "heart", "label": "Hati", "src": "/stickers/heart.webp" },
+    { "id": "sparkles", "label": "Kilau", "src": "/stickers/sparkles.webp" },
+    { "id": "star", "label": "Bintang", "src": "/stickers/star.webp" },
+    { "id": "cherry-blossom", "label": "Bunga sakura", "src": "/stickers/cherry-blossom.webp" },
+    { "id": "tulip", "label": "Tulip", "src": "/stickers/tulip.webp" },
+    { "id": "ribbon", "label": "Pita", "src": "/stickers/ribbon.webp" },
+    { "id": "gift", "label": "Kado", "src": "/stickers/gift.webp" },
+    { "id": "balloon", "label": "Balon", "src": "/stickers/balloon.webp" },
+    { "id": "party", "label": "Terompet pesta", "src": "/stickers/party.webp" },
+    { "id": "cake", "label": "Kue ulang tahun", "src": "/stickers/cake.webp" },
+    { "id": "rainbow", "label": "Pelangi", "src": "/stickers/rainbow.webp" },
+    { "id": "cloud", "label": "Awan", "src": "/stickers/cloud.webp" },
+    { "id": "moon", "label": "Bulan", "src": "/stickers/moon.webp" },
+    { "id": "cat", "label": "Kucing", "src": "/stickers/cat.webp" },
+    { "id": "bear", "label": "Beruang", "src": "/stickers/bear.webp" },
+    { "id": "love-letter", "label": "Surat cinta", "src": "/stickers/love-letter.webp" },
+    { "id": "clover", "label": "Semanggi", "src": "/stickers/clover.webp" },
+    { "id": "strawberry", "label": "Stroberi", "src": "/stickers/strawberry.webp" }
   ],
   "surpriseRules": [
     { "paper": "navy", "excludeFoil": ["silver"] },

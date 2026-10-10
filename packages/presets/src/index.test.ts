@@ -31,6 +31,7 @@ const lists: Record<string, readonly Option[]> = {
   'letter.foilColors': letter.foilColors,
   'letter.papers': letter.papers,
   'letter.templates': letter.templates,
+  'letter.stickers': letter.stickers,
   'pocket.packetColors': pocket.packetColors,
   'pocket.frames': pocket.frames,
   'pocket.frameColors': pocket.frameColors,

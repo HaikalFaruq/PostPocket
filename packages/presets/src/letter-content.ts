@@ -165,7 +165,8 @@ export function normalizeContent(raw: unknown): LetterContent {
   return { version: 1, elements }
 }
 
-function isFilled(element: LetterElement): boolean {
+/** Elemen yang berisi: slot foto kosong dan blok teks kosong tidak dihitung. */
+export function isFilledElement(element: LetterElement): boolean {
   switch (element.kind) {
     case 'photo':
       return element.photo !== null
@@ -178,7 +179,7 @@ function isFilled(element: LetterElement): boolean {
 
 /** Isi yang dikirim ke API: slot foto kosong dan blok teks kosong dibuang. */
 export function publishableContent(content: LetterContent): LetterContent {
-  return { version: 1, elements: content.elements.filter(isFilled) }
+  return { version: 1, elements: content.elements.filter(isFilledElement) }
 }
 
 /** Kunci foto yang dipakai isi surat, sesuai urutan. Inilah daftar foto yang diunggah. */
