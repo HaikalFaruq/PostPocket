@@ -72,7 +72,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 0 (minggu 1)**
 
 - [x] Buat repo GitHub (dibuat Kall)
-- [ ] Buat proyek Supabase, lalu kirim URL dan anon key ke Kall lewat jalur privat, bukan lewat commit
+- [x] Buat proyek Supabase, lalu kirim URL dan anon key ke Kall lewat jalur privat, bukan lewat commit
 - [ ] Job CI untuk lint dan test backend (workflow `no-ai-attribution` sudah ada)
 - [ ] Migrasi `letters` dan `letter_assets`
 - [ ] `docs/api/openapi.yaml` untuk lima endpoint rilis 1, supaya Kall bisa jalan dengan mock
