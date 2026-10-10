@@ -182,7 +182,7 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 | Yang disimpan | Cara | Kenapa |
 | --- | --- | --- |
 | JS, CSS, ilustrasi, ikon, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
-| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline |
+| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat memang ada di IndexedDB |
 | Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
 | Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
 

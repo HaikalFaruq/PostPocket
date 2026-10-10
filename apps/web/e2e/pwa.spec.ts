@@ -67,6 +67,28 @@ test('Beranda tetap terbuka offline, halaman yang belum tersimpan diganti halama
   await context.setOffline(false)
 })
 
+test('editor surat tetap bisa dipakai offline sejak kunjungan pertama', async ({
+  page,
+  context,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Service worker di Playwright hanya andal di Chromium')
+  await page.goto('/')
+  await expect
+    .poll(
+      () => page.evaluate(async () => !!(await (await caches.open('pages')).match('/letter/new'))),
+      { timeout: 15_000 },
+    )
+    .toBe(true)
+
+  await context.setOffline(true)
+  await page.goto('/letter/new')
+  await expect(page.getByTestId('letter-editor')).toBeVisible()
+  await page.getByRole('textbox', { name: 'Isi surat' }).fill('Ditulis tanpa sinyal')
+  await expect(page.getByRole('textbox', { name: 'Isi surat' })).toHaveValue('Ditulis tanpa sinyal')
+  await context.setOffline(false)
+})
+
 test('kartu Pasang memanggil dialog pasang bawaan browser', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'beforeinstallprompt hanya ada di Chromium')
   await page.goto('/')
