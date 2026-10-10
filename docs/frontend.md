@@ -168,8 +168,25 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 4 dan beta (minggu 8–10)**
 
 - [ ] Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV
-- [ ] `navigator.storage.persist()` dan ajakan pasang PWA
+- [x] `navigator.storage.persist()` dan ajakan pasang PWA ([PWA](#pwa))
 - [ ] Uji di 3 HP; perbaiki bug dari tester
+
+## PWA
+
+PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan service worker). Service worker hanya ada di build production; `pnpm dev` tidak memakainya, jadi cek PWA lewat `pnpm build && node apps/web/.output/server/index.mjs` atau `pnpm test:e2e`.
+
+| Yang disimpan | Cara | Kenapa |
+| --- | --- | --- |
+| JS, CSS, ilustrasi, ikon, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
+| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline |
+| Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
+| Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
+
+- Halaman yang belum pernah tersimpan menampilkan `offline.html` saat offline.
+- Versi baru tidak langsung dipakai. Toast "Versi baru PostPocket siap" muncul dan user memilih kapan memuat ulang, supaya tulisan yang sedang diketik tidak hilang.
+- Kartu "Pasang PostPocket" di Beranda memakai dialog pasang bawaan Chrome, atau petunjuk Tambah ke Layar Utama di iPhone. Aplikasi yang terpasang meminta `navigator.storage.persist()`, dan Safari tidak menghapus datanya setelah 7 hari.
+- Halaman baru yang menampilkan data pribadi wajib dikecualikan dari cache: tambahkan ke `isPrivatePath()` di `app/utils/pwa.ts` dan aturan `runtimeCaching` di `nuxt.config.ts`.
+- Ikon aplikasi dibuat ulang dengan `node scripts/pwa-icons.mjs` dari folder `apps/web`.
 
 ## Uji di HP sungguhan
 
