@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { byId, letter } from '@postpocket/presets'
+import { byId, isFilledElement, letter } from '@postpocket/presets'
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { MESSAGE_LIMIT } from '~/utils/letter-draft'
@@ -37,12 +37,7 @@ const ink = computed(() => paper.value.textColor)
 const art = usePrintArt(frontSource, ink, foilMode)
 const { mask, busy: maskBusy } = useFoilMask(art, designMask, foilMode)
 
-const frontRatio = computed(() =>
-  draft.isPhotoFront && draft.photo
-    ? draft.photo.width / draft.photo.height
-    : illustration.value.ratio,
-)
-const ratio = computed(() => byId(letter.shapes, draft.design.shape)?.ratio ?? frontRatio.value)
+const ratio = computed(() => draft.ratio)
 
 const front = computed({
   get: () => draft.design.illustration,
@@ -118,6 +113,28 @@ useEventListener(document, 'paste', (event: ClipboardEvent) => {
   takeFile(file)
 })
 
+const templateOptions = letter.templates.map((item) => ({ value: item.id, label: item.label }))
+const template = computed({
+  get: () => draft.design.template,
+  set: (id: string) => draft.setTemplate(id),
+})
+const filled = computed(() => draft.content.elements.filter(isFilledElement))
+const contentSummary = computed(() => {
+  const photos = filled.value.filter((e) => e.kind === 'photo').length
+  const stickers = filled.value.filter((e) => e.kind === 'sticker').length
+  const parts = [photos && `${photos} foto`, stickers && `${stickers} stiker`].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'Belum ada foto atau stiker.'
+})
+
+// Editor isi surat layar penuh. Setelah ditutup, kartu dibuka supaya hasilnya langsung terlihat.
+const editing = ref(false)
+const editorButton = ref<HTMLButtonElement | null>(null)
+function closeEditor() {
+  editing.value = false
+  open.value = true
+  nextTick(() => editorButton.value?.focus())
+}
+
 function surpriseMe() {
   open.value = false
   draft.surpriseMe()
@@ -164,8 +181,8 @@ async function startOver() {
         :foil-border="draft.design.foilBorder"
       >
         <template #inside>
-          <p v-if="draft.message" class="break-words whitespace-pre-wrap">{{ draft.message }}</p>
-          <p v-else class="opacity-40">Tulis isi suratmu di langkah 5.</p>
+          <LetterPage :content="draft.content" :photo-urls="draft.photoUrls" />
+          <p v-if="filled.length === 0" class="opacity-40">Tulis isi suratmu di langkah 5.</p>
         </template>
       </FoilCard>
       <p
@@ -265,17 +282,30 @@ async function startOver() {
       </StepCard>
 
       <StepCard :step="5" title="Isi surat">
+        <PillGroup v-model="template" label="Template isi surat" :options="templateOptions" />
         <textarea
           v-model="draft.message"
           :maxlength="MESSAGE_LIMIT"
           rows="5"
           aria-label="Isi surat"
           placeholder="Tulis sesuatu untuk dia…"
-          class="block w-full resize-y rounded-control bg-surface px-3.5 py-3 font-letter text-[19px] leading-snug inset-ring inset-ring-line placeholder:text-ink-subtle focus:outline-2 focus:outline-ink"
+          class="mt-4 block w-full resize-y rounded-control bg-surface px-3.5 py-3 font-letter text-[19px] leading-snug inset-ring inset-ring-line placeholder:text-ink-subtle focus:outline-2 focus:outline-ink"
         />
         <p class="mt-1 text-right text-caption text-ink-subtle">
           {{ draft.message.length }}/{{ MESSAGE_LIMIT }}
         </p>
+        <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <button
+            ref="editorButton"
+            type="button"
+            class="inline-flex h-9 items-center gap-2 rounded-control bg-surface px-3.5 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+            data-testid="open-content-editor"
+            @click="editing = true"
+          >
+            <Icon name="plus" :size="15" /> Atur foto dan stiker
+          </button>
+          <p class="min-w-0 flex-1 text-caption text-ink-muted">{{ contentSummary }}</p>
+        </div>
       </StepCard>
 
       <div class="px-6 pt-1 pb-6">
@@ -294,5 +324,9 @@ async function startOver() {
         >
       </template>
     </component>
+
+    <Teleport to="body">
+      <LetterEditor v-if="editing" @close="closeEditor" />
+    </Teleport>
   </div>
 </template>

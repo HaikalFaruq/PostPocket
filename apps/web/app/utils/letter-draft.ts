@@ -1,7 +1,12 @@
 import {
   byId,
+  contentLimits,
+  contentPhotoKeys,
   defaultLetterDesign,
   letter,
+  normalizeContent,
+  templateElements,
+  type LetterContent,
   type LetterDesign,
   type Option,
 } from '@postpocket/presets'
@@ -9,8 +14,8 @@ import {
 /** Penanda gambar depan berupa foto user, bukan ilustrasi dari library. */
 export const PHOTO_FRONT = 'upload'
 
-/** Panjang maksimal isi surat sementara editor lengkap belum ada. */
-export const MESSAGE_LIMIT = 600
+/** Panjang maksimal satu blok teks isi surat. */
+export const MESSAGE_LIMIT = contentLimits.textLength
 
 export interface DraftPhoto {
   blob: Blob
@@ -31,15 +36,48 @@ export interface StoredPhoto {
 
 /** Draf surat yang disimpan di IndexedDB. Tetap di browser sampai user membuat link. */
 export interface LetterDraft {
-  version: 1
+  version: 2
   design: LetterDesign
+  /** Foto gambar depan, kalau user memakai foto sendiri. */
   photo: DraftPhoto | null
-  message: string
+  /** Isi halaman surat. Slot foto merujuk kunci di `photos`. */
+  content: LetterContent
+  /** Foto isi surat per kunci, maksimal 4. */
+  photos: Record<string, DraftPhoto>
   updatedAt: number
 }
 
+/** Rasio kartu (lebar dibagi tinggi): dari bentuk yang dipilih, atau dari gambar depannya. */
+export function cardRatio(design: LetterDesign, photo: DraftPhoto | null): number {
+  const shape = byId(letter.shapes, design.shape)
+  if (shape?.ratio) return shape.ratio
+  if (design.illustration === PHOTO_FRONT && photo) return photo.width / photo.height
+  return (byId(letter.illustrations, design.illustration) ?? letter.illustrations[0]!).ratio
+}
+
+/** Isi awal: slot template yang dipilih, dengan `text` di blok teks pertama. */
+export function startingContent(
+  design: LetterDesign,
+  photo: DraftPhoto | null,
+  text = '',
+): LetterContent {
+  const template = byId(letter.templates, design.template) ?? letter.templates[0]!
+  const elements = templateElements(template, cardRatio(design, photo)).map((element) =>
+    element.kind === 'text' && element.id === 't1' ? { ...element, text } : element,
+  )
+  return normalizeContent({ elements })
+}
+
 export function emptyDraft(): LetterDraft {
-  return { version: 1, design: { ...defaultLetterDesign }, photo: null, message: '', updatedAt: 0 }
+  const design = { ...defaultLetterDesign }
+  return {
+    version: 2,
+    design,
+    photo: null,
+    content: startingContent(design, null),
+    photos: {},
+    updatedAt: 0,
+  }
 }
 
 /** Pulihkan foto dari bentuk tersimpan (byte mentah) atau Blob. */
@@ -57,20 +95,33 @@ function toDraftPhoto(value: unknown): DraftPhoto | null {
   return null
 }
 
+/** Bentuk foto untuk IndexedDB. */
+export async function toStoredPhoto(photo: DraftPhoto): Promise<StoredPhoto> {
+  return {
+    bytes: await photo.blob.arrayBuffer(),
+    type: photo.blob.type,
+    width: photo.width,
+    height: photo.height,
+  }
+}
+
 function pick(list: readonly Option[], id: unknown, fallback: string): string {
   return typeof id === 'string' && byId(list, id) ? id : fallback
 }
 
 /**
- * Pulihkan draf dari IndexedDB dengan aman. Id preset yang sudah tidak ada diganti bawaan,
- * foto yang hilang mengembalikan gambar depan ke ilustrasi, dan foto tidak memakai mode
- * "Sesuai desain" karena tidak punya lapisan foil bawaan. Foto yang sudah di-upload tetap
- * disimpan walaupun gambar depannya sedang ilustrasi, supaya bisa dipilih lagi.
+ * Pulihkan draf dari IndexedDB dengan aman:
+ * - id preset yang sudah tidak ada diganti bawaan;
+ * - foto depan yang hilang mengembalikan gambar depan ke ilustrasi, dan foto tidak memakai mode
+ *   "Sesuai desain" karena tidak punya lapisan foil bawaan. Foto yang sudah di-upload tetap
+ *   disimpan walaupun gambar depannya sedang ilustrasi, supaya bisa dipilih lagi;
+ * - draf versi 1 (`message` saja) dipindah ke blok teks template;
+ * - foto isi yang hilang jadi slot kosong, dan foto yang tidak dipakai dibuang.
  */
 export function normalizeDraft(raw: unknown): LetterDraft {
   const base = emptyDraft()
   if (!raw || typeof raw !== 'object') return base
-  const stored = raw as Partial<LetterDraft>
+  const stored = raw as Partial<Omit<LetterDraft, 'version'>> & { message?: unknown }
   const design = (stored.design ?? {}) as Partial<LetterDesign>
   const photo = toDraftPhoto(stored.photo)
   const next: LetterDesign = {
@@ -88,11 +139,33 @@ export function normalizeDraft(raw: unknown): LetterDraft {
     template: pick(letter.templates, design.template, base.design.template),
   }
   if (next.illustration === PHOTO_FRONT && next.foilMode === 'design') next.foilMode = 'detail'
-  return {
+
+  const photos: Record<string, DraftPhoto> = {}
+  if (stored.photos && typeof stored.photos === 'object') {
+    for (const [key, value] of Object.entries(stored.photos)) {
+      const restored = toDraftPhoto(value)
+      if (restored) photos[key] = restored
+    }
+  }
+  const restored =
+    stored.content === undefined
+      ? startingContent(next, photo, typeof stored.message === 'string' ? stored.message : '')
+      : normalizeContent(stored.content)
+  const content: LetterContent = {
     version: 1,
+    elements: restored.elements.map((element) =>
+      element.kind === 'photo' && element.photo !== null && !photos[element.photo]
+        ? { ...element, photo: null }
+        : element,
+    ),
+  }
+  const used = new Set(contentPhotoKeys(content))
+  return {
+    version: 2,
     design: next,
     photo,
-    message: typeof stored.message === 'string' ? stored.message.slice(0, MESSAGE_LIMIT) : '',
+    content,
+    photos: Object.fromEntries(Object.entries(photos).filter(([key]) => used.has(key))),
     updatedAt: typeof stored.updatedAt === 'number' ? stored.updatedAt : 0,
   }
 }
