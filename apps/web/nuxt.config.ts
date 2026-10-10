@@ -58,6 +58,8 @@ export default defineNuxtConfig({
     '/letter/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // TV, Booth, dan Pocket membaca data dari IndexedDB dan kamera, jadi cukup di browser.
     '/tv': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    '/pocket': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    '/pocket/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // Surat penerima di-SSR supaya meta OG terbaca crawler WhatsApp, tapi tidak boleh diindeks.
     '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
   },

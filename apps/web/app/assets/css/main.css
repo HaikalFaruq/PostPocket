@@ -22,6 +22,9 @@
   --color-fill: rgb(17 17 20 / 0.05);
 
   /* Aksen Pocket: warna kantong ada di preset, di sini hanya teks dan kayu jepitan */
+  --color-pocket-page: #efefef;
+  --color-pocket-outside: #f9f9fb;
+  --color-pocket-today: #f8f1e7;
   --color-pocket-ink: #4a3b30;
   --color-pocket-muted: #a8927f;
   --color-pocket-wood: #ead2a4;

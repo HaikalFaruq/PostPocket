@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { byId, letter } from '@postpocket/presets'
-import { NuxtLink } from '#components'
 import type { IconName } from '~/utils/icons'
 
 // Crawler WhatsApp hanya membaca URL gambar OG yang absolut.
@@ -18,14 +17,19 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
 })
 
-const doors: { title: string; text: string; icon: IconName; to?: string }[] = [
+const doors: { title: string; text: string; icon: IconName; to: string }[] = [
   {
     title: 'Booth',
     text: 'Foto 4 frame dengan filter retro, langsung jadi strip.',
     icon: 'camera',
     to: '/tv?booth=1',
   },
-  { title: 'Pocket', text: 'Simpan satu hari kecil di kantong berstiker.', icon: 'calendar' },
+  {
+    title: 'Pocket',
+    text: 'Simpan satu hari kecil di kantong berstiker.',
+    icon: 'calendar',
+    to: '/pocket',
+  },
   {
     title: 'Letter',
     text: 'Kartu foil 3D yang dikirim lewat satu link.',
@@ -67,32 +71,23 @@ const open = ref(false)
 
         <ul class="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
           <li v-for="door in doors" :key="door.title">
-            <component
-              :is="door.to ? NuxtLink : 'div'"
-              v-bind="door.to ? { to: door.to } : {}"
-              class="block h-full rounded-[20px] bg-surface p-4 shadow-raised"
-              :class="door.to && 'transition-transform duration-150 hover:-translate-y-0.5'"
+            <NuxtLink
+              :to="door.to"
+              class="block h-full rounded-[20px] bg-surface p-4 shadow-raised transition-transform duration-150 hover:-translate-y-0.5"
             >
               <div class="flex items-center justify-between">
                 <span class="grid size-9 place-items-center rounded-full bg-fill">
                   <Icon :name="door.icon" :size="17" />
                 </span>
                 <span
-                  v-if="door.to"
                   class="inline-flex items-center gap-1 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-semibold text-white"
                 >
                   Buat <Icon name="arrow-right" :size="11" />
                 </span>
-                <span
-                  v-else
-                  class="rounded-full bg-fill px-2 py-0.5 font-mono text-[10px] tracking-[0.12em] text-ink-muted uppercase"
-                >
-                  Segera
-                </span>
               </div>
               <h2 class="mt-3 text-[15px] font-semibold">{{ door.title }}</h2>
               <p class="mt-1 text-caption text-ink-muted">{{ door.text }}</p>
-            </component>
+            </NuxtLink>
           </li>
         </ul>
       </div>
