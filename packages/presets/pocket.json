@@ -1,0 +1,23 @@
+{
+  "packetColors": [
+    { "id": "blue", "label": "Biru", "flavor": "Blueberry", "color": "#7fb3f5" },
+    { "id": "pink", "label": "Pink", "flavor": "Stroberi", "color": "#f08fa8" },
+    { "id": "yellow", "label": "Kuning", "flavor": "Lemon", "color": "#f4d35e" },
+    { "id": "purple", "label": "Ungu", "flavor": "Anggur", "color": "#a98ce8" },
+    { "id": "orange", "label": "Oranye", "flavor": "Jeruk", "color": "#f39a62" },
+    { "id": "mint", "label": "Hijau mint", "flavor": "Mint", "color": "#86cfa8" }
+  ],
+  "frames": [
+    { "id": "polaroid", "label": "Polaroid", "hint": "Cetak instan klasik" },
+    { "id": "stamp", "label": "Prangko", "hint": "Tepi bergerigi seperti prangko" },
+    { "id": "ticket", "label": "Tiket bioskop", "hint": "Kenang-kenangan dari bioskop" }
+  ],
+  "frameColors": [
+    { "id": "cream", "label": "Krem", "color": "#fbf6ec" },
+    { "id": "forest", "label": "Hijau tua", "color": "#1f6b4f" },
+    { "id": "rose", "label": "Mawar", "color": "#eba3b5" },
+    { "id": "mustard", "label": "Mustard", "color": "#e9c46a" },
+    { "id": "sky", "label": "Biru langit", "color": "#8fb8de" },
+    { "id": "plum", "label": "Plum", "color": "#7a4f73" }
+  ]
+}
