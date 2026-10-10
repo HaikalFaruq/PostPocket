@@ -45,6 +45,7 @@ apps/web/
   app/pages/                / (Beranda), /letter/new (editor surat), /lab, /lab/foil, /lab/safari
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
+  server/routes/mock-api/   mock API surat untuk development dan E2E (NUXT_MOCK_API=1)
   test/                     unit test Vitest
 packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, isAllowed, surprise)
 ```
@@ -128,6 +129,8 @@ Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `
 **Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya.
 
 **CORS** perlu mengizinkan `https://postpocket.vercel.app`, preview `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
+
+**Mock API.** `apps/web/server/routes/mock-api/` meniru kelima endpoint di atas (validasi, kode error, upload ke URL bertanda tangan) dengan data di memori, supaya alur "Buat link" dan halaman penerima bisa dibangun sebelum backend siap. Nyalakan dengan `NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api` (contohnya di `apps/web/.env.example`); E2E selalu memakainya, produksi tidak. `/lab/kirim` menjalankan alur kirim dari ujung ke ujung: kompres foto, render gambar OG, kirim, baca, buka, lalu hapus.
 
 ## Checklist per sprint
 
