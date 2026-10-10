@@ -35,8 +35,20 @@ info:
 
     - `apikey`: publishable key Supabase, wajib di semua request (dikirim otomatis oleh
       `supabase.functions.invoke`).
-    - CORS mengizinkan `https://postpocket.vercel.app`,
-      `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
+    - `X-Edit-Token`: khusus publish dan hapus.
+
+    **CORS**
+
+    - Origin yang diizinkan: `https://postpocket.vercel.app`, `http://localhost:3000`, dan
+      preview yang cocok dengan regex
+      `^https://postpocket-[a-z0-9-]+-haikalfaruqs-projects\.vercel\.app$`. Origin yang cocok
+      dikembalikan apa adanya di `Access-Control-Allow-Origin` (bukan `*`), ditambah
+      `Vary: Origin`.
+    - Preflight `OPTIONS` dijawab `204` dengan `Access-Control-Allow-Methods: GET, POST,
+      DELETE, OPTIONS` dan `Access-Control-Allow-Headers: apikey, authorization,
+      content-type, x-client-info, x-edit-token`.
+    - Upload berkas ke `signedUrl` (PUT, tanpa supabase-js juga boleh) dilayani Storage, bukan
+      Edge Function, jadi tidak lewat aturan CORS di atas.
 
     Batas angka `content` sama dengan `contentLimits` di
     `packages/presets/src/letter-content.ts`, dan backend memvalidasi dengan angka yang sama.
@@ -95,7 +107,7 @@ paths:
               cover: { type: image/jpeg, width: 1536, height: 2048, size: 412000 }
               photos:
                 - { key: p1, type: image/webp, width: 2048, height: 1536, size: 380000 }
-              og: { type: image/png, width: 1200, height: 630, size: 210000 }
+              og: { type: image/jpeg, width: 1200, height: 630, size: 110000 }
               replyTo: null
       responses:
         '201':
@@ -372,6 +384,7 @@ components:
           description: Derajat searah jarum jam.
 
     TextElement:
+      unevaluatedProperties: false
       allOf:
         - $ref: '#/components/schemas/ElementBase'
         - type: object
@@ -394,6 +407,7 @@ components:
               enum: [left, center, right]
 
     PhotoElement:
+      unevaluatedProperties: false
       allOf:
         - $ref: '#/components/schemas/ElementBase'
         - type: object
@@ -411,6 +425,7 @@ components:
               description: Lebar dibagi tinggi bingkai.
 
     StickerElement:
+      unevaluatedProperties: false
       allOf:
         - $ref: '#/components/schemas/ElementBase'
         - type: object
@@ -445,6 +460,7 @@ components:
           description: Byte.
 
     PhotoMeta:
+      unevaluatedProperties: false
       allOf:
         - $ref: '#/components/schemas/ImageMeta'
         - type: object
@@ -455,11 +471,13 @@ components:
 
     OgMeta:
       type: object
+      description: Sampul kartu untuk preview link. Frontend mengirim JPEG; PNG dari foto hampir selalu melewati 300 KB.
       required: [type, width, height, size]
       additionalProperties: false
       properties:
         type:
-          const: image/png
+          type: string
+          enum: [image/jpeg, image/png]
         width:
           const: 1200
         height:
