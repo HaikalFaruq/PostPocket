@@ -101,11 +101,11 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 2 (minggu 4–5)**
 
-- [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto, dan stiker
-- [ ] Alur "Buat link": kompres foto, hapus EXIF lokasi, upload ke URL bertanda tangan, publish (kontrak dari `docs/api/openapi.yaml`)
-- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan
-- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, karena crawler WhatsApp tidak menjalankan JavaScript
-- [ ] Meta tag OG memakai URL gambar OG dari `GET /l/:slug` (dirender backend saat publish, di bawah sekitar 300 KB); jangan pasang Nuxt OG Image
+- [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker
+- [ ] Alur "Buat link": kompres tiap foto sampai di bawah 500 KB (JPEG atau WebP), hapus EXIF lokasi, upload ke URL bertanda tangan, lalu publish (kontrak dari `docs/api/openapi.yaml`)
+- [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: PNG 1200×630 di bawah sekitar 300 KB, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
+- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka)
+- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`
 - [ ] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore
 - [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
 
