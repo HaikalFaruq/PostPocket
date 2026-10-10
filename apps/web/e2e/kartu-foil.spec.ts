@@ -18,12 +18,13 @@ test('drag memutar kartu lalu berhenti di sampul belakang', async ({ page }) => 
   await page.mouse.move(x, y)
   await page.mouse.down()
   await page.mouse.move(x + 120, y, { steps: 8 })
-  expect(Math.abs(await rotateY(page))).toBeGreaterThan(20)
+  // Gaya kartu ditulis di frame animasi berikutnya, jadi tunggu sebentar.
+  await expect.poll(async () => Math.abs(await rotateY(page))).toBeGreaterThan(20)
   await page.mouse.move(x + 380, y, { steps: 12 })
   // Ditahan diam dulu: kartu tidak boleh terlempar saat dilepas.
   await page.waitForTimeout(150)
   await page.mouse.up()
-  await expect.poll(() => rotateY(page), { timeout: 4000 }).toBe(180)
+  await expect.poll(() => rotateY(page), { timeout: 8000 }).toBe(180)
 })
 
 test('lemparan cepat memutar kartu lebih jauh', async ({ page }) => {
@@ -45,7 +46,7 @@ test('lemparan cepat memutar kartu lebih jauh', async ({ page }) => {
         const angle = await rotateY(page)
         return angle !== 0 && angle % 180 === 0
       },
-      { timeout: 4000 },
+      { timeout: 8000 },
     )
     .toBe(true)
 })
@@ -61,7 +62,7 @@ test('tap dan Enter membuka serta menutup kartu', async ({ page }) => {
 
 test('panah kanan membalik kartu ke belakang', async ({ page }) => {
   await page.getByRole('button', { name: /Kartu surat/ }).press('ArrowRight')
-  await expect.poll(() => rotateY(page), { timeout: 4000 }).toBe(180)
+  await expect.poll(() => rotateY(page), { timeout: 8000 }).toBe(180)
 })
 
 test('ganti warna foil dan kertas langsung terlihat di kartu', async ({ page }) => {

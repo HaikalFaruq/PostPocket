@@ -46,11 +46,16 @@ export function useCardMotion({ stage, rotor, open, onTap }: Options) {
   }
 
   function loop(now: number) {
-    const dt = Math.min(0.05, (now - lastTime) / 1000 || 1 / 60)
+    // Langkah tetap 1/120 detik: animasi selesai tepat waktu meski frame lambat (HP murah).
+    let elapsed = Math.min(0.25, Math.max(0, (now - lastTime) / 1000))
     lastTime = now
     if (mode === 'spring') {
-      ;[state.rx, state.vx] = springStep(state.rx, state.vx, state.tx, dt)
-      ;[state.ry, state.vy] = springStep(state.ry, state.vy, state.ty, dt)
+      while (elapsed > 0) {
+        const dt = Math.min(1 / 120, elapsed)
+        ;[state.rx, state.vx] = springStep(state.rx, state.vx, state.tx, dt)
+        ;[state.ry, state.vy] = springStep(state.ry, state.vy, state.ty, dt)
+        elapsed -= dt
+      }
       // Selisih 0,25° tidak terlihat; kunci ke target supaya kartu tidak bergetar sub-piksel.
       const settled =
         Math.abs(state.rx - state.tx) < 0.25 &&
@@ -103,7 +108,6 @@ export function useCardMotion({ stage, rotor, open, onTap }: Options) {
   function onPointerDown(event: PointerEvent) {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     if (mode === 'bench') return
-    rotor.value?.setPointerCapture(event.pointerId)
     Object.assign(drag, {
       id: event.pointerId,
       x: event.clientX,
@@ -118,6 +122,12 @@ export function useCardMotion({ stage, rotor, open, onTap }: Options) {
     state.vy = 0
     mode = 'drag'
     kick()
+    // Capture supaya drag tetap terbaca di luar kartu. Kalau browser menolak, drag tetap jalan.
+    try {
+      rotor.value?.setPointerCapture(event.pointerId)
+    } catch {
+      // abaikan
+    }
   }
 
   function onPointerMove(event: PointerEvent) {
