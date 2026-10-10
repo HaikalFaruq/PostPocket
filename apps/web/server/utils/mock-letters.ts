@@ -296,3 +296,18 @@ export function openMockLetter(event: H3Event, slug: string) {
   const expireAt = Math.min(found.openedAt + 7 * DAY, found.publishedAt! + 30 * DAY)
   return { openedAt: iso(found.openedAt), photosExpireAt: iso(expireAt) }
 }
+
+/**
+ * Khusus uji: jalankan pembersihan "7 hari setelah dibuka" sekarang juga. Foto isi selalu
+ * dihapus; cover dan gambar OG ikut dihapus kalau gambar depannya foto user.
+ */
+export function deleteMockPhotos(event: H3Event, slug: string) {
+  const found = sentLetter(slug)
+  if (!found) return fail(event, 404, 'not_found', 'surat tidak ada atau sudah kedaluwarsa')
+  const withCover = found.design.illustration === 'upload'
+  for (const file of found.files) {
+    if (file.kind === 'photo' || withCover) blobs.delete(file.path)
+  }
+  found.photosDeletedAt = Date.now()
+  return { photosDeletedAt: iso(found.photosDeletedAt) }
+}
