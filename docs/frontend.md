@@ -106,7 +106,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: PNG 1200×630 di bawah sekitar 300 KB, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
 - [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka)
 - [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`
-- [ ] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore
+- [x] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore ([Deploy](#deploy))
 - [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
 
 **Sprint 3 (minggu 6–7)**
@@ -124,4 +124,20 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 ## Uji di HP sungguhan
 
 - `/lab/foil?bench=1` menjalankan benchmark otomatis; hasilnya muncul di pojok kanan atas dan bisa disalin dari langkah 5. Parameter lain: `?flip=1` (sampul belakang) dan `?open=1` (kartu terbuka).
-- `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: pakai preview deploy, atau `pnpm dev --host` lalu tunnel HTTPS.
+- `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: buka di domain produksi, atau `pnpm dev --host` lalu tunnel HTTPS.
+
+Domain produksi: [postpocket.vercel.app/lab/foil?bench=1](https://postpocket.vercel.app/lab/foil?bench=1) dan [postpocket.vercel.app/lab/safari](https://postpocket.vercel.app/lab/safari).
+
+## Deploy
+
+Proyek Vercel `postpocket` (Hobby, akun Kall) tersambung ke repo ini lewat GitHub. Setiap push ke `main` deploy ke produksi di [postpocket.vercel.app](https://postpocket.vercel.app), setiap PR dapat preview.
+
+| Setting | Nilai |
+| --- | --- |
+| Root directory | `apps/web`, file di luar root ikut di-build (misalnya `packages/presets`) |
+| Framework dan Node | Nuxt, 24.x |
+| Region fungsi | `sin1`, dekat dengan Supabase di Singapore |
+| Env production, preview, development | `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, nilainya sama dengan `apps/web/.env` |
+
+- Preview dilindungi Vercel Authentication, jadi hanya bisa dibuka akun pemilik proyek. Domain produksi terbuka untuk siapa saja.
+- Env baru atau yang berubah baru terpakai di deploy berikutnya. Hanya nilai yang aman di browser yang boleh masuk sini; secret key tetap di Supabase.
