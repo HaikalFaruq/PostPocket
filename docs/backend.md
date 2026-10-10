@@ -9,7 +9,7 @@ Untuk Bintang dan agent-nya. Baca [AGENTS.md](../AGENTS.md) dulu; detail produk 
 
 Bintang memegang auth, database, storage foto, API surat dan share link, gambar OG untuk preview link, kompresi dan pembersihan file, rate limit, dan deploy backend.
 
-Default-nya Supabase (Postgres, Auth, Storage, Edge Functions) supaya MVP cepat. Keputusan tetap Supabase atau stack sendiri ada di tangan Bintang, paling lambat sebelum Sprint 1.
+Backend memakai Supabase (Postgres, Auth, Storage, Edge Functions); keputusan ini sudah final dan proyeknya sudah dibuat. Frontend di-deploy ke Vercel Hobby.
 
 Area kode: `supabase/migrations/`, `supabase/functions/`, dan `docs/api/openapi.yaml`.
 
@@ -22,12 +22,12 @@ sequenceDiagram
     participant B as Backend
     participant S as Storage
     participant R as Penerima (HP lain)
-    P->>P: Kompres foto, hapus EXIF lokasi
+    P->>P: Kompres foto, hapus EXIF lokasi, render gambar OG
     P->>B: POST /letters
     B-->>P: id, edit_token, URL upload bertanda tangan per foto
-    P->>S: Upload foto
+    P->>S: Upload foto dan gambar OG
     P->>B: POST /letters/:id/publish (edit_token)
-    B->>B: Validasi, buat slug, render gambar OG, status sent
+    B->>B: Validasi foto dan gambar OG, buat slug, status sent
     B-->>P: Link pendek postpocket.app/l/:slug
     P-)R: Kirim link lewat WhatsApp
     R->>B: GET /l/:slug
@@ -42,11 +42,42 @@ Catat jawabannya di PRD bagian Pertanyaan terbuka (centang dan tulis keputusanny
 
 | Keputusan | Batas | Catatan |
 | --- | --- | --- |
-| Tetap Supabase atau stack sendiri | Sebelum Sprint 1 | Kalau ganti, perbarui PRD bagian Tech stack dan tabel area kode di AGENTS.md |
-| Bucket `letter-assets` publik atau URL bertanda tangan | Sprint 0 | Path acak tak tertebak per surat tetap wajib |
-| Batas ukuran per file dan jumlah foto per surat | Sebelum Sprint 2 | Frontend sudah mengompres foto ke sisi panjang maksimal 2048 px |
-| Surat berlaku selamanya atau kedaluwarsa | Bareng Kall | Menentukan perlu tidaknya job pembersihan file |
 | Login masuk rilis 1 atau fase 2 | Bareng Kall | PRD menaruh login di fase 2 |
+
+## Keputusan yang sudah diambil
+
+| Keputusan | Isi |
+| --- | --- |
+| Backend | **Supabase**, bukan stack sendiri. Kalau storage 1 GB tidak cukup, foto dipindah ke Cloudflare R2 dan database tetap di Supabase |
+| Gambar OG | **Dirender browser** waktu "Buat link" dari kartu yang sama dengan yang dilihat pengirim (PNG 1200×630, di bawah sekitar 300 KB), lalu diunggah lewat URL bertanda tangan seperti foto. Backend hanya memvalidasi tipe, ukuran, dan dimensi saat publish, lalu mencatatnya di `og_path`. Kalau dirender di Edge Function, tampilan foil harus dibuat ulang di sana |
+| Bucket `letter-assets` | **Publik untuk baca**, path acak tak tertebak per surat (`<letter_id>/<uuid>.<ext>`). Upload hanya lewat URL bertanda tangan dari `POST /letters`; tidak ada policy listing. Publik dipilih supaya crawler WhatsApp bisa mengambil gambar OG dan file bisa di-cache CDN (hemat egress) |
+| Batas foto | Maksimal **4 foto per surat** (sesuai template kolase), maksimal **500 KB per foto** setelah dikompres, tipe JPEG atau WebP. Gambar OG maksimal 300 KB |
+| Masa berlaku surat | Surat (data, link, dan gambar OG) dihapus **30 hari setelah publish** |
+| Masa berlaku foto | Foto dihapus **7 hari setelah surat pertama kali dibuka** (`opened_at`). Kalau tidak pernah dibuka, foto ikut terhapus bersama suratnya di hari ke-30. Setelah foto dihapus, halaman penerima tetap menampilkan kartu dan teks, dengan placeholder di slot foto |
+| Repo | **Public**. Alasannya, Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Apakah repo public membebaskan batasan itu belum terbukti; dicek begitu proyek Vercel tersambung |
+
+Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karena foto hidup paling lama 7 hari setelah dibuka, yang perlu dipantau adalah jumlah surat aktif, bukan total surat.
+
+## Batasan free tier
+
+| Layanan | Batas yang berpengaruh | Akibatnya |
+| --- | --- | --- |
+| Supabase Free | Storage 1 GB, 2 proyek aktif | Ditahan oleh batas foto dan masa berlaku di atas. Satu proyek untuk produksi, satu untuk staging |
+| Supabase Free | Egress 5 GB per bulan | Foto yang dibuka penerima ikut dihitung dan kemungkinan habis sebelum storage. Dengan 4 foto × 500 KB, cukup untuk sekitar 2.500 kali surat dibuka per bulan; pantau egress selama beta |
+| Supabase Free | Proyek di-pause setelah 7 hari tanpa request | Selama beta yang sepi, link surat bisa mati; pasang ping terjadwal |
+| Vercel Hobby | Body fungsi sekitar 4,5 MB, durasi pendek | Foto dan gambar OG selalu diunggah langsung ke storage lewat URL bertanda tangan, tidak lewat fungsi Vercel |
+| Vercel Hobby | Hanya untuk non-komersial | Kalau nanti ada monetisasi, pindah ke Pro atau host lain |
+| Vercel Hobby | Custom event analitik dan cron terbatas | Event analitik disimpan di tabel Postgres; job pembersihan memakai `pg_cron` di Supabase |
+
+## Pembersihan file
+
+Satu job `pg_cron` per jam memanggil Edge Function pembersih lewat `pg_net`. Fungsi itu menghapus:
+
+- draf yang tidak pernah di-publish setelah 24 jam, beserta filenya;
+- foto surat yang `opened_at`-nya sudah lewat 7 hari;
+- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya.
+
+File harus dihapus lewat Storage API (`storage.remove()`) di Edge Function. Menghapus baris `storage.objects` lewat SQL meninggalkan file yatim yang tetap memakan kuota ([Supabase: Delete Objects](https://supabase.com/docs/guides/storage/management/delete-objects)).
 
 ## Checklist per sprint
 
@@ -55,11 +86,11 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 0 (minggu 1)**
 
 - [x] Buat repo GitHub (dibuat Kall)
-- [ ] Buat proyek Supabase, lalu kirim URL dan anon key ke Kall lewat jalur privat, bukan lewat commit
+- [x] Buat proyek Supabase, lalu kirim URL dan anon key ke Kall lewat jalur privat, bukan lewat commit
 - [ ] Job CI untuk lint dan test backend (workflow `no-ai-attribution` sudah ada)
 - [ ] Migrasi `letters` dan `letter_assets`
 - [ ] `docs/api/openapi.yaml` untuk lima endpoint rilis 1, supaya Kall bisa jalan dengan mock
-- [ ] Putuskan bucket `letter-assets` publik atau bertanda tangan
+- [x] Putuskan bucket `letter-assets` publik atau bertanda tangan
 
 **Sprint 1 (minggu 2–3)**
 
@@ -69,7 +100,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 2 (minggu 4–5)**
 
-- [ ] `POST /letters/:id/publish`: validasi, slug, render gambar OG, status `sent`
+- [ ] `POST /letters/:id/publish`: validasi isi serta foto dan gambar OG yang sudah diunggah, slug, status `sent`
+- [ ] Job pembersihan file (`pg_cron` + `pg_net` + Edge Function), lihat bagian Pembersihan file
 - [ ] `GET /l/:slug` dan `POST /l/:slug/open`
 - [ ] `DELETE /letters/:id`
 - [ ] `noindex` untuk surat, dikoordinasikan dengan Kall karena halaman `/l/:slug` dirender frontend
@@ -91,7 +123,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 | Tabel | Kolom penting |
 | --- | --- |
-| `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `cover_path`, `og_path`, `status`, `edit_token_hash`, `reply_to_id`, `opened_at`, `created_at` |
+| `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `cover_path`, `og_path`, `status`, `edit_token_hash`, `reply_to_id`, `opened_at`, `published_at`, `expires_at`, `photos_deleted_at`, `created_at` |
 | `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`sticker`), `width`, `height` |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
@@ -101,6 +133,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
+- `expires_at` = `published_at` + 30 hari. `photos_deleted_at` diisi job pembersihan, supaya `GET /l/:slug` tahu harus menampilkan placeholder foto.
 
 Tabel fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) ada di PRD bagian Arsitektur. CRUD-nya lewat klien Supabase langsung dengan Row Level Security: user hanya bisa membaca dan menulis barisnya sendiri.
 
@@ -108,15 +141,15 @@ Tabel fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) ada d
 
 | Method | Path | Fungsi | Auth |
 | --- | --- | --- | --- |
-| POST | `/letters` | Buat draf, kembalikan `id`, `edit_token`, dan URL upload bertanda tangan untuk tiap foto | Anonim boleh, kena rate limit |
-| POST | `/letters/:id/publish` | Validasi isi, buat `slug`, render gambar OG, ubah status jadi `sent` | `edit_token` |
+| POST | `/letters` | Buat draf, kembalikan `id`, `edit_token`, dan URL upload bertanda tangan untuk tiap foto (maksimal 4) dan gambar OG | Anonim boleh, kena rate limit |
+| POST | `/letters/:id/publish` | Validasi isi serta foto dan gambar OG yang sudah diunggah, buat `slug`, ubah status jadi `sent` | `edit_token` |
 | GET | `/l/:slug` | Ambil surat untuk halaman penerima (design, content, URL foto) | Publik |
 | POST | `/l/:slug/open` | Catat waktu pertama kali dibuka | Publik, sekali per surat |
 | DELETE | `/letters/:id` | Hapus surat dan fotonya | `edit_token` atau pemilik |
 
 ## Storage
 
-- `letter-assets`: path acak tak tertebak per surat. Dibaca lewat URL publik atau bertanda tangan, sesuai keputusan di atas.
+- `letter-assets`: publik untuk baca, path acak tak tertebak per surat. Upload hanya lewat URL bertanda tangan; tidak ada policy listing.
 - `moments` (fase 2): privat, hanya pemilik.
 
 ## Keamanan dan privasi
@@ -132,8 +165,9 @@ Tabel fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) ada d
 
 - `docs/api/openapi.yaml` lebih dulu, supaya Kall bisa membangun UI dengan mock.
 - URL proyek dan anon key untuk `.env` (lewat jalur privat).
-- CORS untuk domain frontend, termasuk URL preview deploy.
-- Gambar OG yang bisa diambil crawler WhatsApp tanpa login.
+- CORS untuk domain frontend, termasuk URL preview deploy Vercel yang berubah-ubah (`*.vercel.app` milik proyek kita).
+- Gambar OG yang dirender browser saat "Buat link" dan bisa diambil crawler WhatsApp tanpa login, lewat URL publik yang dikembalikan `GET /l/:slug`.
+- Region Supabase di Singapore; fungsi Vercel diset ke `sin1` supaya SSR `/l/:slug` tidak bolak-balik ke US.
 
 ## Di luar cakupan rilis 1
 
