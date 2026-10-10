@@ -39,11 +39,12 @@ apps/web/
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
   app/components/letter/    komponen khusus Letter: FoilCard, LetterPage, LetterEditor, FrontPicker, dll.
   app/components/tv/        TvSet, CdShelf, TvSlideshow, BoothCamera, BoothResult
+  app/components/pocket/    SnackPacket (kantong snack), SaveDayModal (modal simpan hari), MonthPicker
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/stores/               useLetterDraft (draf surat) dan useMemories (momen, hari Pocket, album CD) di IndexedDB
-  app/utils/                logika murni (card-motion, foil-map, letter-draft, color, foil, icons) dan
-                            util browser (front-image, photo-filter), diuji di test/
-  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /lab, /lab/foil, /lab/safari, /lab/kirim
+  app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
+                            color, foil, icons) dan util browser (front-image, photo-filter), diuji di test/
+  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /lab, /lab/foil, /lab/safari, /lab/kirim
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
   server/routes/mock-api/   mock API surat untuk development dan E2E (NUXT_MOCK_API=1)
@@ -176,7 +177,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 4 dan beta (minggu 8–10)**
 
-- [ ] Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV
+- [x] Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV
 - [ ] `navigator.storage.persist()` dan ajakan pasang PWA
 - [ ] Uji di 3 HP; perbaiki bug dari tester
 
