@@ -2,6 +2,8 @@ import letterData from '../letter.json'
 import pocketData from '../pocket.json'
 import tvData from '../tv.json'
 
+export * from './letter-content'
+
 export interface Option {
   id: string
   label: string

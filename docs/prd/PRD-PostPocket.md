@@ -117,7 +117,8 @@ Letter mengubah gambar jadi kartu lipat bercetak foil 3D yang bisa diputar, dibu
 **Kirim dan buka**
 
 1. Tap "Buat link" → gambar dikompres di browser → diunggah → server mengembalikan link pendek (contoh `postpocket.app/l/x7Kp2q`).
-2. Link punya gambar preview (OG image) berisi sampul kartu, supaya terlihat menarik saat dibagikan di WhatsApp.
+2. Link punya gambar preview (OG image) berisi sampul kartu, supaya terlihat menarik saat dibagikan di WhatsApp. Gambar dirender browser sekali waktu "Buat link" dari kartu yang sama (PNG 1200×630, di bawah sekitar 300 KB) dan diunggah bersama foto, lalu halaman `/l/:slug` di-SSR karena crawler WhatsApp tidak menjalankan JavaScript.
+5. Surat berlaku 30 hari setelah dikirim. Foto di dalamnya dihapus 7 hari setelah surat pertama kali dibuka; setelah itu kartu dan teks tetap tampil, dengan placeholder di slot foto.
 3. Halaman penerima menampilkan kartu tertutup. Tap untuk membuka; isi surat muncul dengan animasi.
 4. Di bawah kartu ada tombol "Bikin balasan" yang membawa penerima ke editor Letter.
 
@@ -296,9 +297,9 @@ Frontend memakai Nuxt + TypeScript karena Kall sudah menguasai Vue; backend defa
 | Kamera Booth | `getUserMedia` lewat VueUse | [useUserMedia](https://vueuse.org/core/useUserMedia/) |
 | Foto di browser | exifr (tanggal), heic2any (HEIC), browser-image-compression | [exifr](https://github.com/MikeKovarik/exifr), [heic2any](https://github.com/alexcorvi/heic2any), [browser-image-compression](https://github.com/Donaldcwl/browser-image-compression) |
 | Simpan lokal | IndexedDB lewat idb-keyval | [idb-keyval](https://github.com/jakearchibald/idb-keyval) |
-| Preview link | Gambar OG dinamis per surat | [Nuxt OG Image](https://nuxtseo.com/docs/og-image) |
+| Preview link | Gambar OG dirender browser waktu "Buat link" (ekspor kartu ke PNG), diunggah ke storage lewat URL bertanda tangan; halaman `/l/:slug` di-SSR dan memasang URL-nya di meta tag | — |
 | Backend | Supabase: Postgres, Auth, Storage, Edge Functions | [Supabase](https://supabase.com/docs) |
-| Hosting | Vercel atau Cloudflare Pages (FE), Supabase Cloud (BE) | — |
+| Hosting | Vercel Hobby (FE, repo public supaya commit dari kita berdua bisa ter-deploy), Supabase Cloud (BE) | — |
 | Kualitas | ESLint, Prettier, Vitest, Playwright untuk alur utama | — |
 
 Satu jebakan yang perlu diuji awal: filter CSS hanya mengubah tampilan di layar. Saat menyimpan strip Booth atau ekspor surat, filter harus diterapkan ulang ke kanvas (`ctx.filter` atau shader WebGL), dan dukungan `ctx.filter` di Safari perlu dicek di minggu pertama.
@@ -331,7 +332,7 @@ Rilis 1 hanya butuh server untuk surat yang dikirim; Pocket, TV, dan Booth berja
 | Method | Path | Fungsi | Auth |
 | --- | --- | --- | --- |
 | POST | `/letters` | Buat draf, kembalikan `id`, `edit_token`, dan URL upload bertanda tangan untuk tiap foto | Anonim boleh, kena rate limit |
-| POST | `/letters/:id/publish` | Validasi isi, buat `slug`, render gambar OG, ubah status jadi sent | `edit_token` |
+| POST | `/letters/:id/publish` | Validasi isi serta foto dan gambar OG yang sudah diunggah, buat `slug`, ubah status jadi sent | `edit_token` |
 | GET | `/l/:slug` | Ambil surat untuk halaman penerima (design, content, URL foto) | Publik |
 | POST | `/l/:slug/open` | Catat waktu pertama kali dibuka | Publik, sekali per surat |
 | DELETE | `/letters/:id` | Hapus surat dan fotonya | `edit_token` atau pemilik |
@@ -340,9 +341,10 @@ CRUD Pocket dan album di fase 2 memakai klien Supabase langsung dengan Row Level
 
 **Storage**
 
-- Bucket `letter-assets`: path acak tak tertebak per surat; dibaca lewat URL bertanda tangan atau publik, diputuskan Bintang.
+- Bucket `letter-assets`: publik untuk baca, path acak tak tertebak per surat; upload hanya lewat URL bertanda tangan.
 - Bucket `moments` (fase 2): privat, hanya pemilik.
-- Batas ukuran per file dan jumlah foto per surat ditetapkan Bintang sebelum sprint 2.
+- Maksimal 4 foto per surat, 500 KB per foto setelah kompres, gambar OG maksimal 300 KB.
+- File dihapus job terjadwal lewat Storage API: draf yang ditinggal setelah 24 jam, foto 7 hari setelah surat dibuka, surat beserta gambar OG 30 hari setelah dikirim.
 
 **Privasi dan keamanan**
 
@@ -364,7 +366,7 @@ Setiap fase hanya lanjut bila gerbangnya lolos: kartu foil lancar di HP murah, l
 | --- | --- | --- |
 | 0 | Scaffold Nuxt, token, komponen bersama (`StepCard`, `PillChip`, `Swatch`, `StickyCTA`, `BottomSheet`, `Modal`); spike kartu foil CSS vs TresJS; uji `ctx.filter` dan kamera di Safari | Buat repo dan proyek Supabase, CI, migrasi `letters` + `letter_assets`, `openapi.yaml`, keputusan bucket publik atau bertanda tangan |
 | 1 | Halaman Letter langkah 1 sampai 4, kartu 3D bisa diputar dan dibuka, Surprise me, draf otomatis di IndexedDB | `POST /letters`, URL upload bertanda tangan, rate limit anonim, hapus EXIF di sisi server sebagai lapis kedua |
-| 2 | Editor isi surat (vue-konva + 4 template), alur Buat link, halaman penerima `/l/:slug`, tombol Bikin balasan | `publish`, `GET /l/:slug`, `open`, `DELETE`, render gambar OG, `noindex` |
+| 2 | Editor isi surat (vue-konva + 4 template), alur Buat link termasuk render gambar OG, halaman penerima `/l/:slug` (plus placeholder foto kedaluwarsa), tombol Bikin balasan | `publish`, `GET /l/:slug`, `open`, `DELETE`, validasi gambar OG, job pembersihan file, `noindex` |
 | 3 | Halaman TV (clay, filter, coverflow, slideshow), Booth (hitung mundur, strip, unduh), kirim hasil Booth ke Letter | Event analitik (surat dibuat, dibuka, dibalas), monitoring error, review keamanan endpoint |
 | 4 | Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV; uji di 3 HP | Desain skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) dan RLS; siapkan lingkungan beta |
 | Beta | Perbaikan bug dari tester | Perbaikan bug, pantau kuota storage dan error |
@@ -385,9 +387,12 @@ Risiko terbesar ada di performa kartu 3D di HP murah dan di Safari iOS yang bisa
 **Pertanyaan terbuka**
 
 - [ ] Domain dan handle sosial untuk PostPocket (nama sudah final); cek ketersediaan.
-- [ ] Backend tetap Supabase atau stack sendiri? Bintang yang memutuskan sebelum sprint 1.
-- [ ] Surat yang dikirim berlaku selamanya atau kedaluwarsa (misalnya 1 tahun)?
-- [ ] Maksimal foto per surat dan ukuran file.
+- [x] Backend tetap Supabase atau stack sendiri? **Diputuskan: tetap Supabase**, proyeknya sudah dibuat. Kalau storage gratis 1 GB tidak cukup, foto dipindah ke Cloudflare R2 tanpa mengganti database.
+- [x] Gambar OG dirender di mana? **Diputuskan: browser waktu "Buat link"**, supaya sampulnya persis sama dengan kartu. Diunggah lewat URL bertanda tangan, divalidasi backend saat publish, disimpan di `og_path`. Frontend tidak memakai Nuxt OG Image; `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`.
+- [x] Repo public atau private? **Diputuskan: public**, karena Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Apakah repo public membebaskan batasan itu dicek begitu proyek Vercel tersambung.
+- [x] Bucket `letter-assets` publik atau bertanda tangan? **Diputuskan: publik untuk baca** dengan path acak; upload tetap lewat URL bertanda tangan.
+- [x] Surat yang dikirim berlaku selamanya atau kedaluwarsa? **Diputuskan: surat 30 hari setelah dikirim; foto 7 hari setelah surat pertama kali dibuka.** Dievaluasi lagi setelah beta.
+- [x] Maksimal foto per surat dan ukuran file. **Diputuskan: 4 foto, maksimal 500 KB per foto setelah kompres; gambar OG maksimal 300 KB.**
 - [ ] Bahasa UI: Indonesia, Inggris, atau keduanya.
 - [ ] Login masuk rilis 1 atau fase 2.
 - [ ] Model bisnis (gratis, premium preset, atau cetak kartu fisik) setelah ada data pemakaian.

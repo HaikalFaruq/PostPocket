@@ -28,6 +28,9 @@ Pertama kali menjalankan E2E di mesin baru: `pnpm --filter @postpocket/web exec 
 > [!NOTE]
 > TypeScript dikunci di 6.0.x karena `vue-tsc` belum bisa memakai TypeScript 7 (versi native tidak punya `lib/tsc`). Naikkan bersama `vue-tsc` kalau sudah didukung.
 
+> [!NOTE]
+> `pnpm.overrides` di `package.json` root memaksa versi yang sudah ditambal untuk dua alat dev: `simple-git` 4 (dipakai Nuxt DevTools) dan `esbuild` 0.28 (dipakai `fontless` dari `@nuxt/fonts`). simple-git 4 tidak punya export default, jadi `patches/@nuxt__devtools@3.4.2.patch` mengganti import-nya di DevTools. Kalau `pnpm install` menolak karena patch tidak terpakai setelah Nuxt naik versi: hapus patch dan override `simple-git` kalau DevTools versi baru sudah tidak memakai simple-git 3, atau buat ulang patch-nya dengan `pnpm patch @nuxt/devtools@<versi>`. Override `esbuild` boleh dihapus begitu `fontless` memakai esbuild 0.28.1 ke atas.
+
 ## Struktur
 
 ```text
@@ -74,6 +77,57 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 | `FoilCard` | Letter, Beranda, halaman penerima | Kartu lipat foil CSS 3D, lihat [spike](spikes/foil-3d.md) |
 
 Semua komponen bisa dilihat dan dicoba di `/lab`.
+
+## Data surat untuk API
+
+Bahan kontrak `docs/api/openapi.yaml`: apa yang dikirim frontend saat "Buat link" dan apa yang dibutuhkan halaman penerima. Nama field final mengikuti kontrak yang ditulis Bintang. Tipe dan validasinya ada di `packages/presets/src/letter-content.ts` (`normalizeContent`, `publishableContent`, `contentPhotoKeys`).
+
+**`design`** berisi id preset dengan bentuk `LetterDesign`: `illustration`, `shape`, `foilMode`, `foilBorder`, `foilColor`, `paper`, dan `template`. `illustration: "upload"` berarti gambar depannya foto user.
+
+**`content`** berisi elemen kanvas halaman surat. Posisi dan ukurannya relatif terhadap halaman, jadi tampil sama di layar mana pun.
+
+```json
+{
+  "version": 1,
+  "elements": [
+    { "kind": "photo", "id": "e1", "x": 0.5, "y": 0.32, "width": 0.7, "rotation": -3, "photo": "p1", "aspect": 1.33 },
+    { "kind": "text", "id": "e2", "x": 0.5, "y": 0.72, "width": 0.8, "rotation": 0, "text": "Selamat ulang tahun!", "size": 0.07, "align": "center" },
+    { "kind": "sticker", "id": "e3", "x": 0.84, "y": 0.12, "width": 0.18, "rotation": 12, "sticker": "heart" }
+  ]
+}
+```
+
+| Field | Elemen | Arti | Rentang |
+| --- | --- | --- | --- |
+| `id` | Semua | Unik per surat | 1–40 huruf, angka, `-`, atau `_` |
+| `x`, `y` | Semua | Titik tengah elemen, pecahan lebar dan tinggi halaman | 0–1 |
+| `width` | Semua | Lebar, pecahan lebar halaman | 0,05–1 |
+| `rotation` | Semua | Derajat searah jarum jam | -180–180 |
+| `text` | `text` | Tulisan tangan Caveat, warnanya ikut kertas | Maksimal 600 karakter per blok |
+| `size` | `text` | Ukuran huruf, pecahan lebar halaman | 0,02–0,25 |
+| `align` | `text` | `left`, `center`, atau `right` | |
+| `photo` | `photo` | Kunci foto di daftar `photos` | Pola sama dengan `id` |
+| `aspect` | `photo` | Lebar dibagi tinggi bingkai; foto di-crop menutupi bingkai | 0,2–5 |
+| `sticker` | `sticker` | Id stiker dari preset | Pola sama dengan `id` |
+
+- Urutan `elements` adalah urutan tumpukan: yang terakhir tampil paling atas.
+- Maksimal 4 blok teks, 4 foto, dan 16 stiker. Satu foto hanya dipakai sekali.
+- Teks tidak berisi `\u0000` karena `jsonb` Postgres menolaknya; `normalizeContent()` sudah membuangnya.
+- Slot foto kosong (`"photo": null`) hanya ada di draf dan dibuang sebelum dikirim.
+
+**Berkas yang diunggah**
+
+| Berkas | Kapan | Format |
+| --- | --- | --- |
+| Cover | Kalau `design.illustration` bernilai `upload` | JPEG atau WebP, maksimal 500.000 byte, sisi panjang maksimal 2048 px |
+| `photos` | Satu per kunci `photo` di `content`, maksimal 4 | Sama dengan cover |
+| Gambar OG | Selalu | PNG 1200×630, di bawah sekitar 300 KB |
+
+Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `height`, dan `size`. Server mengembalikan URL upload bertanda tangan untuk tiap foto, cover, dan gambar OG. `replyTo` berisi slug surat yang dibalas lewat "Bikin balasan".
+
+**Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya.
+
+**CORS** perlu mengizinkan `https://postpocket.vercel.app`, preview `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
 
 ## Checklist per sprint
 
