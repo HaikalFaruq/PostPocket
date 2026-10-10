@@ -125,7 +125,7 @@ Bahan kontrak `docs/api/openapi.yaml`: apa yang dikirim frontend saat "Buat link
 
 Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `height`, dan `size`. Server mengembalikan URL upload bertanda tangan untuk tiap foto, cover, dan gambar OG. `replyTo` berisi slug surat yang dibalas lewat "Bikin balasan".
 
-**Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya.
+**Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya. Kalau `og` bernilai `null` (cover dari foto user ikut dihapus), meta tag OG memakai gambar bawaan `/og-surat.jpg` dan kartu memakai sampul polos.
 
 **CORS** perlu mengizinkan `https://postpocket.vercel.app`, preview `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
 
