@@ -38,9 +38,11 @@ apps/web/
   app/assets/css/main.css   design token (@theme Tailwind) dan gaya dasar
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
   app/components/letter/    komponen khusus Letter: FoilCard, FoilSwatchIcon
-  app/composables/          useCardMotion: drag, pegas, kilau, benchmark kartu
-  app/utils/                logika murni (card-motion, color, foil, icons), diuji di test/
-  app/pages/                / (Beranda), /lab, /lab/foil, /lab/safari
+  app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
+  app/stores/               useLetterDraft: draf surat di IndexedDB
+  app/utils/                logika murni (card-motion, foil-map, letter-draft, color, foil, icons) dan
+                            util browser (front-image, photo-filter), diuji di test/
+  app/pages/                / (Beranda), /letter/new (editor surat), /lab, /lab/foil, /lab/safari
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
   test/                     unit test Vitest
@@ -55,6 +57,8 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 - **Ilustrasi milik sendiri.** Ubah `scripts/illustrations.mjs`, lalu jalankan `node scripts/illustrations.mjs`. Aset dari web referensi tidak boleh masuk repo.
 - **Cek efek 3D di Safari sungguhan.** Screenshot Playwright WebKit tidak memakai compositing 3D, jadi `backface-visibility` terlihat rusak padahal di Safari benar. E2E kartu memeriksa state DOM; tampilannya dicek di simulator iOS atau iPhone.
 - **`mask` dijalankan setelah `filter`.** Kalau elemen ber-mask butuh bayangan, taruh `drop-shadow` di pembungkusnya.
+- **Foto user selalu lewat `preparePhoto()`**: diputar sesuai EXIF, diperkecil ke 2048 px, lalu disimpan ulang sebagai JPEG supaya metadata lokasi hilang (PRD bagian Privasi).
+- **Draf di IndexedDB menyimpan foto sebagai byte (`ArrayBuffer`), bukan `Blob`**: Safari Private Browsing menolak Blob di IndexedDB. Foto disimpan di key terpisah supaya mengetik isi surat tidak menulis ulang foto.
 - **Ekspor foto berfilter lewat `drawFiltered()`**, jangan `ctx.filter` langsung: Safari tidak mendukung `ctx.filter` dan filternya hilang diam-diam ([hasil spike](spikes/safari.md)).
 
 ## Komponen bersama
@@ -117,7 +121,7 @@ Bahan kontrak `docs/api/openapi.yaml`: apa yang dikirim frontend saat "Buat link
 | --- | --- | --- |
 | Cover | Kalau `design.illustration` bernilai `upload` | JPEG atau WebP, maksimal 500.000 byte, sisi panjang maksimal 2048 px |
 | `photos` | Satu per kunci `photo` di `content`, maksimal 4 | Sama dengan cover |
-| Gambar OG | Selalu | PNG 1200×630, di bawah sekitar 300 KB |
+| Gambar OG | Selalu | JPEG 1200×630, maksimal 300.000 byte. PNG dari foto bisa lebih dari 750 KB |
 
 Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `height`, dan `size`. Server mengembalikan URL upload bertanda tangan untuk tiap foto, cover, dan gambar OG. `replyTo` berisi slug surat yang dibalas lewat "Bikin balasan".
 
@@ -142,21 +146,21 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 1 (minggu 2–3)**
 
-- [ ] Halaman `/letter/new` dengan langkah 1 sampai 4 (gambar depan, bagian foil, warna foil, kertas), kartu berubah langsung tanpa reload
-- [ ] Upload, drop, dan paste foto sendiri untuk gambar depan; bentuk Asli, Portrait, Square, Landscape
-- [ ] Peta foil dari gambar di browser: Detail (deteksi tepi), Bayangan (threshold), Satu warna
-- [ ] Surprise me memakai `surprise()` dari preset, dengan animasi kartu berputar sekali
-- [ ] Draf otomatis di IndexedDB; refresh tidak menghilangkan isi
+- [x] Halaman `/letter/new` dengan langkah 1 sampai 4 (gambar depan, bagian foil, warna foil, kertas), kartu berubah langsung tanpa reload. Langkah 5 sementara berupa kolom teks sampai editor Sprint 2 siap
+- [x] Upload, drop, dan paste foto sendiri untuk gambar depan; bentuk Asli, Portrait, Square, Landscape
+- [x] Peta foil dari gambar di browser: Detail (deteksi tepi), Bayangan (threshold), Satu warna
+- [x] Surprise me memakai `surprise()` dari preset, dengan animasi kartu berputar sekali
+- [x] Draf otomatis di IndexedDB; refresh tidak menghilangkan isi
 - [ ] Gerbang: kartu foil di atas 50 fps di HP Android kelas menengah
 
 **Sprint 2 (minggu 4–5)**
 
-- [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto, dan stiker
-- [ ] Alur "Buat link": kompres foto, hapus EXIF lokasi, upload ke URL bertanda tangan, publish (kontrak dari `docs/api/openapi.yaml`)
-- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan
-- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, karena crawler WhatsApp tidak menjalankan JavaScript
-- [ ] Meta tag OG memakai URL gambar OG dari `GET /l/:slug` (dirender backend saat publish, di bawah sekitar 300 KB); jangan pasang Nuxt OG Image
-- [ ] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore
+- [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker
+- [ ] Alur "Buat link": kompres tiap foto sampai di bawah 500 KB (JPEG atau WebP), hapus EXIF lokasi, upload ke URL bertanda tangan, lalu publish (kontrak dari `docs/api/openapi.yaml`)
+- [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: JPEG 1200×630 maksimal 300.000 byte, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
+- [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
+- [ ] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`, atau gambar OG bawaan kalau sudah dihapus
+- [x] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore ([Deploy](#deploy))
 - [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
 
 **Sprint 3 (minggu 6–7)**
@@ -174,4 +178,20 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 ## Uji di HP sungguhan
 
 - `/lab/foil?bench=1` menjalankan benchmark otomatis; hasilnya muncul di pojok kanan atas dan bisa disalin dari langkah 5. Parameter lain: `?flip=1` (sampul belakang) dan `?open=1` (kartu terbuka).
-- `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: pakai preview deploy, atau `pnpm dev --host` lalu tunnel HTTPS.
+- `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: buka di domain produksi, atau `pnpm dev --host` lalu tunnel HTTPS.
+
+Domain produksi: [postpocket.vercel.app/lab/foil?bench=1](https://postpocket.vercel.app/lab/foil?bench=1) dan [postpocket.vercel.app/lab/safari](https://postpocket.vercel.app/lab/safari).
+
+## Deploy
+
+Proyek Vercel `postpocket` (Hobby, akun Kall) tersambung ke repo ini lewat GitHub. Setiap push ke `main` deploy ke produksi di [postpocket.vercel.app](https://postpocket.vercel.app), setiap PR dapat preview.
+
+| Setting | Nilai |
+| --- | --- |
+| Root directory | `apps/web`, file di luar root ikut di-build (misalnya `packages/presets`) |
+| Framework dan Node | Nuxt, 24.x |
+| Region fungsi | `sin1`, dekat dengan Supabase di Singapore |
+| Env production, preview, development | `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, nilainya sama dengan `apps/web/.env` |
+
+- Preview dilindungi Vercel Authentication, jadi hanya bisa dibuka akun pemilik proyek. Domain produksi terbuka untuk siapa saja.
+- Env baru atau yang berubah baru terpakai di deploy berikutnya. Hanya nilai yang aman di browser yang boleh masuk sini; secret key tetap di Supabase.
