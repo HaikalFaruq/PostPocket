@@ -82,7 +82,9 @@ export default defineNuxtConfig({
       clientsClaim: true,
       // Stiker WebP ikut disimpan supaya kantong Pocket dan editor surat tetap lengkap offline.
       globPatterns: ['**/*.{js,css,svg,png,webp}', 'offline.html'],
-      globIgnores: ['samples/**'],
+      // Pengubah HEIC (sekitar 2 MB) hanya dipakai kalau ada foto HEIC, jadi tidak ikut precache;
+      // setelah sekali dipakai, aturan /_nuxt/ di bawah tetap menyimpannya untuk offline.
+      globIgnores: ['samples/**', '**/heic.worker-*.js'],
       runtimeCaching: [
         {
           // Halaman: jaringan dulu, salinan terakhir kalau offline. Surat penerima (/l/…)

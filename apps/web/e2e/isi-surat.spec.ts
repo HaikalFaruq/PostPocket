@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 const cardPage = (page: Page) => page.getByTestId('letter-page')
@@ -113,4 +114,19 @@ test('foto isi surat mengisi slot template dan tetap ada setelah dimuat ulang', 
   await page.reload()
   await expect(cardPage(page).locator('[data-kind="photo"] img')).toHaveAttribute('src', /^blob:/)
   await expect(page.getByText('1 foto', { exact: true })).toBeVisible()
+})
+
+test('foto HEIC tanpa tipe (seperti di Windows) tetap masuk ke isi surat', async ({ page }) => {
+  const heic = readFileSync(new URL('./fixtures/foto.heic', import.meta.url))
+  await chooseTemplate(page, '1 foto + teks')
+  await openEditor(page)
+  await page
+    .getByTestId('content-photo-upload')
+    .setInputFiles({ name: 'IMG_0002.HEIC', mimeType: 'application/octet-stream', buffer: heic })
+  await expect(editorPage(page).locator('[data-kind="photo"] img')).toHaveAttribute(
+    'src',
+    /^blob:/,
+    { timeout: 20_000 },
+  )
+  await expect(editor(page).getByRole('alert')).toHaveCount(0)
 })

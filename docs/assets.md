@@ -17,3 +17,12 @@ Setiap aset yang masuk repo dicatat di sini (PRD bagian Risiko: lisensi aset tid
 | Stiker isi surat dan Pocket (18 buah) | `apps/web/public/stickers/` | [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) gaya 3D, commit `1ffb34c`, diperkecil ke WebP 192 px oleh `apps/web/scripts/stickers.mjs` | MIT, teks lisensinya di `apps/web/public/stickers/LICENSE` |
 
 Screenshot tiga web referensi tidak disimpan di repo karena repo public; yang ada di `docs/reference/` hanya ukuran dan catatan.
+
+## Pustaka dengan lisensi khusus
+
+Pustaka npm lain berlisensi permisif (MIT, Apache, ISC). Yang di bawah ini perlu perlakuan khusus.
+
+| Pustaka | Dipakai untuk | Lisensi | Catatan |
+| --- | --- | --- | --- |
+| `libheif-js` 1.23.2, berisi libheif dan libde265 (WebAssembly) | Mengubah foto HEIC ke JPEG di browser yang tidak bisa membukanya sendiri (Chrome, Firefox); Safari tidak memakainya | LGPL-3.0, teks lisensinya ada di paket npm | Dibundel tanpa diubah sebagai berkas terpisah `heic.worker-*.js`, jadi bisa diganti versi lain sesuai syarat LGPL. Hanya dimuat saat ada foto HEIC dan tidak ikut precache PWA. Format HEVC punya urusan paten; untuk beta gratis risikonya kecil, ditinjau lagi sebelum ada model bisnis. Versinya dipatok persis. |
+| Foto uji `apps/web/e2e/fixtures/foto.heic` | E2E HEIC | Milik sendiri | Gradien buatan sendiri, diubah ke HEIC dengan `sips` di macOS |

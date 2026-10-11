@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 // Hari ini dibuat tetap supaya kalender dan judul bulan bisa dicek pasti.
@@ -199,4 +200,29 @@ test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum data
   await page.goto('/pocket/2026-10-11')
   await expect(page).toHaveURL(/\/pocket$/)
   await expect(page.getByTestId('month-label')).toHaveText('Oktober 2026')
+})
+
+test('foto HEIC bisa dipilih dan tampil, juga di browser yang tidak membuka HEIC sendiri', async ({
+  page,
+}) => {
+  // Foto HEIC asli 480×360. Chrome dan Firefox mengubahnya ke JPEG di Web Worker.
+  const heic = readFileSync(new URL('./fixtures/foto.heic', import.meta.url))
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await page
+    .getByTestId('moment-upload')
+    .setInputFiles({ name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: heic })
+  const thumb = dialog.locator('img[src^="blob:"]').first()
+  await expect
+    .poll(() => thumb.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight]), {
+      timeout: 20_000,
+    })
+    .toEqual([480, 360])
+  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.goto(`/pocket/${TODAY}`)
+  await page.getByRole('button', { name: 'Buka kantong' }).click()
+  await expect(page.getByTestId('moment')).toHaveCount(1)
 })

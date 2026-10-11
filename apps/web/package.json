@@ -19,6 +19,7 @@
     "@vueuse/core": "^15.0.0",
     "@vueuse/nuxt": "^15.0.0",
     "idb-keyval": "^6.3.0",
+    "libheif-js": "1.23.2",
     "motion-v": "^2.6.0",
     "nuxt": "^4.6.1",
     "pinia": "^4.0.3",

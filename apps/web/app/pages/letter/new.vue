@@ -2,6 +2,7 @@
 import { byId, isFilledElement, letter } from '@postpocket/presets'
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
+import { looksLikeImage } from '~/utils/heic'
 import { MESSAGE_LIMIT } from '~/utils/letter-draft'
 
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
@@ -78,7 +79,7 @@ async function takeFile(file: File) {
 }
 
 function imageFile(list: FileList | null | undefined): File | undefined {
-  return [...(list ?? [])].find((file) => file.type.startsWith('image/'))
+  return [...(list ?? [])].find(looksLikeImage)
 }
 
 // Drop di mana saja di halaman.
