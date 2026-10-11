@@ -3,16 +3,33 @@ import {
   contentLimits,
   contentPhotoKeys,
   letter,
-  normalizeContent,
   type LetterContent,
   type LetterDesign,
 } from '@postpocket/presets'
 import type { H3Event } from 'h3'
 
 // Mock API surat untuk development dan E2E, mengikuti docs/api/openapi.yaml. Hanya aktif kalau
-// NUXT_MOCK_API=1. Datanya di memori proses, jadi hilang saat server dimatikan.
+// NUXT_MOCK_API=1. Datanya di memori proses, jadi hilang saat server dimatikan. Bentuk body
+// diperiksa langsung dengan skema kontrak (lihat contract.ts); yang dicek di sini hanya isinya.
 
 const DAY = 24 * 60 * 60 * 1000
+
+interface FileMeta {
+  type: string
+  width: number
+  height: number
+  size: number
+}
+
+/** Body `POST /letters` yang sudah lolos skema `CreateLetterRequest`. */
+interface CreateBody {
+  design: LetterDesign
+  content: LetterContent
+  cover?: FileMeta | null
+  photos: (FileMeta & { key: string })[]
+  og: FileMeta
+  replyTo?: string | null
+}
 
 interface MockFile {
   kind: 'cover' | 'photo' | 'og'
@@ -48,9 +65,15 @@ export function assertMockEnabled(event: H3Event) {
 }
 
 /** Respons error dengan bentuk skema `Error` di kontrak. */
-export function fail(event: H3Event, status: number, code: string, message: string) {
+export function fail(
+  event: H3Event,
+  status: number,
+  code: string,
+  message: string,
+  details?: { path: string; message: string }[],
+) {
   setResponseStatus(event, status)
-  return { error: { code, message } }
+  return { error: details?.length ? { code, message, details } : { code, message } }
 }
 
 function slugOf(): string {
@@ -60,87 +83,74 @@ function slugOf(): string {
 
 const iso = (time: number | null) => (time === null ? null : new Date(time).toISOString())
 
-function isImageMeta(value: unknown, types: string[], maxSide: number, maxSize: number) {
-  if (!value || typeof value !== 'object') return false
-  const meta = value as Record<string, unknown>
-  return (
-    types.includes(meta.type as string) &&
-    Number.isInteger(meta.width) &&
-    Number.isInteger(meta.height) &&
-    Number.isInteger(meta.size) &&
-    (meta.width as number) >= 1 &&
-    (meta.height as number) >= 1 &&
-    (meta.width as number) <= maxSide &&
-    (meta.height as number) <= maxSide &&
-    (meta.size as number) >= 1 &&
-    (meta.size as number) <= maxSize
-  )
-}
-
-function validDesign(value: unknown): value is LetterDesign {
-  if (!value || typeof value !== 'object') return false
-  const design = value as Record<string, unknown>
-  const has = (list: readonly { id: string }[], id: unknown) =>
-    typeof id === 'string' && list.some((item) => item.id === id)
+function validDesign(design: LetterDesign): boolean {
+  const has = (list: readonly { id: string }[], id: string) => list.some((item) => item.id === id)
   const upload = design.illustration === 'upload'
   return (
     (upload || has(letter.illustrations, design.illustration)) &&
     has(letter.shapes, design.shape) &&
     has(letter.foilModes, design.foilMode) &&
     !(upload && design.foilMode === 'design') &&
-    typeof design.foilBorder === 'boolean' &&
     has(letter.foilColors, design.foilColor) &&
     has(letter.papers, design.paper) &&
     has(letter.templates, design.template)
   )
 }
 
-/** Validasi `POST /letters`. Mengembalikan kode error kontrak, atau `null` kalau lolos. */
-function invalid(body: Record<string, unknown>): [string, string] | null {
-  if (!validDesign(body.design)) return ['invalid_design', 'design tidak sesuai preset']
-  const content = normalizeContent(body.content)
-  const exact = JSON.stringify(content) === JSON.stringify(body.content)
-  const filled = content.elements.every((element) =>
-    element.kind === 'photo'
-      ? element.photo !== null
-      : element.kind !== 'text' || element.text.trim() !== '',
+/** Aturan isi di deskripsi kontrak yang tidak bisa ditulis sebagai skema. */
+function validContent(content: LetterContent): boolean {
+  const ids = new Set(content.elements.map((element) => element.id))
+  const counts = { text: 0, photo: 0, sticker: 0 }
+  for (const element of content.elements) counts[element.kind]++
+  const photos = contentPhotoKeys(content)
+  return (
+    ids.size === content.elements.length &&
+    new Set(photos).size === photos.length &&
+    counts.text <= contentLimits.text &&
+    counts.photo <= contentLimits.photo &&
+    counts.sticker <= contentLimits.sticker &&
+    content.elements.every((element) => element.kind !== 'text' || element.text.trim() !== '') &&
+    content.elements.every(
+      (element) =>
+        element.kind !== 'sticker' || letter.stickers.some((item) => item.id === element.sticker),
+    )
   )
-  if (!exact || !filled) return ['invalid_content', 'content tidak sesuai skema']
-  const photos = Array.isArray(body.photos) ? (body.photos as Record<string, unknown>[]) : null
-  if (!photos || photos.length > contentLimits.photo) return ['invalid_request', 'photos']
-  const keys = photos.map((photo) => photo.key)
-  const wanted = contentPhotoKeys(content)
+}
+
+/** Body yang bentuknya sudah sesuai skema tapi isinya ditolak (422). */
+function unprocessable(body: CreateBody): [string, string] | null {
+  if (!validDesign(body.design)) return ['invalid_design', 'design tidak sesuai preset']
+  if (!validContent(body.content)) return ['invalid_content', 'content melanggar batas isi surat']
+  const keys = body.photos.map((photo) => photo.key)
+  const wanted = contentPhotoKeys(body.content)
   const sameKeys =
     new Set(keys).size === keys.length &&
     keys.length === wanted.length &&
     wanted.every((key) => keys.includes(key))
   if (!sameKeys) return ['photo_mismatch', 'photos[].key tidak sama dengan content']
-  const photoTypes = ['image/jpeg', 'image/webp']
-  if (!photos.every((photo) => isImageMeta(photo, photoTypes, 2048, 500_000))) {
-    return ['invalid_request', 'metadata foto']
-  }
-  const needsCover = (body.design as LetterDesign).illustration === 'upload'
-  if (needsCover !== (body.cover !== null && body.cover !== undefined)) {
+  if ((body.design.illustration === 'upload') !== (body.cover != null)) {
     return ['cover_mismatch', 'cover wajib hanya kalau illustration = upload']
   }
-  if (needsCover && !isImageMeta(body.cover, photoTypes, 2048, 500_000)) {
-    return ['invalid_request', 'metadata cover']
-  }
-  const og = body.og as Record<string, unknown> | undefined
-  const ogOk =
-    isImageMeta(og, ['image/jpeg', 'image/png'], 1200, 300_000) &&
-    og?.width === 1200 &&
-    og?.height === 630
-  if (!ogOk) return ['invalid_request', 'metadata og']
-  const reply = body.replyTo
-  if (reply !== null && reply !== undefined && !(typeof reply === 'string' && slugs.has(reply))) {
+  if (body.replyTo != null && !slugs.has(body.replyTo)) {
     return ['reply_not_found', 'replyTo tidak ditemukan']
   }
   return null
 }
 
-export function createMockLetter(event: H3Event, body: Record<string, unknown>) {
-  const problem = invalid(body)
+export async function createMockLetter(event: H3Event, raw: unknown) {
+  const validate = (await useContract())('CreateLetterRequest')
+  if (!validate(raw)) {
+    const details = contractDetails(validate.errors)
+    const where = details[0]?.path ?? ''
+    const code = where.startsWith('design')
+      ? 'invalid_design'
+      : where.startsWith('content')
+        ? 'invalid_content'
+        : 'invalid_request'
+    return fail(event, 400, code, 'body tidak sesuai skema CreateLetterRequest', details)
+  }
+  const body = raw as CreateBody
+  const problem = unprocessable(body)
   if (problem) return fail(event, 422, problem[0], problem[1])
   const id = randomUUID()
   const origin = getRequestURL(event).origin
@@ -150,23 +160,16 @@ export function createMockLetter(event: H3Event, body: Record<string, unknown>) 
     token: randomBytes(12).toString('hex'),
   })
   const files: MockFile[] = []
-  if (body.cover)
-    files.push(
-      target({ kind: 'cover', ...(body.cover as Omit<MockFile, 'kind' | 'path' | 'token'>) }),
-    )
-  for (const photo of body.photos as (Omit<MockFile, 'kind' | 'path' | 'token'> & {
-    key: string
-  })[]) {
-    files.push(target({ ...photo, kind: 'photo' }))
-  }
-  files.push(target({ kind: 'og', ...(body.og as Omit<MockFile, 'kind' | 'path' | 'token'>) }))
+  if (body.cover) files.push(target({ kind: 'cover', ...body.cover }))
+  for (const photo of body.photos) files.push(target({ kind: 'photo', ...photo }))
+  files.push(target({ kind: 'og', ...body.og }))
   const draft: MockLetter = {
     id,
     editToken: randomBytes(24).toString('base64url'),
     slug: null,
-    design: body.design as LetterDesign,
-    content: body.content as LetterContent,
-    replyTo: (body.replyTo as string | null | undefined) ?? null,
+    design: body.design,
+    content: body.content,
+    replyTo: body.replyTo ?? null,
     files,
     draftExpiresAt: Date.now() + DAY,
     publishedAt: null,

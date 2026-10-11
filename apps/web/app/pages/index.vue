@@ -131,6 +131,8 @@ const open = ref(false)
       </figure>
     </main>
 
+    <InstallCard class="mb-6 max-w-md" />
+
     <footer
       class="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft py-5 text-caption text-ink-subtle"
     >

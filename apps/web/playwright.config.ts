@@ -16,6 +16,8 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'retain-on-failure',
+    // Service worker hanya dinyalakan di e2e/pwa.spec.ts, supaya tes lain tidak memakai cache.
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'android', use: { ...devices['Pixel 7'], launchOptions: fakeCamera } },
