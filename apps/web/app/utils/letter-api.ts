@@ -257,10 +257,11 @@ export function createLetterApi(options: {
   const base = options.base.replace(/\/$/, '')
   const run = options.fetch ?? globalThis.fetch.bind(globalThis)
 
+  /** `alsoOk`: satu status selain 2xx yang di kontrak membawa body sukses. */
   async function call<T>(
     method: string,
     path: string,
-    init: { body?: unknown; editToken?: string } = {},
+    init: { body?: unknown; editToken?: string; alsoOk?: number } = {},
   ) {
     const headers: Record<string, string> = { apikey: options.apiKey }
     if (init.body !== undefined) headers['content-type'] = 'application/json'
@@ -275,15 +276,16 @@ export function createLetterApi(options: {
     } catch {
       throw new LetterApiError('network', `${method} ${path} gagal tersambung`)
     }
-    // 409 saat publish membawa slug yang sama, jadi diperlakukan sebagai berhasil.
-    if (!response.ok && response.status !== 409) throw await failure(response)
+    if (!response.ok && response.status !== init.alsoOk) throw await failure(response)
     return (response.status === 204 ? undefined : await response.json()) as T
   }
 
   return {
     create: (body) => call('POST', '/letters', { body }),
+    // 409: surat sudah pernah terbit dan body-nya slug serta link yang sama, jadi publish yang
+    // diulang (misalnya setelah koneksi putus) tetap berhasil. Endpoint lain tidak punya 409.
     publish: (id, editToken) =>
-      call('POST', `/letters/${encodeURIComponent(id)}/publish`, { editToken }),
+      call('POST', `/letters/${encodeURIComponent(id)}/publish`, { editToken, alsoOk: 409 }),
     get: (slug) => call('GET', `/l/${encodeURIComponent(slug)}`),
     open: (slug) => call('POST', `/l/${encodeURIComponent(slug)}/open`),
     remove: (id, editToken) => call('DELETE', `/letters/${encodeURIComponent(id)}`, { editToken }),
