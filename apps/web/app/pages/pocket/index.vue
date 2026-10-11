@@ -178,9 +178,11 @@ function openDay(day: string) {
         </div>
       </section>
 
-      <p class="mt-6 text-center text-caption text-pocket-muted">
-        Data dan foto hanya tersimpan di perangkat ini. Buka kantong untuk memutarnya di TV atau
-        mengirimnya sebagai surat.
+      <p
+        class="mx-auto mt-6 max-w-md rounded-[16px] bg-surface/70 px-4 py-3 text-center text-caption text-pocket-ink"
+      >
+        Foto dan kantongmu hanya tersimpan di perangkat ini. Kalau data browser dihapus, isinya ikut
+        hilang.
       </p>
     </div>
 

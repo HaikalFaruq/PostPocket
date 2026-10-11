@@ -120,21 +120,16 @@ const open = ref(false)
             </template>
           </ClientOnly>
         </div>
-        <figcaption class="mt-2 text-caption text-ink-subtle">
-          Contoh surat · tap untuk membuka, geser untuk memutar
+        <figcaption class="mt-2 text-caption text-ink-muted">
+          Contoh surat · ketuk untuk membuka, geser untuk memutar
         </figcaption>
       </figure>
     </main>
 
     <InstallCard class="mb-6 max-w-md" />
 
-    <footer
-      class="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft py-5 text-caption text-ink-subtle"
-    >
-      <p>Masih Sprint 0 · beta tertutup sekitar minggu ke-10</p>
-      <NuxtLink to="/lab" class="underline underline-offset-2 hover:text-ink"
-        >Lab komponen</NuxtLink
-      >
+    <footer class="border-t border-line-soft py-5 text-caption text-ink-muted">
+      <p>Versi beta · foto, kantong, dan draf suratmu tersimpan di perangkat ini.</p>
     </footer>
   </div>
 </template>
