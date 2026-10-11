@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { LetterApiError } from '~/utils/letter-api'
+import { sentHere } from '~/utils/sent-letters'
 
 /**
  * Halaman penerima surat (PRD: Kirim dan buka). Di-SSR supaya meta OG terbaca crawler WhatsApp
@@ -42,10 +43,17 @@ useSeoMeta({
 
 const open = ref(false)
 const reading = ref(false)
+// Pengirim yang melihat suratnya sendiri (pratinjau) tidak menandainya dibuka, supaya hitungan
+// 7 hari foto baru mulai saat penerima membukanya.
+const ownLetter = ref(false)
+onMounted(async () => {
+  ownLetter.value = await sentHere(slug)
+})
 let marked = false
 watch(open, async (isOpen) => {
   if (!isOpen || marked || !letter.value) return
   marked = true
+  if (ownLetter.value || (await sentHere(slug))) return
   try {
     const opened = await api.open(slug)
     letter.value = { ...letter.value, ...opened }
@@ -111,6 +119,7 @@ const formatDate = (value: string | null | undefined) =>
             Baca lebih besar
           </button>
           <NuxtLink
+            v-if="!ownLetter"
             :to="`/letter/new?balas=${letter.slug}`"
             class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-5 text-body font-semibold text-white hover:bg-ink/90"
             data-testid="reply"
@@ -128,6 +137,15 @@ const formatDate = (value: string | null | undefined) =>
         <template v-else-if="hasPhotos && letter.photosExpireAt">
           Foto di dalamnya dihapus {{ formatDate(letter.photosExpireAt) }}.
         </template>
+      </p>
+      <p
+        v-if="ownLetter"
+        class="mt-3 max-w-sm rounded-control bg-fill px-3 py-2 text-center text-caption"
+        data-testid="own-letter-note"
+      >
+        Ini pratinjau suratmu. Penerima melihat halaman yang sama<template v-if="hasPhotos"
+          >, dan membukanya di sini tidak memulai hitungan 7 hari fotonya</template
+        >.
       </p>
     </main>
 

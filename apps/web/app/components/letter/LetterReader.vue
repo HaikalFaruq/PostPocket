@@ -23,6 +23,11 @@ defineProps<{
   ratio: number
 }>()
 const open = defineModel<boolean>('open', { default: false })
+
+// Back di HP menutup tampilan baca, bukan meninggalkan halaman surat.
+useBackToClose(open, () => {
+  open.value = false
+})
 </script>
 
 <template>
