@@ -128,8 +128,18 @@ const open = ref(false)
 
     <InstallCard class="mb-6 max-w-md" />
 
-    <footer class="border-t border-line-soft py-5 text-caption text-ink-muted">
+    <footer
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-soft py-5 text-caption text-ink-muted"
+    >
       <p>Versi beta · foto, kantong, dan draf suratmu tersimpan di perangkat ini.</p>
+      <nav aria-label="Tentang PostPocket" class="flex gap-4">
+        <NuxtLink to="/privasi" class="underline underline-offset-2 hover:text-ink"
+          >Privasi</NuxtLink
+        >
+        <NuxtLink to="/lisensi" class="underline underline-offset-2 hover:text-ink"
+          >Lisensi</NuxtLink
+        >
+      </nav>
     </footer>
   </div>
 </template>
