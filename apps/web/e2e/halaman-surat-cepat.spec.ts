@@ -55,8 +55,9 @@ async function sprigLetter(request: APIRequestContext): Promise<string> {
 test('gambar depan kartu di-preload dari HTML halaman surat', async ({ request }) => {
   const slug = await sprigLetter(request)
   const html = await (await request.get(`/l/${slug}`)).text()
+  // crossorigin sama dengan <img> kartu dan pemuat kanvas, supaya preload-nya terpakai.
   expect(html).toMatch(
-    /<link rel="preload" as="image" href="\/illustrations\/sprig\.svg" fetchpriority="high">/,
+    /<link rel="preload" as="image" href="\/illustrations\/sprig\.svg" crossorigin="anonymous" fetchpriority="high">/,
   )
   expect(html).toContain('href="/illustrations/sprig-foil.svg"')
 })

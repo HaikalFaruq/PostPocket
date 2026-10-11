@@ -43,8 +43,15 @@ const cardHeight = computed(() => cardWidth.value / props.ratio)
 // melompat ke ukuran sebenarnya, dan halaman penerima mendapat layout shift.
 const measured = computed(() => stageWidth.value > 0 && stageHeight.value > 0)
 
-// Isi kartu (termasuk foto-fotonya) baru dirender saat kartu dibuka atau browser senggang setelah
-// halaman dimuat, supaya foto isi tidak berebut jaringan dengan gambar depan kartu.
+// Gambar depan muncul pelan begitu termuat, bukan muncul tiba-tiba di atas kartu kosong.
+const artLoaded = ref(false)
+function onArtSettled() {
+  artLoaded.value = true
+}
+
+// Isi kartu (termasuk foto-fotonya) baru dirender saat kartu dibuka, atau saat browser senggang
+// setelah gambar depan termuat (tanpa gambar depan: setelah halaman dimuat), supaya foto isi
+// tidak berebut jaringan dengan gambar depan.
 const insideReady = ref(false)
 watch(open, (isOpen) => isOpen && (insideReady.value = true), { immediate: true })
 onMounted(() => {
@@ -53,7 +60,8 @@ onMounted(() => {
     'requestIdleCallback' in window
       ? window.requestIdleCallback(ready, { timeout: 1500 })
       : setTimeout(ready, 300)
-  if (document.readyState === 'complete') later()
+  if (props.art) watch(artLoaded, (loaded) => loaded && later(), { immediate: true })
+  else if (document.readyState === 'complete') later()
   else window.addEventListener('load', later, { once: true })
 })
 /** Kartu terbuka dua kali lebih lebar, jadi diperkecil supaya tetap ada jarak ke tepi. */
@@ -144,13 +152,19 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
         <!-- Lembar depan: sampul foil, dengan bagian dalam sampul di baliknya. -->
         <div class="foil-leaf foil-leaf--front">
           <div class="foil-face foil-face--front">
+            <!-- crossorigin sama dengan pemuat kanvas (peta foil), jadi preload dari halaman
+                 surat terpakai dan gambarnya tidak diunduh dua kali. -->
             <img
               v-if="art"
               class="foil-art"
+              :class="{ 'is-loaded': artLoaded }"
               :src="art"
               alt=""
               draggable="false"
               fetchpriority="high"
+              crossorigin="anonymous"
+              @load="onArtSettled"
+              @error="onArtSettled"
             />
             <div class="foil-grain" />
             <template v-if="foilMask">
@@ -284,6 +298,18 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
   height: 100%;
   object-fit: cover;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 240ms ease-out;
+}
+
+.foil-art.is-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foil-art {
+    transition: none;
+  }
 }
 
 .foil-grain {
