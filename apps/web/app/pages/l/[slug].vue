@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { LetterApiError } from '~/utils/letter-api'
+import { sentHere } from '~/utils/sent-letters'
 
 /**
  * Halaman penerima surat (PRD: Kirim dan buka). Di-SSR supaya meta OG terbaca crawler WhatsApp
@@ -7,7 +8,11 @@ import { LetterApiError } from '~/utils/letter-api'
  * menandainya dibuka; yang menandai hanya ketukan pertama di kartu.
  */
 const route = useRoute()
-const slug = String(route.params.slug)
+// Link yang tersalin bersama tanda baca di belakangnya (misalnya titik di akhir kalimat chat)
+// diarahkan ke link suratnya, bukan dibilang suratnya sudah tidak ada.
+const rawSlug = String(route.params.slug)
+const slug = rawSlug.replace(/[^A-Za-z0-9]+$/, '')
+if (slug && slug !== rawSlug) await navigateTo(`/l/${slug}`, { redirectCode: 301, replace: true })
 const api = useLetterApi()
 
 const { data: letter, error } = await useAsyncData(`surat-${slug}`, () =>
@@ -41,10 +46,24 @@ useSeoMeta({
 })
 
 const open = ref(false)
+const reading = ref(false)
+// Pengirim yang melihat suratnya sendiri (pratinjau) tidak menandainya dibuka, supaya hitungan
+// 7 hari foto baru mulai saat penerima membukanya.
+const ownLetter = ref(false)
+onMounted(async () => {
+  ownLetter.value = await sentHere(slug)
+})
+// Ajakan mengetuk baru tampil saat kartunya benar-benar bisa diketuk, bukan selama JavaScript
+// masih dimuat (di 4G lambat bisa beberapa detik).
+const interactive = ref(false)
+onMounted(() => {
+  interactive.value = true
+})
 let marked = false
 watch(open, async (isOpen) => {
   if (!isOpen || marked || !letter.value) return
   marked = true
+  if (ownLetter.value || (await sentHere(slug))) return
   try {
     const opened = await api.open(slug)
     letter.value = { ...letter.value, ...opened }
@@ -86,7 +105,7 @@ const formatDate = (value: string | null | undefined) =>
     <main v-if="letter" class="flex flex-1 flex-col items-center">
       <div class="relative h-[min(64dvh,560px)] w-full">
         <ClientOnly>
-          <ReceivedLetter v-model:open="open" :letter="letter" />
+          <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
           <template #fallback>
             <div class="grid size-full place-items-center">
               <div class="aspect-[0.72] h-[72%] rounded-[3px] bg-surface shadow-raised" />
@@ -94,17 +113,36 @@ const formatDate = (value: string | null | undefined) =>
           </template>
         </ClientOnly>
       </div>
-      <p class="mt-2 text-caption text-ink-subtle">
-        {{ open ? 'Geser untuk memutar, ketuk untuk menutup' : 'Ketuk kartu untuk membuka' }}
-      </p>
-
-      <NuxtLink
-        :to="`/letter/new?balas=${letter.slug}`"
-        class="mt-6 inline-flex h-11 items-center gap-2 rounded-control bg-ink px-6 text-body font-semibold text-white hover:bg-ink/90"
-        data-testid="reply"
+      <!-- Sebelum dibuka, satu-satunya langkah adalah mengetuk kartu; balasan baru muncul sesudahnya. -->
+      <p
+        v-if="!open"
+        class="mt-3 text-body font-semibold text-ink"
+        :class="{ invisible: !interactive }"
+        data-testid="open-hint"
       >
-        Bikin balasan <Icon name="arrow-right" :size="15" />
-      </NuxtLink>
+        Ketuk kartunya untuk membuka suratmu
+      </p>
+      <template v-else>
+        <p class="mt-2 text-caption text-ink-muted">Geser untuk memutar, ketuk untuk menutup</p>
+        <!-- Di dalam kartu, halaman surat hanya separuh lebar kartu; di HP tulisannya jadi kecil. -->
+        <div class="mt-4 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            class="inline-flex h-11 items-center gap-2 rounded-control bg-surface px-5 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+            @click="reading = true"
+          >
+            Baca lebih besar
+          </button>
+          <NuxtLink
+            v-if="!ownLetter"
+            :to="`/letter/new?balas=${letter.slug}`"
+            class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-5 text-body font-semibold text-white hover:bg-ink/90"
+            data-testid="reply"
+          >
+            Bikin balasan <Icon name="arrow-right" :size="15" />
+          </NuxtLink>
+        </div>
+      </template>
 
       <p class="mt-6 max-w-sm text-center text-caption text-ink-muted">
         Surat ini bisa dibuka sampai {{ formatDate(letter.expiresAt) }}.
@@ -114,6 +152,15 @@ const formatDate = (value: string | null | undefined) =>
         <template v-else-if="hasPhotos && letter.photosExpireAt">
           Foto di dalamnya dihapus {{ formatDate(letter.photosExpireAt) }}.
         </template>
+      </p>
+      <p
+        v-if="ownLetter"
+        class="mt-3 max-w-sm rounded-control bg-fill px-3 py-2 text-center text-caption"
+        data-testid="own-letter-note"
+      >
+        Ini pratinjau suratmu. Penerima melihat halaman yang sama<template v-if="hasPhotos"
+          >, dan membukanya di sini tidak memulai hitungan 7 hari fotonya</template
+        >.
       </p>
     </main>
 
@@ -128,7 +175,7 @@ const formatDate = (value: string | null | undefined) =>
       <p class="mt-2 max-w-sm text-ink-muted">
         {{
           missing
-            ? 'Mungkin sudah lewat 30 hari, atau pengirimnya menghapusnya.'
+            ? 'Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau link-nya terpotong saat disalin.'
             : 'Coba muat ulang halaman ini sebentar lagi.'
         }}
       </p>

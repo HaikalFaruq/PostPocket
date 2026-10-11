@@ -8,6 +8,8 @@ import { cardRatio } from '~/utils/letter-draft'
  */
 const props = defineProps<{ letter: Letter }>()
 const open = defineModel<boolean>('open', { default: false })
+/** Tampilan baca selebar layar (LetterReader). */
+const reading = defineModel<boolean>('reading', { default: false })
 
 const design = computed(() => props.letter.design)
 const coverUrl = computed(() => props.letter.cover?.url ?? null)
@@ -19,6 +21,14 @@ const photoUrls = computed(() =>
 </script>
 
 <template>
+  <LetterReader
+    v-model:open="reading"
+    :content="letter.content"
+    :photo-urls="photoUrls"
+    :photo-placeholder="letter.photosDeletedAt ? 'Foto sudah dihapus' : undefined"
+    :paper="paper"
+    :ratio="ratio"
+  />
   <FoilCard
     v-model:open="open"
     :art="art"
