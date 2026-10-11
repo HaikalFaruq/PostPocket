@@ -135,6 +135,12 @@ function close() {
   if (state.value !== 'sending') emit('close')
 }
 
+// Back di HP menutup lembar ini, kecuali selagi link sedang dibuat.
+useBackToClose(true, () => {
+  if (state.value === 'sending') return false
+  close()
+})
+
 useEventListener(document, 'keydown', (event: KeyboardEvent) => {
   if (event.key === 'Escape') close()
 })

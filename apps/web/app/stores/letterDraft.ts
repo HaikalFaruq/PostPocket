@@ -9,6 +9,7 @@ import {
   letter,
   normalizeContent,
   surprise,
+  tidyStickers as tidiedStickers,
   type LetterContent,
   type LetterDesign,
   type LetterElement,
@@ -64,6 +65,25 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   const ratio = computed(() => cardRatio(design.value, photo.value))
   /** Draf belum berisi apa pun yang bisa dikirim: tanpa isi surat dan tanpa foto depan. */
   const blank = computed(() => !isPhotoFront.value && !content.value.elements.some(isFilledElement))
+
+  /** Potongan isi draf supaya user mengenalinya, misalnya di dialog "Masih ada draf surat". */
+  const summary = computed(() => {
+    const text = content.value.elements.find(
+      (e): e is TextElement => e.kind === 'text' && !!e.text.trim(),
+    )
+    if (text) {
+      const line = Array.from(text.text.trim().split('\n')[0]!)
+      return line.length > 60 ? `${line.slice(0, 60).join('').trimEnd()}…` : line.join('')
+    }
+    const count = content.value.elements.filter((e) => e.kind === 'photo' && e.photo).length
+    if (count) return `${count} foto, belum ada tulisan`
+    return isPhotoFront.value ? 'Kartu bergambar foto, belum ada isinya' : 'Kartu tanpa tulisan'
+  })
+  /** Isi surat sudah berisi 4 foto tanpa slot kosong, jadi foto baru tidak bisa ditambahkan. */
+  const photosFull = computed(() => {
+    const photoSlots = content.value.elements.filter((e) => e.kind === 'photo')
+    return photoSlots.length >= contentLimits.photo && photoSlots.every((e) => e.photo)
+  })
 
   // Sidik draf: desain, isi, dan foto depan. Berubah begitu user mengubah apa pun.
   const signature = computed(() =>
@@ -333,6 +353,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     })
   }
 
+  /** Stiker yang menutupi teks atau foto dipindah ke tempat yang kosong. */
+  function tidyStickers(random: () => number = Math.random) {
+    setContent(tidiedStickers(content.value, ratio.value, random))
+  }
+
   /** Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah. */
   function setTemplate(id: string) {
     const template = byId(letter.templates, id)
@@ -416,6 +441,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     photoUrl,
     isPhotoFront,
     blank,
+    summary,
+    photosFull,
     sent,
     markSent,
     clearSent,
@@ -437,6 +464,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     bringToFront,
     addText,
     fitPhotos,
+    tidyStickers,
     addSticker,
     addPhoto,
     setTemplate,

@@ -20,16 +20,24 @@ export interface PendingPhoto {
  * "Batal" tidak membuang apa pun. Mengembalikan `false` kalau dibatalkan.
  */
 export async function sendPhotoToLetter(photo: DraftPhoto, from: string): Promise<boolean> {
+  const router = useRouter()
   const draft = useLetterDraft()
   await draft.load()
   let mode: DraftChoice = 'new'
   if (!draft.blank && !draft.sent) {
-    const choice = await askDraftChoice({ kind: 'photo', from })
+    const choice = await askDraftChoice({
+      kind: 'photo',
+      from,
+      draft: draft.summary,
+      full: draft.photosFull,
+    })
     if (!choice) return false
     mode = choice
   }
   await set(KEY, { ...(await toStoredPhoto(photo)), from, mode })
-  await navigateTo('/letter/new?foto=1')
+  // Bukan navigateTo(): selagi navigasi lain berjalan (misalnya popstate dari dialog yang baru
+  // ditutup), navigateTo() diam-diam tidak memindahkan halaman.
+  await router.push('/letter/new?foto=1')
   return true
 }
 

@@ -20,6 +20,11 @@ const emit = defineEmits<{ changed: [] }>()
 const draft = useLetterDraft()
 const api = useLetterApi()
 
+// Back di HP menutup daftar ini, bukan meninggalkan editor.
+useBackToClose(open, () => {
+  open.value = false
+})
+
 const letters = ref<SentRecord[]>([])
 const copied = ref<string | null>(null)
 const busy = ref<string | null>(null)

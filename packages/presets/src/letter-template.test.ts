@@ -11,6 +11,7 @@ import {
   fitPhoto,
   freeSpot,
   templateElements,
+  tidyStickers,
   templateForPhotos,
 } from './letter-template'
 
@@ -213,3 +214,35 @@ function textBounds(element: LetterElement, ratio: number) {
   const height = lines * element.size * 1.25 * ratio
   return { ...bounds(element, ratio), top: element.y - height / 2, bottom: element.y + height / 2 }
 }
+
+describe('tidyStickers', () => {
+  it('stiker yang menutupi pesan dipindah, stiker lain tetap', () => {
+    const [text] = templateElements(template('text'), 0.75)
+    const message = { ...text!, id: 't', text: 'Halo Rara, selamat ulang tahun!' }
+    const onText = {
+      kind: 'sticker',
+      id: 's1',
+      x: message.x,
+      y: message.y,
+      width: 0.2,
+      rotation: 5,
+      sticker: 'heart',
+    }
+    const corner = {
+      kind: 'sticker',
+      id: 's2',
+      x: 0.88,
+      y: 0.08,
+      width: 0.15,
+      rotation: 0,
+      sticker: 'star',
+    }
+    const content = normalizeContent({ elements: [message, onText, corner] })
+    const next = tidyStickers(content, 0.75, () => 0)
+    expect(next.elements.map((e) => e.id)).toEqual(['t', 's1', 's2'])
+    const moved = next.elements[1]!
+    expect([moved.x, moved.y]).not.toEqual([message.x, message.y])
+    expect(moved).toMatchObject({ rotation: 5, sticker: 'heart' })
+    expect(next.elements[2]).toEqual(content.elements[2])
+  })
+})

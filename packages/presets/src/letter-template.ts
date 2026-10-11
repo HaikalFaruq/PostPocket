@@ -179,3 +179,42 @@ export function freeSpot(
   const pick = best[Math.min(best.length - 1, Math.floor(random() * best.length))]!
   return { x: round(pick.x), y: round(pick.y) }
 }
+
+function overlaps(a: ReturnType<typeof elementBox>, b: ReturnType<typeof elementBox>): boolean {
+  return (
+    Math.min(a.right, b.right) > Math.max(a.left, b.left) &&
+    Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top)
+  )
+}
+
+/**
+ * Stiker yang menutupi teks atau foto dipindah ke tempat yang kosong (`freeSpot`), misalnya
+ * setelah tata letak diganti otomatis. Stiker lain dan urutan tumpukannya tetap.
+ */
+export function tidyStickers(
+  content: LetterContent,
+  pageRatio: number,
+  random: () => number = Math.random,
+): LetterContent {
+  const settled: LetterElement[] = content.elements.filter((element) => element.kind !== 'sticker')
+  const blockers = settled.map((element) => elementBox(element, pageRatio))
+  const elements = content.elements.map((element) => {
+    if (element.kind !== 'sticker') return element
+    const box = elementBox(element, pageRatio)
+    const next = blockers.some((other) => overlaps(box, other))
+      ? {
+          ...element,
+          ...freeSpot(
+            { version: 1, elements: settled },
+            element.width,
+            element.width * pageRatio,
+            pageRatio,
+            random,
+          ),
+        }
+      : element
+    settled.push(next)
+    return next
+  })
+  return normalizeContent({ version: 1, elements })
+}

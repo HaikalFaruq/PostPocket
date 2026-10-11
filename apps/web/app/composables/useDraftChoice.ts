@@ -4,8 +4,14 @@ export type DraftChoice = 'new' | 'add'
 export interface DraftQuestion {
   /** `photo`: foto dari Pocket atau Booth mau dipakai di surat. `reply`: mulai membalas surat. */
   kind: 'photo' | 'reply'
+  /** Potongan isi draf yang belum dikirim, supaya user tahu draf yang mana. */
+  draft: string
   /** Asal foto untuk keterangan, misalnya "Booth". */
   from?: string
+  /** Draf sudah berisi 4 foto, jadi fotonya tidak bisa ditambahkan. */
+  full?: boolean
+  /** Draf itu sudah jadi balasan untuk surat lain. */
+  replyingElsewhere?: boolean
 }
 
 // Hanya diisi dari event di browser, jadi tidak pernah terbawa antar-request di server.
@@ -29,8 +35,13 @@ export function askDraftChoice(question: DraftQuestion): Promise<DraftChoice | n
 export function useDraftChoice() {
   function answer(choice: DraftChoice | null) {
     const current = asking.value
-    asking.value = null
-    current?.answer(choice)
+    if (!current) return
+    current.answer(choice)
+    // Dialog ditutup sesaat kemudian, setelah pemanggilnya selesai (misalnya tombol "Pakai di
+    // surat" aktif lagi), supaya fokus kembali ke tombol itu, bukan ke <body>.
+    setTimeout(() => {
+      if (asking.value === current) asking.value = null
+    })
   }
   return { asking: readonly(asking), answer }
 }

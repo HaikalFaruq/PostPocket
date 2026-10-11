@@ -15,17 +15,21 @@ import {
  */
 const { asking, answer } = useDraftChoice()
 const keepButton = ref<HTMLButtonElement | null>(null)
+const cancelButton = ref<HTMLButtonElement | null>(null)
 
-// Fokus awal di pilihan yang tidak menghapus apa pun, jadi Enter tidak membuang draf.
-function focusSafeChoice(event: Event) {
-  event.preventDefault()
-  keepButton.value?.focus()
-}
+// Back di HP sama dengan Batal, dan dialog tidak ikut terbawa ke halaman lain.
+useBackToClose(
+  () => !!asking.value,
+  () => answer(null),
+)
+useRouter().afterEach((to, from) => {
+  if (to.path !== from.path) answer(null)
+})
 
 const text = computed(() =>
   asking.value?.kind === 'reply'
     ? {
-        question: 'Mulai balasan baru, atau jadikan draf itu balasannya?',
+        question: 'Mulai balasan baru, atau jadikan draf itu balasan untuk surat ini?',
         warning: 'Kalau mulai balasan baru, draf itu dihapus.',
         fresh: 'Hapus draf, mulai balasan',
         keep: 'Jadikan draf ini balasan',
@@ -37,6 +41,14 @@ const text = computed(() =>
         keep: 'Tambahkan ke draf',
       },
 )
+
+// Fokus awal di pilihan yang tidak menghapus apa pun, jadi Enter tidak membuang draf. Untuk
+// balasan, "Batal": memindahkan draf ke surat lain juga bisa salah alamat.
+function focusSafeChoice(event: Event) {
+  event.preventDefault()
+  const safe = asking.value?.kind === 'reply' || asking.value?.full ? cancelButton : keepButton
+  safe.value?.focus()
+}
 </script>
 
 <template>
@@ -51,7 +63,14 @@ const text = computed(() =>
       >
         <DialogTitle class="text-title font-semibold">Masih ada draf surat</DialogTitle>
         <DialogDescription class="mt-1 text-ink-muted">
-          Draf yang belum kamu kirim masih ada. {{ text.question }}
+          Draf yang belum kamu kirim:
+          <span class="font-letter text-[19px] text-ink" data-testid="draft-summary"
+            >“{{ asking?.draft }}”</span
+          >.
+          <template v-if="asking?.replyingElsewhere">
+            Draf ini sudah jadi balasan untuk surat lain.
+          </template>
+          {{ text.question }}
         </DialogDescription>
         <p class="mt-3 rounded-control bg-[#fbefd2] px-3 py-2 text-caption text-[#7a5a14]">
           {{ text.warning }}
@@ -67,16 +86,24 @@ const text = computed(() =>
           <button
             ref="keepButton"
             type="button"
-            class="h-11 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line sm:flex-1"
+            class="h-11 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line disabled:opacity-40 sm:flex-1"
+            :disabled="asking?.full"
             @click="answer('add')"
           >
             {{ text.keep }}
           </button>
         </div>
-        <DialogClose
-          class="mt-3 w-full text-center text-caption text-ink-muted underline underline-offset-2"
-        >
-          Batal
+        <p v-if="asking?.full" class="mt-2 text-caption text-ink-muted">
+          Draf itu sudah berisi 4 foto, jadi foto ini tidak bisa ditambahkan ke sana.
+        </p>
+        <DialogClose as-child>
+          <button
+            ref="cancelButton"
+            type="button"
+            class="mt-2 min-h-11 w-full text-center text-body text-ink-muted underline underline-offset-2"
+          >
+            Batal
+          </button>
         </DialogClose>
       </DialogContent>
     </DialogPortal>

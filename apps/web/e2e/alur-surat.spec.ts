@@ -144,6 +144,37 @@ test('batal di pilihan draf tidak memindahkan halaman maupun mengubah draf', asy
   await expect(page.getByText('Belum ada foto atau stiker.')).toBeVisible()
 })
 
+test('Back di HP menutup pilihan draf tanpa memindahkan halaman', async ({ page }) => {
+  await writeDraft(page, 'Draf untuk Rani')
+  await sendFromPocket(page)
+  const choice = page.getByTestId('draft-choice')
+  await expect(choice.getByTestId('draft-summary')).toContainText('Draf untuk Rani')
+  await page.goBack()
+  await expect(choice).toBeHidden()
+  await expect(page).toHaveURL(new RegExp(`/pocket/${TODAY}$`))
+  await expect(page.getByRole('button', { name: 'Kirim sebagai surat' })).toBeVisible()
+})
+
+test('draf berisi 4 foto tidak ditawari "Tambahkan ke draf"', async ({ page }) => {
+  await sendFromPocket(page)
+  await expect(page).toHaveURL(/\/letter\/new$/)
+  for (let i = 0; i < 3; i++) {
+    await sendAgainFromPocket(page)
+    await page
+      .getByTestId('draft-choice')
+      .getByRole('button', { name: 'Tambahkan ke draf' })
+      .click()
+    await expect(page).toHaveURL(/\/letter\/new$/)
+  }
+  await expect(page.getByText('4 foto', { exact: true })).toBeVisible()
+
+  await sendAgainFromPocket(page)
+  const choice = page.getByTestId('draft-choice')
+  await expect(choice).toContainText('sudah berisi 4 foto')
+  await expect(choice.getByRole('button', { name: 'Tambahkan ke draf' })).toBeDisabled()
+  await expect(choice.getByRole('button', { name: 'Batal' })).toBeFocused()
+})
+
 test('strip Booth tetap ada kalau pilihan draf dibatalkan, lalu tampil utuh di surat', async ({
   page,
   browserName,
@@ -164,6 +195,20 @@ test('strip Booth tetap ada kalau pilihan draf dibatalkan, lalu tampil utuh di s
   await expect(choice).toBeHidden()
   await expect(page.getByTestId('booth-strip')).toBeVisible()
 
+  // Back di HP juga hanya menutup dialognya: strip tetap ada dan tidak ditanya dibuang.
+  let asked = false
+  page.on('dialog', (dialog) => {
+    asked = true
+    void dialog.dismiss()
+  })
+  await result.getByRole('button', { name: 'Pakai di surat' }).click()
+  await expect(choice).toBeVisible()
+  await page.goBack()
+  await expect(choice).toBeHidden()
+  await expect(page.getByTestId('booth-strip')).toBeVisible()
+  await expect(page).toHaveURL(/\/tv\?booth=1$/)
+  expect(asked).toBe(false)
+
   await result.getByRole('button', { name: 'Pakai di surat' }).click()
   await choice.getByRole('button', { name: 'Hapus draf, mulai baru' }).click()
   await expect(page).toHaveURL(/\/letter\/new$/)
@@ -172,6 +217,9 @@ test('strip Booth tetap ada kalau pilihan draf dibatalkan, lalu tampil utuh di s
   await expect(frame.locator('img')).toBeVisible()
   const ratio = await frame.evaluate((el: HTMLElement) => el.offsetWidth / el.offsetHeight)
   expect(ratio).toBeLessThan(0.5)
+  // Sekali Back langsung kembali ke Booth, tanpa entri riwayat kosong.
+  await page.goBack()
+  await expect(page).toHaveURL(/\/tv\?booth=1$/)
 })
 
 test('foto kedua dari Pocket mengganti tata letak supaya tidak menumpuk', async ({ page }) => {
@@ -203,12 +251,17 @@ test('foto kedua dari Pocket mengganti tata letak supaya tidak menumpuk', async 
   expect(Math.abs(centers[0]! - centers[1]!)).toBeGreaterThan(0.3)
 })
 
-test('balasan tidak diam-diam memakai draf yang belum dikirim', async ({ page }) => {
-  await message(page).fill('Surat yang nanti dibalas')
+/** Buat link dari isi `text`, lalu kosongkan editor untuk surat berikutnya. Mengembalikan slug. */
+async function sentLetter(page: Page, text: string): Promise<string> {
+  await message(page).fill(text)
   const url = await createLink(page)
-  const slug = url.split('/l/')[1]!
   await page.getByTestId('send-letter').getByRole('button', { name: 'Selesai' }).click()
   await page.getByTestId('sent-banner').getByRole('button', { name: 'Bikin surat baru' }).click()
+  return url.split('/l/')[1]!
+}
+
+test('balasan tidak diam-diam memakai draf yang belum dikirim', async ({ page }) => {
+  const slug = await sentLetter(page, 'Surat yang nanti dibalas')
   await writeDraft(page, 'Draf untuk Rara')
 
   // Batal: kembali ke surat yang mau dibalas, draf tetap.
@@ -225,7 +278,23 @@ test('balasan tidak diam-diam memakai draf yang belum dikirim', async ({ page })
   await expect(banner).toBeVisible()
   await expect(message(page)).toHaveValue('Draf untuk Rara')
 
+  // Draf yang sudah jadi balasan surat lain: dialognya bilang begitu, dan fokusnya di Batal.
+  const other = await sentLetter(page, 'Surat kedua')
+  await writeDraft(page, 'Balasan khusus untuk Rara')
+  await page.goto(`/letter/new?balas=${slug}`)
+  await choice.getByRole('button', { name: 'Jadikan draf ini balasan' }).click()
+  await page.waitForTimeout(700)
+  await page.goto(`/letter/new?balas=${other}`)
+  await expect(choice.getByTestId('draft-summary')).toContainText('Balasan khusus untuk Rara')
+  await expect(choice).toContainText('sudah jadi balasan untuk surat lain')
+  await expect(choice.getByRole('button', { name: 'Batal' })).toBeFocused()
+  // Back di HP sama dengan Batal: kembali ke surat yang mau dibalas.
+  await page.goBack()
+  await expect(page).toHaveURL(new RegExp(`/l/${other}$`))
+
   // Mulai balasan baru: draf lama dihapus.
+  await page.goto(`/letter/new?balas=${slug}`)
+  await expect(banner).toBeVisible()
   await banner.getByRole('button', { name: 'Batal membalas' }).click()
   await page.waitForTimeout(700)
   await page.goto(`/letter/new?balas=${slug}`)
@@ -253,6 +322,29 @@ test('link lama tetap ada di "Surat terkirim" dan bisa dihapus dari sana', async
   await expect(item).toHaveCount(0)
   await expect(list).toContainText('Belum ada surat')
   expect((await page.request.get(url)).status()).toBe(404)
+})
+
+test('Back di HP menutup lembar di editor surat, bukan meninggalkan halaman', async ({ page }) => {
+  await page.getByTestId('open-content-editor').click()
+  const contentEditor = page.getByTestId('content-editor')
+  await expect(contentEditor).toBeVisible()
+  await page.goBack()
+  await expect(contentEditor).toBeHidden()
+  await expect(page).toHaveURL(/\/letter\/new$/)
+
+  await message(page).fill('Halo dari editor')
+  await createLink(page)
+  await page.goBack()
+  await expect(page.getByTestId('send-letter')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/letter\/new$/)
+
+  await page.getByTestId('sent-banner').getByRole('button', { name: 'Bikin surat baru' }).click()
+  await page.getByTestId('open-sent-letters').click()
+  const list = page.getByTestId('sent-letters')
+  await expect(list).toBeVisible()
+  await page.goBack()
+  await expect(list).toBeHidden()
+  await expect(page).toHaveURL(/\/letter\/new$/)
 })
 
 test('petunjuk di bawah kartu mengikuti keadaan kartunya', async ({ page, isMobile }) => {

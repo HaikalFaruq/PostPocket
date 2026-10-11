@@ -29,7 +29,12 @@ onMounted(async () => {
       pending.mode ??
       (draft.blank || draft.sent
         ? 'new'
-        : await askDraftChoice({ kind: 'photo', from: pending.from }))
+        : await askDraftChoice({
+            kind: 'photo',
+            from: pending.from,
+            draft: draft.summary,
+            full: draft.photosFull,
+          }))
     if (mode === 'new') await startWithPhoto(pending)
     else if (mode === 'add') await addToDraft(pending)
   }
@@ -46,15 +51,21 @@ async function startReply(slug: string) {
     draft.setReplyTo(slug)
     return
   }
-  const choice = await askDraftChoice({ kind: 'reply' })
+  const choice = await askDraftChoice({
+    kind: 'reply',
+    draft: draft.summary,
+    replyingElsewhere: !!draft.replyTo,
+  })
   if (choice === 'new') await draft.reset()
   if (choice) {
     draft.setReplyTo(slug)
     return
   }
+  // router, bukan navigateTo(): kalau dibatalkan lewat Back, popstate-nya masih berjalan dan
+  // navigateTo() akan diam-diam tidak memindahkan halaman.
   const letterPath = `/l/${encodeURIComponent(slug)}`
   if (window.history.state?.back === letterPath) router.back()
-  else await navigateTo(letterPath, { replace: true })
+  else await router.replace(letterPath)
 }
 
 const notice = ref('')
@@ -91,6 +102,8 @@ async function addToDraft(pending: PendingPhoto) {
   if (next) {
     draft.setTemplate(next.id)
     draft.fitPhotos({ grow: count === 1 ? 1.4 : 1 })
+    // Tata letak baru bisa membuat stiker lama menutupi tulisan atau foto.
+    draft.tidyStickers()
   } else {
     draft.fitPhotos({ ids: [id] })
   }
@@ -272,6 +285,8 @@ function closeEditor() {
   open.value = true
   nextTick(() => editorButton.value?.focus())
 }
+// Back di HP menutup editor isi surat, bukan meninggalkan halaman.
+useBackToClose(editing, closeEditor)
 
 function surpriseMe() {
   open.value = false
