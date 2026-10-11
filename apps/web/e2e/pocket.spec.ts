@@ -118,9 +118,16 @@ test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ pag
   await dialog.getByRole('button', { name: 'Nanti saja' }).click()
   await expect(dialog).toBeVisible()
 
+  // Back di HP juga bertanya dulu, dan tidak meninggalkan Pocket.
+  page.once('dialog', (confirm) => confirm.dismiss())
+  await page.goBack()
+  await expect(dialog).toBeVisible()
+  await expect(page).toHaveURL(/\/pocket$/)
+
   page.once('dialog', (confirm) => confirm.accept())
-  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await page.goBack()
   await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/\/pocket$/)
   await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
 })
 

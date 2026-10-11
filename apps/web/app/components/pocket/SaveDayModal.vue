@@ -143,6 +143,12 @@ function setOpen(next: boolean) {
   open.value = next
 }
 
+// Back di HP menutup modal dengan pertanyaan yang sama, bukan meninggalkan Pocket.
+useBackToClose(open, () => {
+  setOpen(false)
+  return !open.value
+})
+
 onBeforeUnmount(clearAdded)
 </script>
 

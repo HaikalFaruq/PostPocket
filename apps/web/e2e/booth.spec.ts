@@ -101,6 +101,12 @@ test('strip yang belum disimpan tidak dibuang tanpa bertanya', async ({ page, br
   expect(asked).toContain('belum disimpan')
   await expect(result).toBeVisible()
 
+  // Back di HP juga bertanya dulu, dan tidak meninggalkan TV.
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.goBack()
+  await expect(result).toBeVisible()
+  await expect(page).toHaveURL(/\/tv\?booth=1$/)
+
   // Setelah disimpan, menutup tidak bertanya lagi.
   await result.getByRole('button', { name: /Simpan ke Pocket/ }).click()
   await expect(result).toContainText('Tersimpan di kantong hari ini')

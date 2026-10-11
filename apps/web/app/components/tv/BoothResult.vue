@@ -129,13 +129,17 @@ const download = () =>
     message.value = 'Strip diunduh ke perangkatmu.'
   })
 
-/** Strip yang belum disimpan ke mana pun tidak dibuang tanpa bertanya. */
-function discard(then: 'close' | 'retake') {
+/** Strip yang belum disimpan ke mana pun tidak dibuang tanpa bertanya. `false` kalau batal. */
+function discard(then: 'close' | 'retake'): boolean {
   const kept = saved.pocket || saved.cd || saved.file
-  if (!kept && !window.confirm('Buang strip ini? Strip-nya belum disimpan.')) return
+  if (!kept && !window.confirm('Buang strip ini? Strip-nya belum disimpan.')) return false
   if (then === 'close') emit('close')
   else emit('retake')
+  return true
 }
+
+// Back di HP menutup hasil Booth dengan pertanyaan yang sama, bukan meninggalkan TV.
+useBackToClose(true, () => discard('close'))
 </script>
 
 <template>
