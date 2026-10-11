@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { previewProblems } from './preview'
 
 // Alur kirim dan buka surat lewat mock API (server/routes/mock-api).
 
@@ -25,6 +26,8 @@ test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, request }) =
   expect(response?.headers()['x-robots-tag']).toBe('noindex')
   const ogImage = await page.locator('meta[property="og:image"]').getAttribute('content')
   expect(ogImage).toMatch(/^http.*\/mock-api\/assets\/.+\.jpg$/)
+  // Gambar OG hasil render browser memenuhi aturan preview WhatsApp.
+  expect(await previewProblems(request, url)).toEqual([])
 
   // Membaca halaman belum menandai surat dibuka; ketukan pertama yang menandai.
   expect((await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt).toBeNull()
