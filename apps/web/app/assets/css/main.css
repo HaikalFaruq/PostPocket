@@ -32,7 +32,9 @@
 
   /* Aksen TV: clay pink dan panel gelap */
   --color-tv-page: #eaeaeb;
-  --color-tv-accent: #e91e8c;
+  /* Aksen untuk latar (dengan teks putih, 4,8:1); glow untuk teks di panel gelap (minimal 4,7:1). */
+  --color-tv-accent: #d81b80;
+  --color-tv-glow: #ff4fa6;
   --color-tv-clay: #e48ba1;
   --color-tv-panel: #2a2a2a;
   --color-tv-panel-ink: rgb(255 255 255 / 0.92);

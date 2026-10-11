@@ -291,7 +291,7 @@ const marquee = computed(() =>
 
 <template>
   <div class="min-h-dvh bg-tv-page">
-    <div class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
+    <main class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
       <header class="py-4">
         <NuxtLink
           to="/"
@@ -356,7 +356,7 @@ const marquee = computed(() =>
           <template #panel>
             <div class="overflow-hidden rounded-[10px] bg-black/40 py-1.5" aria-live="polite">
               <p
-                class="tv-marquee font-tv text-[18px] tracking-[0.12em] whitespace-nowrap text-tv-accent"
+                class="tv-marquee font-tv text-[18px] tracking-[0.12em] whitespace-nowrap text-tv-glow"
               >
                 {{ marquee }}
               </p>
@@ -428,7 +428,7 @@ const marquee = computed(() =>
                 </button>
                 <button
                   type="button"
-                  class="inline-flex h-11 items-center justify-center gap-2 rounded-[12px] font-tv text-[20px] tracking-[0.16em] text-tv-accent inset-ring-2 inset-ring-tv-accent hover:bg-tv-accent/10"
+                  class="inline-flex h-11 items-center justify-center gap-2 rounded-[12px] font-tv text-[20px] tracking-[0.16em] text-tv-glow inset-ring-2 inset-ring-tv-glow hover:bg-tv-glow/10"
                   @click="openBooth"
                 >
                   <Icon name="camera" :size="18" /> PHOTO BOOTH
@@ -554,7 +554,7 @@ const marquee = computed(() =>
       <p class="mt-10 text-center text-caption text-ink-subtle">
         Semua foto disimpan di perangkat ini saja.
       </p>
-    </div>
+    </main>
   </div>
 </template>
 
