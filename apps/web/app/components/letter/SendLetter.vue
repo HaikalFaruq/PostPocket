@@ -7,8 +7,9 @@ import { compressPhoto, renderOgImage, type OgCard } from '~/utils/upload-image'
 /**
  * Alur "Buat link" (PRD: Kirim dan buka): kompres foto, render gambar OG dari sampul yang sama,
  * unggah, terbitkan, lalu tampilkan link yang siap disalin atau dibagikan. Mulai begitu dibuka.
+ * Dengan `existing`, langsung menampilkan link surat yang sudah dibuat dari draf yang sama.
  */
-const props = defineProps<{ card: OgCard }>()
+const props = defineProps<{ card: OgCard; existing?: SentLetter | null }>()
 const emit = defineEmits<{ close: [] }>()
 const draft = useLetterDraft()
 const api = useLetterApi()
@@ -31,6 +32,10 @@ const phases: { id: Phase; label: string }[] = [
   { id: 'publish', label: 'Menerbitkan' },
 ]
 const phaseIndex = computed(() => phases.findIndex((item) => item.id === phase.value))
+// Foto isi (dan cover dari foto user) dihapus 7 hari setelah surat pertama kali dibuka (kontrak).
+const hasPhotos = computed(
+  () => draft.isPhotoFront || contentPhotoKeys(publishableContent(draft.content)).length > 0,
+)
 
 const expires = computed(() =>
   sent.value
@@ -73,13 +78,20 @@ async function send() {
         if (done === count) phase.value = 'publish'
       },
     )
-    await rememberSent(result)
+    await rememberSent({ ...result, preview: previewText() })
+    await draft.markSent(result)
     sent.value = result
     state.value = 'done'
   } catch (problem) {
     error.value = errorMessage(problem)
     state.value = 'error'
   }
+}
+
+/** Potongan teks pertama surat, untuk daftar "Surat terkirim". */
+function previewText(): string | undefined {
+  const text = draft.content.elements.find((e) => e.kind === 'text' && e.text.trim())
+  return text?.kind === 'text' ? Array.from(text.text.trim()).slice(0, 80).join('') : undefined
 }
 
 async function copy() {
@@ -112,6 +124,7 @@ async function remove() {
   try {
     await api.remove(sent.value.id, sent.value.editToken)
     await forgetSent(sent.value.id)
+    await draft.clearSent()
     state.value = 'deleted'
   } catch (problem) {
     error.value = errorMessage(problem)
@@ -122,13 +135,22 @@ function close() {
   if (state.value !== 'sending') emit('close')
 }
 
+// Back di HP menutup lembar ini, kecuali selagi link sedang dibuat.
+useBackToClose(true, () => {
+  if (state.value === 'sending') return false
+  close()
+})
+
 useEventListener(document, 'keydown', (event: KeyboardEvent) => {
   if (event.key === 'Escape') close()
 })
 
 onMounted(() => {
   dialog.value?.focus()
-  send()
+  if (props.existing) {
+    sent.value = props.existing
+    state.value = 'done'
+  } else send()
 })
 </script>
 
@@ -178,6 +200,9 @@ onMounted(() => {
         <h2 id="send-title" class="text-title font-semibold">Link surat siap</h2>
         <p class="mt-1 text-ink-muted">
           Kirim link ini ke dia. Suratnya bisa dibuka sampai {{ expires }}.
+          <template v-if="hasPhotos">
+            Fotonya hanya disimpan 7 hari sejak dia membuka surat, jadi minta dia segera membukanya.
+          </template>
         </p>
         <div class="mt-4 flex gap-2">
           <input
@@ -210,7 +235,7 @@ onMounted(() => {
             target="_blank"
             rel="noopener"
             class="inline-flex h-9 items-center rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
-            >Lihat surat</a
+            >Pratinjau surat</a
           >
         </div>
         <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>

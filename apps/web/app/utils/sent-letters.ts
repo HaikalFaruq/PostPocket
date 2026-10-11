@@ -22,7 +22,7 @@ export async function sentHere(slug: string): Promise<boolean> {
  * Surat yang dikirim dari browser ini, lengkap dengan `editToken`. Server hanya menyimpan hash
  * token, jadi hanya browser pengirim yang bisa menghapus suratnya (kontrak API).
  */
-export async function rememberSent(letter: SentLetter): Promise<void> {
+export async function rememberSent(letter: SentRecord): Promise<void> {
   try {
     const list = await read()
     await set(KEY, [{ ...letter }, ...list.filter((item) => item.id !== letter.id)].slice(0, LIMIT))
@@ -39,5 +39,19 @@ export async function forgetSent(id: string): Promise<void> {
     )
   } catch {
     // Tidak ada yang perlu dihapus.
+  }
+}
+
+/** Surat terkirim beserta potongan teksnya, supaya mudah dikenali di daftar "Surat terkirim". */
+export interface SentRecord extends SentLetter {
+  preview?: string
+}
+
+/** Semua surat yang dikirim dari browser ini, yang terbaru dulu. */
+export async function listSent(): Promise<SentRecord[]> {
+  try {
+    return await read()
+  } catch {
+    return []
   }
 }

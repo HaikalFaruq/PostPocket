@@ -3,9 +3,13 @@ import {
   byId,
   contentLimits,
   contentPhotoKeys,
+  fitPhoto,
+  freeSpot,
+  isFilledElement,
   letter,
   normalizeContent,
   surprise,
+  tidyStickers as tidiedStickers,
   type LetterContent,
   type LetterDesign,
   type LetterElement,
@@ -13,6 +17,7 @@ import {
 } from '@postpocket/presets'
 import { del, get, keys, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
+import type { SentLetter } from '~/utils/letter-api'
 import { uniqueId } from '~/utils/letter-gesture'
 import { requestPersistentStorage } from '~/utils/pwa'
 import {
@@ -29,6 +34,8 @@ const DRAFT_KEY = 'postpocket:letter-draft'
 // Foto disimpan terpisah, jadi mengetik isi surat tidak menulis ulang foto berukuran megabyte.
 const PHOTO_KEY = 'postpocket:letter-draft-photo'
 const CONTENT_PHOTO_PREFIX = 'postpocket:letter-draft-photo:'
+// Surat yang sudah dibuat linknya dari draf ini, bersama sidik draf saat itu.
+const SENT_KEY = 'postpocket:letter-draft-sent'
 
 type ElementKind = LetterElement['kind']
 
@@ -56,6 +63,41 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   const isPhotoFront = computed(() => design.value.illustration === PHOTO_FRONT && !!photo.value)
   /** Rasio kartu, juga rasio halaman surat. */
   const ratio = computed(() => cardRatio(design.value, photo.value))
+  /** Draf belum berisi apa pun yang bisa dikirim: tanpa isi surat dan tanpa foto depan. */
+  const blank = computed(() => !isPhotoFront.value && !content.value.elements.some(isFilledElement))
+
+  /** Potongan isi draf supaya user mengenalinya, misalnya di dialog "Masih ada draf surat". */
+  const summary = computed(() => {
+    const text = content.value.elements.find(
+      (e): e is TextElement => e.kind === 'text' && !!e.text.trim(),
+    )
+    if (text) {
+      const line = Array.from(text.text.trim().split('\n')[0]!)
+      return line.length > 60 ? `${line.slice(0, 60).join('').trimEnd()}…` : line.join('')
+    }
+    const count = content.value.elements.filter((e) => e.kind === 'photo' && e.photo).length
+    if (count) return `${count} foto, belum ada tulisan`
+    return isPhotoFront.value ? 'Kartu bergambar foto, belum ada isinya' : 'Kartu tanpa tulisan'
+  })
+  /** Isi surat sudah berisi 4 foto tanpa slot kosong, jadi foto baru tidak bisa ditambahkan. */
+  const photosFull = computed(() => {
+    const photoSlots = content.value.elements.filter((e) => e.kind === 'photo')
+    return photoSlots.length >= contentLimits.photo && photoSlots.every((e) => e.photo)
+  })
+
+  // Sidik draf: desain, isi, dan foto depan. Berubah begitu user mengubah apa pun.
+  const signature = computed(() =>
+    JSON.stringify([
+      design.value,
+      content.value,
+      photo.value && [photo.value.blob.size, photo.value.width, photo.value.height],
+    ]),
+  )
+  const sentMark = shallowRef<{ signature: string; letter: SentLetter } | null>(null)
+  /** Surat yang sudah dibuat linknya dari draf ini, selama drafnya belum diubah sejak itu. */
+  const sent = computed(() =>
+    sentMark.value?.signature === signature.value ? sentMark.value.letter : null,
+  )
 
   const photoUrl = ref<string | null>(null)
   watch(photo, (next) => {
@@ -97,6 +139,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       photos.value = draft.photos
       replyTo.value = draft.replyTo
       savedPhotoKeys = new Set(Object.keys(draft.photos))
+      const mark = (await get(SENT_KEY)) as { signature?: unknown; letter?: SentLetter } | undefined
+      sentMark.value =
+        typeof mark?.signature === 'string' && mark.letter?.url
+          ? { signature: mark.signature, letter: mark.letter }
+          : null
       await nextTick()
       photoDirty = false
       dirtyPhotos.clear()
@@ -223,20 +270,28 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     setContent({ elements: [...content.value.elements.filter((item) => item.id !== id), element] })
   }
 
-  /** Sedikit acak supaya elemen baru tidak menumpuk persis di tengah. */
+  /** Putaran acak kecil untuk elemen baru, supaya terlihat ditempel tangan. */
   function jitter(random: () => number, spread: number): number {
     return (random() - 0.5) * spread
   }
+
+  // Elemen baru ditaruh di tempat yang paling kosong (`freeSpot`), supaya tidak menimpa tulisan.
 
   function addText(random: () => number = Math.random): string | null {
     if (count('text') >= contentLimits.text) return null
     const id = uniqueId('t', takenIds())
     const size = 0.06 * Math.min(1, 1 / ratio.value)
-    const element = { kind: 'text', id, x: 0.5, y: 0.5 + jitter(random, 0.1), width: 0.7 }
+    const { x, y } = freeSpot(
+      content.value,
+      0.7,
+      2 * size * 1.25 * ratio.value,
+      ratio.value,
+      random,
+    )
     setContent({
       elements: [
         ...content.value.elements,
-        { ...element, rotation: 0, text: '', size, align: 'center' },
+        { kind: 'text', id, x, y, width: 0.7, rotation: 0, text: '', size, align: 'center' },
       ],
     })
     return id
@@ -245,13 +300,13 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   function addSticker(sticker: string, random: () => number = Math.random): string | null {
     if (count('sticker') >= contentLimits.sticker || !byId(letter.stickers, sticker)) return null
     const id = uniqueId('s', takenIds())
-    const x = 0.5 + jitter(random, 0.3)
-    const y = 0.5 + jitter(random, 0.3)
+    const width = 0.22
+    const { x, y } = freeSpot(content.value, width, width * ratio.value, ratio.value, random)
     const rotation = Math.round(jitter(random, 24))
     setContent({
       elements: [
         ...content.value.elements,
-        { kind: 'sticker', id, x, y, width: 0.22, rotation, sticker },
+        { kind: 'sticker', id, x, y, width, rotation, sticker },
       ],
     })
     return id
@@ -281,21 +336,56 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     const id = uniqueId('p', takenIds())
     const rotation = Math.round(jitter(random, 8))
     const aspect = next.width / next.height
-    setContent({
-      elements: [
-        ...elements,
-        { kind: 'photo', id, x: 0.5, y: 0.45, width: 0.55, rotation, photo: key, aspect },
-      ],
-    })
+    // Foto baru diperkecil kalau perlu, supaya tidak menimpa tulisan, dan diletakkan di bawah
+    // stiker supaya stiker yang sudah ada tidak tertutup.
+    let place = { x: 0.5, y: 0.5, width: 0.55 }
+    for (const width of [0.55, 0.45, 0.36, 0.28]) {
+      const spot = freeSpot(
+        content.value,
+        width,
+        (width / aspect) * ratio.value,
+        ratio.value,
+        random,
+      )
+      place = { x: spot.x, y: spot.y, width }
+      if (!spot.coversText) break
+    }
+    const firstSticker = elements.findIndex((e) => e.kind === 'sticker')
+    const at = firstSticker < 0 ? elements.length : firstSticker
+    const element = { kind: 'photo', id, ...place, rotation, photo: key, aspect }
+    setContent({ elements: [...elements.slice(0, at), element, ...elements.slice(at)] })
     return id
   }
 
-  /** Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah. */
+  /**
+   * Bingkai foto isi mengikuti bentuk fotonya, jadi foto dari Pocket atau Booth tampil utuh.
+   * Tanpa `ids`, semua foto isi; `grow` lihat `fitPhoto()`.
+   */
+  function fitPhotos({ ids, grow }: { ids?: string[]; grow?: number } = {}) {
+    setContent({
+      elements: content.value.elements.map((element) => {
+        if (element.kind !== 'photo' || !element.photo) return element
+        if (ids && !ids.includes(element.id)) return element
+        const item = photos.value[element.photo]
+        return item ? fitPhoto(element, item.width / item.height, ratio.value, { grow }) : element
+      }),
+    })
+  }
+
+  /** Stiker yang menutupi teks atau foto dipindah ke tempat yang kosong. */
+  function tidyStickers(random: () => number = Math.random) {
+    setContent(tidiedStickers(content.value, ratio.value, random))
+  }
+
+  /**
+   * Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah; stiker
+   * yang jadi menutupi tulisan atau foto dipindah ke tempat kosong.
+   */
   function setTemplate(id: string) {
     const template = byId(letter.templates, id)
     if (!template) return
     design.value = { ...design.value, template: id }
-    setContent(applyTemplate(content.value, template, ratio.value))
+    setContent(tidiedStickers(applyTemplate(content.value, template, ratio.value), ratio.value))
   }
 
   /** Blok teks pertama, yang ditulis langsung dari kolom isi surat di langkah 5. */
@@ -313,12 +403,36 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     const next = surprise(design.value, random, { keepIllustration: isPhotoFront.value })
     design.value = next
     const template = byId(letter.templates, next.template)
-    if (template) setContent(applyTemplate(content.value, template, ratio.value))
+    if (template) {
+      setContent(tidiedStickers(applyTemplate(content.value, template, ratio.value), ratio.value))
+    }
   }
 
   /** Tandai draf ini sebagai balasan untuk surat `slug`, atau `null` untuk batal membalas. */
   function setReplyTo(slug: string | null) {
     replyTo.value = slug && SLUG_PATTERN.test(slug) ? slug : null
+  }
+
+  /** Tandai draf ini sudah jadi link `letter`. Tanda hilang sendiri kalau drafnya diubah. */
+  async function markSent(letter: SentLetter) {
+    // Simpan draf saat itu juga, supaya draf yang tersimpan sama dengan yang ditandai terkirim.
+    clearTimeout(timer)
+    await save()
+    sentMark.value = { signature: signature.value, letter: { ...letter } }
+    try {
+      await set(SENT_KEY, { signature: signature.value, letter: { ...letter } })
+    } catch {
+      // Tanpa IndexedDB tanda ini hanya bertahan sampai halaman ditutup.
+    }
+  }
+
+  async function clearSent() {
+    sentMark.value = null
+    try {
+      await del(SENT_KEY)
+    } catch {
+      // Tidak ada yang perlu dihapus.
+    }
   }
 
   async function reset() {
@@ -332,9 +446,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     replyTo.value = null
     savedPhotoKeys = new Set()
     dirtyPhotos.clear()
+    sentMark.value = null
     try {
       await Promise.all([
         del(DRAFT_KEY),
+        del(SENT_KEY),
         del(PHOTO_KEY),
         ...stale.map((key) => del(CONTENT_PHOTO_PREFIX + key)),
       ])
@@ -348,6 +464,12 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     photo,
     photoUrl,
     isPhotoFront,
+    blank,
+    summary,
+    photosFull,
+    sent,
+    markSent,
+    clearSent,
     ratio,
     content,
     photos,
@@ -365,6 +487,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     removeElement,
     bringToFront,
     addText,
+    fitPhotos,
+    tidyStickers,
     addSticker,
     addPhoto,
     setTemplate,
