@@ -553,7 +553,7 @@ const marquee = computed(() =>
         data-testid="album-upload"
         @change="onFiles"
       />
-      <p class="mt-10 text-center text-caption text-ink-subtle">
+      <p class="mt-10 text-center text-caption text-ink-muted">
         Semua foto disimpan di perangkat ini saja.
       </p>
     </main>

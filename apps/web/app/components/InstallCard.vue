@@ -68,7 +68,7 @@ function dismiss() {
         Buka langsung dari layar utama, dan tetap bisa dipakai saat sinyal hilang.
       </p>
       <p v-else class="mt-0.5 text-caption text-ink-muted">
-        Tap <Icon name="share" :size="14" class="inline-block align-[-2px]" /> Bagikan, lalu
+        Ketuk <Icon name="share" :size="14" class="inline-block align-[-2px]" /> Bagikan, lalu
         <span class="font-semibold text-ink">Tambah ke Layar Utama</span>. Dengan begitu Safari
         tidak menghapus draf dan fotomu.
       </p>

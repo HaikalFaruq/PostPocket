@@ -15,7 +15,8 @@
   --color-surface: #ffffff;
   --color-panel: #fcfcfb;
   --color-ink: #111114;
-  --color-ink-muted: rgb(17 17 20 / 0.55);
+  /* Teks sekunder: minimal 4.5:1 di semua latar halaman, termasuk TV (#eaeaeb). */
+  --color-ink-muted: rgb(17 17 20 / 0.6);
   --color-ink-subtle: rgb(17 17 20 / 0.45);
   --color-line: rgb(17 17 20 / 0.14);
   --color-line-soft: rgb(17 17 20 / 0.08);
@@ -26,7 +27,8 @@
   --color-pocket-outside: #f9f9fb;
   --color-pocket-today: #f8f1e7;
   --color-pocket-ink: #4a3b30;
-  --color-pocket-muted: #a8927f;
+  /* Teks sekunder Pocket: kontras minimal 4.5:1 di halaman Pocket (#efefef) dan kantong hari ini. */
+  --color-pocket-muted: #7d6858;
   --color-pocket-wood: #ead2a4;
   --color-pocket-ok: #a6d08f;
 
