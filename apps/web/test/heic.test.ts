@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { readExifDate } from '../app/utils/exif'
 import { isHeic, isHeifBytes } from '../app/utils/heic'
 
 // Foto HEIC asli kecil, dibuat dengan `sips -s format heic` di macOS.
@@ -37,5 +38,19 @@ describe('HEIC', () => {
     expect(
       await isHeic(new File([new Uint8Array([0xff, 0xd8])], 'a.jpg', { type: 'image/jpeg' })),
     ).toBe(false)
+  })
+})
+
+describe('tanggal EXIF dari HEIC', () => {
+  it('dibaca dari item Exif berkas HEIC', async () => {
+    // Dibuat dengan `sips -s format heic` dari JPEG ber-EXIF DateTimeOriginal 2026:10:05 14:30:00.
+    const dated = readFileSync(new URL('../e2e/fixtures/foto-tanggal.heic', import.meta.url))
+    const local = new Date(2026, 9, 5, 14, 30, 0).toISOString()
+    expect(await readExifDate(new Blob([new Uint8Array(dated)]))).toBe(local)
+  })
+
+  it('HEIC tanpa EXIF atau yang terpotong tidak membuat error', async () => {
+    expect(await readExifDate(new Blob([heic]))).toBeNull()
+    expect(await readExifDate(new Blob([heic.slice(0, 40)]))).toBeNull()
   })
 })
