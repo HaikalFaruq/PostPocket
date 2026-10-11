@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { byId, letter as letterPresets } from '@postpocket/presets'
-import { LetterApiError } from '~/utils/letter-api'
 import { PHOTO_FRONT } from '~/utils/letter-draft'
+import { LetterApiError } from '~/utils/letter-api'
 
 /**
  * Halaman penerima surat (PRD: Kirim dan buka). Di-SSR supaya meta OG terbaca crawler WhatsApp
