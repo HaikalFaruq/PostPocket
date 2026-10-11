@@ -107,6 +107,23 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   await expect(savedCount(page)).toHaveText('1 hari tersimpan')
 })
 
+test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ page }) => {
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await page.getByTestId('moment-upload').setInputFiles(await photos(page, [20]))
+  await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
+
+  page.once('dialog', (confirm) => confirm.dismiss())
+  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(dialog).toBeVisible()
+
+  page.once('dialog', (confirm) => confirm.accept())
+  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
+})
+
 test('buka kantong: disobek, foto keluar, lalu dikirim sebagai surat', async ({ page }) => {
   await page.goto('/pocket')
   await saveDay(page, TODAY, [20, 200])
@@ -188,23 +205,6 @@ test('foto kenangan pertama meminta penyimpanan permanen, sekali saja', async ({
   await page.getByTestId('pocket-upload').setInputFiles(await photos(page, [200]))
   await expect(page.getByTestId('moment')).toHaveCount(2)
   expect(await calls()).toBe(1)
-})
-
-test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ page }) => {
-  await page.goto('/pocket')
-  await page.locator(`[data-day="${TODAY}"]`).click()
-  const dialog = page.getByRole('dialog')
-  await page.getByTestId('moment-upload').setInputFiles(await photos(page, [20]))
-  await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
-
-  page.once('dialog', (confirm) => confirm.dismiss())
-  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
-  await expect(dialog).toBeVisible()
-
-  page.once('dialog', (confirm) => confirm.accept())
-  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
-  await expect(dialog).toBeHidden()
-  await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
 })
 
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({
