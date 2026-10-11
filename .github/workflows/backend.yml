@@ -50,6 +50,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
+          # packageManager di package.json root menyalakan cache pnpm otomatis, padahal job ini
+          # tidak memasang pnpm.
+          package-manager-cache: false
 
       - name: Lint openapi.yaml
         run: npx --yes @redocly/cli@1 lint docs/api/openapi.yaml
