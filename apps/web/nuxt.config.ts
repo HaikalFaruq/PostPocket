@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -116,6 +117,13 @@ export default defineNuxtConfig({
         },
       ],
     },
+  },
+
+  nitro: {
+    // Kontrak API untuk mock (server/utils/contract.ts), dibaca lewat useStorage('assets:contract').
+    serverAssets: [
+      { baseName: 'contract', dir: fileURLToPath(new URL('../../docs/api', import.meta.url)) },
+    ],
   },
 
   runtimeConfig: {

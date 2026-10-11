@@ -3,5 +3,5 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
   if (!body || typeof body !== 'object')
     return fail(event, 400, 'invalid_request', 'body bukan JSON')
-  return createMockLetter(event, body as Record<string, unknown>)
+  return createMockLetter(event, body)
 })
