@@ -520,9 +520,11 @@ onMounted(() => dialog.value?.focus())
               <Icon name="plus" :size="15" /> Stiker
             </button>
           </div>
+          <!-- Di HP dua baris yang digeser ke samping (setengah kolom berikutnya mengintip), supaya
+               halaman surat di atasnya tidak tertutup; di layar lebar semua stiker kelihatan. -->
           <div
             v-if="stickersOpen"
-            class="grid grid-cols-6 gap-1 sm:grid-cols-9"
+            class="grid auto-cols-[calc((100%-1.25rem)/5.5)] grid-flow-col grid-rows-2 gap-1 overflow-x-auto overscroll-x-contain pb-1 sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-9 sm:grid-rows-none sm:overflow-visible"
             role="group"
             aria-label="Pilih stiker"
           >
