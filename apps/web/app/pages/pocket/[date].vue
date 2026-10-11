@@ -5,6 +5,8 @@ import { readExifDate } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 
 useSeoMeta({ title: 'Kantong · PostPocket', robots: 'noindex' })
+// Sama dengan --color-pocket-page di main.css.
+usePageTint('bg-pocket-page', '#efefef')
 
 // Tanggal yang tidak ada atau belum datang kembali ke kalender.
 definePageMeta({

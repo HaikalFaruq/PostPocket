@@ -53,12 +53,15 @@ test('foto masuk album, CD diputar dengan filter, lalu dikeluarkan', async ({ pa
   await expect(slideshow).toBeVisible()
   await expect(slideshow.locator('img')).toHaveAttribute('src', /^blob:/)
   await expect(slideshow).toContainText('/2')
+  // Rak CD memberi tahu bahwa album di tengah sedang diputar, bukan menyuruh memasukkannya lagi.
+  await expect(page.getByText(/sedang diputar di TV/i)).toBeVisible()
   await page.getByRole('radio', { name: 'Noir' }).click()
   await expect(slideshow).toHaveAttribute('data-filter', 'noir')
   await expect(slideshow.locator('img')).toHaveCSS('filter', /grayscale/)
 
   await page.getByRole('button', { name: 'KELUARKAN CD' }).click()
   await expect(page.getByTestId('tv-idle')).toBeVisible()
+  await expect(page.getByText(/geser piringan untuk memasukkan/i)).toBeVisible()
 })
 
 test('rak CD bisa digeser lewat tombol panah dan keyboard, dan tetap ada setelah dimuat ulang', async ({

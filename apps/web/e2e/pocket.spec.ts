@@ -87,6 +87,15 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   await dialog.getByRole('radio', { name: 'Bunga sakura' }).click()
   await expect(combo).toHaveText('STROBERI / BUNGA SAKURA')
   await expect(preview.locator('.packet__sticker')).toHaveAttribute('alt', 'Bunga sakura')
+  // Nama kombinasi tidak tertimpa kantong, termasuk di layar HP yang sempit.
+  const packetBox = (await packet.boundingBox())!
+  const comboBox = (await combo.boundingBox())!
+  const overlaps =
+    comboBox.x < packetBox.x + packetBox.width &&
+    packetBox.x < comboBox.x + comboBox.width &&
+    comboBox.y < packetBox.y + packetBox.height &&
+    packetBox.y < comboBox.y + comboBox.height
+  expect(overlaps).toBe(false)
 
   // Foto pertama langsung menyelip di depan kantong, dengan bingkai pilihan.
   await page.getByTestId('moment-upload').setInputFiles(await photos(page, [20, 200]))
@@ -186,6 +195,21 @@ test('foto kenangan pertama meminta penyimpanan permanen, sekali saja', async ({
   await page.getByTestId('pocket-upload').setInputFiles(await photos(page, [200]))
   await expect(page.getByTestId('moment')).toHaveCount(2)
   expect(await calls()).toBe(1)
+})
+
+test('latar Pocket sampai ke tepi layar dan kembali normal setelah pindah halaman', async ({
+  page,
+}) => {
+  const themeColor = page.locator('meta[name="theme-color"]')
+  await page.goto('/pocket')
+  await expect(page.locator('[data-day]').first()).toBeVisible()
+  await expect(page.locator('html')).toHaveClass(/bg-pocket-page/)
+  await expect(themeColor).toHaveAttribute('content', '#efefef')
+
+  await page.getByRole('link', { name: /PostPocket/ }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('html')).not.toHaveClass(/bg-pocket-page/)
+  await expect(themeColor).toHaveAttribute('content', '#f5f5f3')
 })
 
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({

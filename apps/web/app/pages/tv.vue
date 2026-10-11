@@ -7,6 +7,8 @@ import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { dayAlbum, dayKey, type AlbumView } from '~/utils/memories'
 
 useSeoMeta({ title: 'Memori TV · PostPocket', robots: 'noindex' })
+// Sama dengan --color-tv-page di main.css.
+usePageTint('bg-tv-page', '#eaeaeb')
 
 /**
  * TV clay (PRD modul 3, referensi Memory TV): pilih album di arsip CD, masukkan ke slot, lalu
