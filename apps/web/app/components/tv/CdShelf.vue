@@ -157,7 +157,7 @@ function caseLabel(album: AlbumView) {
               draggable="false"
             />
           </span>
-          <span class="cd-disc__label">KETUK</span>
+          <span class="cd-disc__label" aria-hidden="true">KETUK</span>
         </button>
       </div>
     </div>
