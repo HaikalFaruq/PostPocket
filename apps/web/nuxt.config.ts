@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -118,11 +119,22 @@ export default defineNuxtConfig({
     },
   },
 
+  nitro: {
+    // Kontrak API untuk mock (server/utils/contract.ts), dibaca lewat useStorage('assets:contract').
+    serverAssets: [
+      { baseName: 'contract', dir: fileURLToPath(new URL('../../docs/api', import.meta.url)) },
+    ],
+  },
+
   runtimeConfig: {
+    // Mock API surat di /mock-api untuk development dan E2E (NUXT_MOCK_API=1). Mati di produksi.
+    mockApi: false,
     public: {
       // Diisi dari .env (lihat .env.example). Secret key Supabase tidak pernah dipakai di sini.
       supabaseUrl: '',
       supabasePublishableKey: '',
+      // Kosong berarti fungsi Supabase (<supabaseUrl>/functions/v1); `/mock-api` untuk mock.
+      apiBase: '',
     },
   },
 

@@ -25,7 +25,13 @@ export default defineConfig({
   // E2E selalu jalan di build production, sama seperti yang nanti di-deploy.
   webServer: {
     command: `pnpm build && node .output/server/index.mjs`,
-    env: { NITRO_PORT: String(port), NITRO_HOST: '127.0.0.1' },
+    // E2E memakai mock API surat (server/routes/mock-api), bukan Supabase sungguhan.
+    env: {
+      NITRO_PORT: String(port),
+      NITRO_HOST: '127.0.0.1',
+      NUXT_MOCK_API: '1',
+      NUXT_PUBLIC_API_BASE: '/mock-api',
+    },
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
