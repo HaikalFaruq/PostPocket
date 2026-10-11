@@ -41,6 +41,7 @@ useSeoMeta({
 })
 
 const open = ref(false)
+const reading = ref(false)
 let marked = false
 watch(open, async (isOpen) => {
   if (!isOpen || marked || !letter.value) return
@@ -86,7 +87,7 @@ const formatDate = (value: string | null | undefined) =>
     <main v-if="letter" class="flex flex-1 flex-col items-center">
       <div class="relative h-[min(64dvh,560px)] w-full">
         <ClientOnly>
-          <ReceivedLetter v-model:open="open" :letter="letter" />
+          <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
           <template #fallback>
             <div class="grid size-full place-items-center">
               <div class="aspect-[0.72] h-[72%] rounded-[3px] bg-surface shadow-raised" />
@@ -94,17 +95,30 @@ const formatDate = (value: string | null | undefined) =>
           </template>
         </ClientOnly>
       </div>
-      <p class="mt-2 text-caption text-ink-subtle">
-        {{ open ? 'Geser untuk memutar, ketuk untuk menutup' : 'Ketuk kartu untuk membuka' }}
+      <!-- Sebelum dibuka, satu-satunya langkah adalah mengetuk kartu; balasan baru muncul sesudahnya. -->
+      <p v-if="!open" class="mt-3 text-body font-semibold text-ink">
+        Ketuk kartunya untuk membuka suratmu
       </p>
-
-      <NuxtLink
-        :to="`/letter/new?balas=${letter.slug}`"
-        class="mt-6 inline-flex h-11 items-center gap-2 rounded-control bg-ink px-6 text-body font-semibold text-white hover:bg-ink/90"
-        data-testid="reply"
-      >
-        Bikin balasan <Icon name="arrow-right" :size="15" />
-      </NuxtLink>
+      <template v-else>
+        <p class="mt-2 text-caption text-ink-muted">Geser untuk memutar, ketuk untuk menutup</p>
+        <!-- Di dalam kartu, halaman surat hanya separuh lebar kartu; di HP tulisannya jadi kecil. -->
+        <div class="mt-4 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            class="inline-flex h-11 items-center gap-2 rounded-control bg-surface px-5 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+            @click="reading = true"
+          >
+            Baca lebih besar
+          </button>
+          <NuxtLink
+            :to="`/letter/new?balas=${letter.slug}`"
+            class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-5 text-body font-semibold text-white hover:bg-ink/90"
+            data-testid="reply"
+          >
+            Bikin balasan <Icon name="arrow-right" :size="15" />
+          </NuxtLink>
+        </div>
+      </template>
 
       <p class="mt-6 max-w-sm text-center text-caption text-ink-muted">
         Surat ini bisa dibuka sampai {{ formatDate(letter.expiresAt) }}.

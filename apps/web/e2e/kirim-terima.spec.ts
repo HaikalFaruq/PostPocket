@@ -32,6 +32,12 @@ test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, request }) =
   await card.click()
   await expect(card).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByTestId('letter-page')).toContainText('Halo dari E2E')
+  // Halaman surat juga bisa dibaca selebar layar, karena di dalam kartu tulisannya kecil di HP.
+  await page.getByRole('button', { name: 'Baca lebih besar' }).click()
+  const reader = page.getByTestId('letter-reader')
+  await expect(reader).toContainText('Halo dari E2E')
+  await reader.getByRole('button', { name: 'Tutup' }).click()
+  await expect(reader).toBeHidden()
   await expect
     .poll(async () => (await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt)
     .not.toBeNull()
