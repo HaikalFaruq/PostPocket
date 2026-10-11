@@ -42,6 +42,8 @@ const example = letter.illustrations[0]!
 const foil = byId(letter.foilColors, 'gold')!
 const paper = byId(letter.papers, 'cream')!
 const open = ref(false)
+// Versi untuk tester saat melapor masalah: commit yang sedang di-deploy.
+const version = useRuntimeConfig().public.appVersion
 </script>
 
 <template>
@@ -128,8 +130,21 @@ const open = ref(false)
 
     <InstallCard class="mb-6 max-w-md" />
 
-    <footer class="border-t border-line-soft py-5 text-caption text-ink-muted">
-      <p>Versi beta · foto, kantong, dan draf suratmu tersimpan di perangkat ini.</p>
+    <footer
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-soft py-5 text-caption text-ink-muted"
+    >
+      <p>
+        Versi beta ({{ version }}) · foto, kantong, dan draf suratmu tersimpan di perangkat ini.
+      </p>
+      <nav aria-label="Tentang PostPocket" class="flex gap-4">
+        <FeedbackLink class="font-semibold text-ink underline underline-offset-2" />
+        <NuxtLink to="/privasi" class="underline underline-offset-2 hover:text-ink"
+          >Privasi</NuxtLink
+        >
+        <NuxtLink to="/lisensi" class="underline underline-offset-2 hover:text-ink"
+          >Lisensi</NuxtLink
+        >
+      </nav>
     </footer>
   </div>
 </template>
