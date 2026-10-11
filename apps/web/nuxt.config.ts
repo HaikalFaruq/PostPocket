@@ -16,6 +16,21 @@ export default defineNuxtConfig({
     optimizeDeps: { include: ['reka-ui'] },
   },
 
+  hooks: {
+    // Worker HEIC berisi libheif (sekitar 2 MB). Tanpa ini, halaman yang memakai front-image.ts
+    // (termasuk halaman surat penerima) ikut mem-preload-nya. Worker-nya cukup diunduh saat ada
+    // foto HEIC yang tidak bisa dibuka browser (utils/heic.ts).
+    'build:manifest'(manifest) {
+      for (const entry of Object.values(manifest)) {
+        entry.assets = entry.assets?.filter((file) => !file.includes('heic.worker'))
+        if (entry.file.includes('heic.worker')) {
+          entry.preload = false
+          entry.prefetch = false
+        }
+      }
+    },
+  },
+
   app: {
     head: {
       htmlAttrs: { lang: 'id' },
