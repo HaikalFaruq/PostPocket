@@ -143,5 +143,7 @@ export default defineNuxtConfig({
     '/lab/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // Editor surat bekerja dengan draf di IndexedDB, jadi cukup dirender di browser.
     '/letter/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    // Surat penerima di-SSR supaya meta OG terbaca crawler WhatsApp, tapi tidak boleh diindeks.
+    '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
   },
 })

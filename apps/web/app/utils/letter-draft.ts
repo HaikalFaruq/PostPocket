@@ -44,11 +44,19 @@ export interface LetterDraft {
   content: LetterContent
   /** Foto isi surat per kunci, maksimal 4. */
   photos: Record<string, DraftPhoto>
+  /** Slug surat yang sedang dibalas lewat "Bikin balasan". */
+  replyTo: string | null
   updatedAt: number
 }
 
+/** Pola slug surat: 10 karakter base62. */
+export const SLUG_PATTERN = /^[A-Za-z0-9]{10}$/
+
 /** Rasio kartu (lebar dibagi tinggi): dari bentuk yang dipilih, atau dari gambar depannya. */
-export function cardRatio(design: LetterDesign, photo: DraftPhoto | null): number {
+export function cardRatio(
+  design: LetterDesign,
+  photo: { width: number; height: number } | null,
+): number {
   const shape = byId(letter.shapes, design.shape)
   if (shape?.ratio) return shape.ratio
   if (design.illustration === PHOTO_FRONT && photo) return photo.width / photo.height
@@ -76,6 +84,7 @@ export function emptyDraft(): LetterDraft {
     photo: null,
     content: startingContent(design, null),
     photos: {},
+    replyTo: null,
     updatedAt: 0,
   }
 }
@@ -166,6 +175,10 @@ export function normalizeDraft(raw: unknown): LetterDraft {
     photo,
     content,
     photos: Object.fromEntries(Object.entries(photos).filter(([key]) => used.has(key))),
+    replyTo:
+      typeof stored.replyTo === 'string' && SLUG_PATTERN.test(stored.replyTo)
+        ? stored.replyTo
+        : null,
     updatedAt: typeof stored.updatedAt === 'number' ? stored.updatedAt : 0,
   }
 }

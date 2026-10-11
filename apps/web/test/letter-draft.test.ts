@@ -123,6 +123,15 @@ describe('normalizeDraft', () => {
   })
 })
 
+describe('replyTo', () => {
+  it('hanya menerima slug surat yang sah', () => {
+    expect(normalizeDraft({ replyTo: 'x7Kp2qLm9A' }).replyTo).toBe('x7Kp2qLm9A')
+    expect(normalizeDraft({ replyTo: '../rahasia' }).replyTo).toBeNull()
+    expect(normalizeDraft({}).replyTo).toBeNull()
+    expect(emptyDraft().replyTo).toBeNull()
+  })
+})
+
 describe('cardRatio', () => {
   it('memakai rasio bentuk, atau gambar depan untuk bentuk Asli', () => {
     const night = byId(letter.illustrations, 'night')!

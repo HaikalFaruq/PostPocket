@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /** Tombol utama hitam selebar panel yang menempel di bawah. `note` tampil kecil di atasnya. */
 defineProps<{ disabled?: boolean; loading?: boolean; note?: string }>()
+// Klik datang dari tombolnya, bukan dari pembungkus, jadi tombol yang nonaktif tidak memicunya.
+defineEmits<{ click: [] }>()
 </script>
 
 <template>
@@ -13,6 +15,7 @@ defineProps<{ disabled?: boolean; loading?: boolean; note?: string }>()
       :disabled="disabled || loading"
       :aria-busy="loading || undefined"
       class="inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-ink/90 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-40"
+      @click="$emit('click')"
     >
       <span
         v-if="loading"
