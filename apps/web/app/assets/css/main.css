@@ -15,7 +15,8 @@
   --color-surface: #ffffff;
   --color-panel: #fcfcfb;
   --color-ink: #111114;
-  --color-ink-muted: rgb(17 17 20 / 0.55);
+  /* Teks sekunder: minimal 4.5:1 di semua latar halaman, termasuk TV (#eaeaeb). */
+  --color-ink-muted: rgb(17 17 20 / 0.6);
   --color-ink-subtle: rgb(17 17 20 / 0.45);
   --color-line: rgb(17 17 20 / 0.14);
   --color-line-soft: rgb(17 17 20 / 0.08);
