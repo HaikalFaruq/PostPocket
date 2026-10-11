@@ -100,7 +100,7 @@ function focusSafeChoice(event: Event) {
           <button
             ref="cancelButton"
             type="button"
-            class="mt-2 min-h-11 w-full text-center text-body text-ink-muted underline underline-offset-2"
+            class="mt-2 min-h-11 w-full rounded-control text-center text-body text-ink-muted underline underline-offset-2"
           >
             Batal
           </button>
