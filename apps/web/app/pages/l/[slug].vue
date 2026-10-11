@@ -8,7 +8,11 @@ import { sentHere } from '~/utils/sent-letters'
  * menandainya dibuka; yang menandai hanya ketukan pertama di kartu.
  */
 const route = useRoute()
-const slug = String(route.params.slug)
+// Link yang tersalin bersama tanda baca di belakangnya (misalnya titik di akhir kalimat chat)
+// diarahkan ke link suratnya, bukan dibilang suratnya sudah tidak ada.
+const rawSlug = String(route.params.slug)
+const slug = rawSlug.replace(/[^A-Za-z0-9]+$/, '')
+if (slug && slug !== rawSlug) await navigateTo(`/l/${slug}`, { redirectCode: 301, replace: true })
 const api = useLetterApi()
 
 const { data: letter, error } = await useAsyncData(`surat-${slug}`, () =>
@@ -48,6 +52,12 @@ const reading = ref(false)
 const ownLetter = ref(false)
 onMounted(async () => {
   ownLetter.value = await sentHere(slug)
+})
+// Ajakan mengetuk baru tampil saat kartunya benar-benar bisa diketuk, bukan selama JavaScript
+// masih dimuat (di 4G lambat bisa beberapa detik).
+const interactive = ref(false)
+onMounted(() => {
+  interactive.value = true
 })
 let marked = false
 watch(open, async (isOpen) => {
@@ -104,7 +114,12 @@ const formatDate = (value: string | null | undefined) =>
         </ClientOnly>
       </div>
       <!-- Sebelum dibuka, satu-satunya langkah adalah mengetuk kartu; balasan baru muncul sesudahnya. -->
-      <p v-if="!open" class="mt-3 text-body font-semibold text-ink">
+      <p
+        v-if="!open"
+        class="mt-3 text-body font-semibold text-ink"
+        :class="{ invisible: !interactive }"
+        data-testid="open-hint"
+      >
         Ketuk kartunya untuk membuka suratmu
       </p>
       <template v-else>
@@ -160,7 +175,7 @@ const formatDate = (value: string | null | undefined) =>
       <p class="mt-2 max-w-sm text-ink-muted">
         {{
           missing
-            ? 'Mungkin sudah lewat 30 hari, atau pengirimnya menghapusnya.'
+            ? 'Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau link-nya terpotong saat disalin.'
             : 'Coba muat ulang halaman ini sebentar lagi.'
         }}
       </p>

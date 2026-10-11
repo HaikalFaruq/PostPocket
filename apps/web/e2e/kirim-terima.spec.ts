@@ -189,3 +189,14 @@ test('slug yang tidak ada mendapat 404 dengan pesan yang jelas', async ({ page }
     '/letter/new',
   )
 })
+
+test('link surat yang ikut tanda baca di belakangnya tetap membuka suratnya', async ({ page }) => {
+  const url = await sendFromEditor(page, 'Surat dari obrolan')
+  for (const tail of ['.', ')', '!,']) {
+    await page.goto(url + tail)
+    await expect(page).toHaveURL(url)
+    await expect(page.getByTestId('received-page')).toBeVisible()
+  }
+  // Ajakan mengetuk tampil begitu kartunya siap diketuk.
+  await expect(page.getByTestId('open-hint')).toBeVisible()
+})
