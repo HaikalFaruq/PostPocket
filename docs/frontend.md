@@ -37,7 +37,7 @@ Pertama kali menjalankan E2E di mesin baru: `pnpm --filter @postpocket/web exec 
 apps/web/
   app/assets/css/main.css   design token (@theme Tailwind) dan gaya dasar
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
-  app/components/letter/    komponen khusus Letter: FoilCard, FoilSwatchIcon
+  app/components/letter/    komponen khusus Letter: FoilCard, LetterPage, LetterEditor, FrontPicker, dll.
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/stores/               useLetterDraft: draf surat di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, color, foil, icons) dan
@@ -60,6 +60,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 - **`mask` dijalankan setelah `filter`.** Kalau elemen ber-mask butuh bayangan, taruh `drop-shadow` di pembungkusnya.
 - **Foto user selalu lewat `preparePhoto()`**: diputar sesuai EXIF, diperkecil ke 2048 px, lalu disimpan ulang sebagai JPEG supaya metadata lokasi hilang (PRD bagian Privasi).
 - **Draf di IndexedDB menyimpan foto sebagai byte (`ArrayBuffer`), bukan `Blob`**: Safari Private Browsing menolak Blob di IndexedDB. Foto disimpan di key terpisah supaya mengetik isi surat tidak menulis ulang foto.
+- **Isi surat hanya dirender `LetterElementView`**, di editor, kartu, maupun halaman penerima. Jangan bikin renderer kedua, supaya yang dilihat penerima sama dengan yang disusun pengirim ([keputusan](spikes/editor-isi-surat.md)).
 - **Ekspor foto berfilter lewat `drawFiltered()`**, jangan `ctx.filter` langsung: Safari tidak mendukung `ctx.filter` dan filternya hilang diam-diam ([hasil spike](spikes/safari.md)).
 
 ## Komponen bersama
@@ -126,7 +127,7 @@ Bahan kontrak `docs/api/openapi.yaml`: apa yang dikirim frontend saat "Buat link
 
 Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `height`, dan `size`. Server mengembalikan URL upload bertanda tangan untuk tiap foto, cover, dan gambar OG. `replyTo` berisi slug surat yang dibalas lewat "Bikin balasan".
 
-**Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya.
+**Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya. Kalau `og` bernilai `null` (cover dari foto user ikut dihapus), meta tag OG memakai gambar bawaan `/og-surat.jpg` dan kartu memakai sampul polos.
 
 **CORS** perlu mengizinkan `https://postpocket.vercel.app`, preview `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
 
@@ -158,7 +159,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 2 (minggu 4–5)**
 
-- [ ] Editor isi surat (vue-konva) dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker
+- [x] Editor isi surat dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker. Editornya DOM, bukan vue-konva ([keputusan](spikes/editor-isi-surat.md))
 - [ ] Alur "Buat link": kompres tiap foto sampai di bawah 500 KB (JPEG atau WebP), hapus EXIF lokasi, upload ke URL bertanda tangan, lalu publish (kontrak dari `docs/api/openapi.yaml`)
 - [ ] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: JPEG 1200×630 maksimal 300.000 byte, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
 - [ ] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
@@ -175,8 +176,25 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 4 dan beta (minggu 8–10)**
 
 - [ ] Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV
-- [ ] `navigator.storage.persist()` dan ajakan pasang PWA
+- [x] `navigator.storage.persist()` dan ajakan pasang PWA ([PWA](#pwa))
 - [ ] Uji di 3 HP; perbaiki bug dari tester
+
+## PWA
+
+PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan service worker). Service worker hanya ada di build production; `pnpm dev` tidak memakainya, jadi cek PWA lewat `pnpm build && node apps/web/.output/server/index.mjs` atau `pnpm test:e2e`.
+
+| Yang disimpan | Cara | Kenapa |
+| --- | --- | --- |
+| JS, CSS, ilustrasi, ikon, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
+| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat memang ada di IndexedDB |
+| Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
+| Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
+
+- Halaman yang belum pernah tersimpan menampilkan `offline.html` saat offline.
+- Versi baru tidak langsung dipakai. Toast "Versi baru PostPocket siap" muncul dan user memilih kapan memuat ulang, supaya tulisan yang sedang diketik tidak hilang.
+- Kartu "Pasang PostPocket" di Beranda memakai dialog pasang bawaan Chrome, atau petunjuk Tambah ke Layar Utama di iPhone. Aplikasi yang terpasang meminta `navigator.storage.persist()`, dan Safari tidak menghapus datanya setelah 7 hari.
+- Halaman baru yang menampilkan data pribadi wajib dikecualikan dari cache: tambahkan ke `isPrivatePath()` di `app/utils/pwa.ts` dan aturan `runtimeCaching` di `nuxt.config.ts`.
+- Ikon aplikasi dibuat ulang dengan `node scripts/pwa-icons.mjs` dari folder `apps/web`.
 
 ## Uji di HP sungguhan
 
