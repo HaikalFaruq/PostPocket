@@ -146,8 +146,12 @@ onBeforeUnmount(clearAdded)
     :description="longDate(day)"
   >
     <template #preview>
-      <div class="grid h-full place-items-center" data-testid="packet-preview">
-        <div class="w-[min(62%,300px)] pt-6">
+      <!-- Di HP nama kombinasi ada di bawah kantong; di layar lebar di pojok kiri bawah. -->
+      <div
+        class="flex h-full flex-col items-center justify-center gap-4"
+        data-testid="packet-preview"
+      >
+        <div class="w-[min(56%,300px)] pt-6">
           <SnackPacket
             :color="packetColor.color"
             :sticker="stickerItem"
@@ -156,13 +160,13 @@ onBeforeUnmount(clearAdded)
             :photo-url="previewPhoto"
           />
         </div>
+        <p
+          class="font-mono text-[11px] tracking-[0.18em] text-pocket-muted md:absolute md:bottom-5 md:left-6"
+          data-testid="combo-name"
+        >
+          {{ comboName }}
+        </p>
       </div>
-      <p
-        class="absolute bottom-5 left-6 font-mono text-[11px] tracking-[0.18em] text-pocket-muted"
-        data-testid="combo-name"
-      >
-        {{ comboName }}
-      </p>
     </template>
 
     <StepCard :step="1" title="Warna kantong" :hint="packetColor.label" variant="card">
