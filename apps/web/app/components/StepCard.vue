@@ -36,7 +36,7 @@ const number = computed(() =>
       >
       <h2 :id="headingId" class="text-body font-semibold">
         <span class="sr-only">Langkah {{ step }}: </span>{{ title }}
-        <span v-if="hint" class="ml-1 font-normal text-ink-subtle">{{ hint }}</span>
+        <span v-if="hint" class="ml-1 font-normal text-ink-muted">{{ hint }}</span>
       </h2>
       <div v-if="$slots.action" class="ml-auto">
         <slot name="action" />
