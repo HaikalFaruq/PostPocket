@@ -19,10 +19,15 @@ const slugOf = (url: string) => url.split('/l/')[1]!
 test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, browser, request }) => {
   const url = await sendFromEditor(page, 'Halo dari E2E')
   const slug = slugOf(url)
-  const openedAt = async () => (await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt
+
+  const response = await page.goto(url)
+  expect(response?.status()).toBe(200)
+  expect(response?.headers()['x-robots-tag']).toBe('noindex')
+  const ogImage = await page.locator('meta[property="og:image"]').getAttribute('content')
+  expect(ogImage).toMatch(/^http.*\/mock-api\/assets\/.+\.jpg$/)
 
   // Pengirim melihat pratinjau di browsernya sendiri: tidak menandai surat dibuka.
-  await page.goto(url)
+  const openedAt = async () => (await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt
   await expect(page.getByTestId('own-letter-note')).toContainText('pratinjau suratmu')
   const ownCard = page.getByRole('button', { name: /Surat untukmu/ })
   await ownCard.click()
@@ -32,16 +37,11 @@ test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, browser, req
   await page.waitForTimeout(500)
   expect(await openedAt()).toBeNull()
 
-  // Penerima di HP lain, tanpa data pengirim.
+  // Penerima di HP lain, tanpa data pengirim. Membaca halaman belum menandai surat dibuka;
+  // ketukan pertama yang menandai.
   const recipient = await (await browser.newContext()).newPage()
-  const response = await recipient.goto(url)
-  expect(response?.status()).toBe(200)
-  expect(response?.headers()['x-robots-tag']).toBe('noindex')
-  const ogImage = await recipient.locator('meta[property="og:image"]').getAttribute('content')
-  expect(ogImage).toMatch(/^http.*\/mock-api\/assets\/.+\.jpg$/)
+  expect((await recipient.goto(url))?.status()).toBe(200)
   await expect(recipient.getByTestId('own-letter-note')).toHaveCount(0)
-
-  // Membaca halaman belum menandai surat dibuka; ketukan pertama yang menandai.
   expect(await openedAt()).toBeNull()
   const card = recipient.getByRole('button', { name: /Surat untukmu/ })
   await card.click()
