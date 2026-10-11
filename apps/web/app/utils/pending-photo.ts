@@ -5,6 +5,12 @@ import { toStoredPhoto, type DraftPhoto, type StoredPhoto } from './letter-draft
 // mulai surat baru, atau tanya dulu kalau masih ada draf yang belum dikirim.
 const KEY = 'postpocket:pending-letter-photo'
 
+/** Foto yang menunggu, beserta asalnya untuk keterangan di editor. */
+export interface PendingPhoto {
+  photo: DraftPhoto
+  from: string
+}
+
 /** Simpan foto untuk editor surat, lalu buka `/letter/new?foto=1`. `from` misalnya "Pocket". */
 export async function sendPhotoToLetter(photo: DraftPhoto, from: string): Promise<void> {
   await set(KEY, { ...(await toStoredPhoto(photo)), from })
@@ -12,7 +18,7 @@ export async function sendPhotoToLetter(photo: DraftPhoto, from: string): Promis
 }
 
 /** Ambil foto yang menunggu, sekali saja. */
-export async function takePendingPhoto(): Promise<{ photo: DraftPhoto; from: string } | null> {
+export async function takePendingPhoto(): Promise<PendingPhoto | null> {
   try {
     const stored = (await get(KEY)) as (StoredPhoto & { from?: string }) | undefined
     await del(KEY)

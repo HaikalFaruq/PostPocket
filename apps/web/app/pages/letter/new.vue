@@ -11,8 +11,8 @@ import {
 } from 'reka-ui'
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
-import { MESSAGE_LIMIT, type DraftPhoto } from '~/utils/letter-draft'
-import { takePendingPhoto } from '~/utils/pending-photo'
+import { MESSAGE_LIMIT } from '~/utils/letter-draft'
+import { takePendingPhoto, type PendingPhoto } from '~/utils/pending-photo'
 
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
 
@@ -42,10 +42,10 @@ onMounted(async () => {
 })
 
 const notice = ref('')
-const waitingPhoto = shallowRef<{ photo: DraftPhoto; from: string } | null>(null)
+const waitingPhoto = shallowRef<PendingPhoto | null>(null)
 
 /** Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. */
-async function startWithPhoto(pending: { photo: DraftPhoto; from: string }) {
+async function startWithPhoto(pending: PendingPhoto) {
   waitingPhoto.value = null
   await draft.reset()
   draft.setTemplate('photo-1')
@@ -55,7 +55,7 @@ async function startWithPhoto(pending: { photo: DraftPhoto; from: string }) {
   open.value = true
 }
 
-async function addToDraft(pending: { photo: DraftPhoto; from: string }) {
+async function addToDraft(pending: PendingPhoto) {
   waitingPhoto.value = null
   if (!draft.addPhoto(pending.photo)) {
     notice.value =
