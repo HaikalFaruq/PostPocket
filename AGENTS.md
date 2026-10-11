@@ -86,7 +86,7 @@ Setiap mulai sesi, termasuk sesi AI agent:
 | --- | --- | --- |
 | `apps/web/` | Kall | Nuxt: semua halaman, kartu foil 3D, editor surat, Pocket, TV, Booth, IndexedDB |
 | `supabase/migrations/` | Bintang | Skema SQL dan RLS |
-| `supabase/functions/` | Bintang | Edge Functions: letters, publish, og |
+| `supabase/functions/` | Bintang | Edge Functions `letters` dan `l` (lima endpoint surat) |
 | `docs/api/openapi.yaml` | Bintang menulis, Kall me-review | Kontrak API antara frontend dan backend |
 | `packages/presets/` | Kall | Preset desain dalam JSON. Backend hanya menyimpan id-nya |
 | `docs/` | Berdua | PRD, panduan peran, catatan referensi, lisensi aset |
@@ -126,10 +126,15 @@ Perintah backend memakai Supabase CLI lewat `npx supabase@2.120.0` (atau `supaba
 | `supabase migration new <nama>` | Buat file migrasi baru |
 | `supabase db lint --level warning` | Lint skema (plpgsql_check) |
 | `supabase test db` | Test pgTAP di `supabase/tests/database/` |
+| `supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta` | Stack lokal untuk Edge Functions (DB, Storage, fungsi) |
+| `deno test tests/unit.test.ts` (dari `supabase/functions`) | Unit test Edge Functions, butuh Deno 2.9 |
+| `deno test -A tests/api.test.ts` (dari `supabase/functions`) | Test integrasi lima endpoint, butuh `API_URL` dan `PUBLISHABLE_KEY` |
+| `scripts/bundle-contract.sh` | Bundel kontrak jadi JSON untuk validasi Edge Functions, wajib setelah `openapi.yaml` berubah |
+| `supabase functions deploy letters l` | Deploy Edge Functions ke proyek yang di-link |
 | `npx @redocly/cli@1 lint docs/api/openapi.yaml` | Validasi kontrak API |
 | `supabase stop` | Matikan stack lokal |
 
-CI menjalankan lint skema, test pgTAP, dan lint kontrak di workflow `Backend` setiap kali `supabase/` atau `docs/api/` berubah. Migrasi yang sudah diterapkan ke proyek Supabase tidak diedit lagi; perubahan skema selalu lewat file migrasi baru.
+CI menjalankan lint skema, test pgTAP, lint kontrak, serta lint dan test Edge Functions di workflow `Backend` setiap kali `supabase/`, `docs/api/`, atau `packages/presets/` berubah. Migrasi yang sudah diterapkan ke proyek Supabase tidak diedit lagi; perubahan skema selalu lewat file migrasi baru.
 
 ## 7. Struktur repo
 
@@ -139,7 +144,7 @@ Yang bertanda *(belum)* dibuat oleh pemiliknya di Sprint 0.
 apps/web/               Nuxt, dipegang Kall
 supabase/migrations/    skema SQL dan RLS, dipegang Bintang
 supabase/tests/         test pgTAP untuk skema
-supabase/functions/     Edge Functions, dipegang Bintang (belum)
+supabase/functions/     Edge Functions (Deno) beserta test-nya, dipegang Bintang
 packages/presets/       preset JSON kertas, foil, kantong, bingkai, filter + helper
 docs/prd/               PRD (Markdown dan PDF) beserta gambarnya
 docs/frontend.md        panduan frontend

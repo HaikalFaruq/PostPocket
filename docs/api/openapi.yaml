@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PostPocket API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Kontrak API rilis 1 antara frontend (`apps/web`) dan backend (Supabase Edge Functions).
     Rilis 1 hanya melayani surat yang dikirim; Pocket, TV, dan Booth tetap di browser.
@@ -34,7 +34,8 @@ info:
     **Header umum**
 
     - `apikey`: publishable key Supabase, wajib di semua request (dikirim otomatis oleh
-      `supabase.functions.invoke`).
+      `supabase.functions.invoke`). Tanpa header ini, atau kalau isinya bukan publishable key
+      proyek, server menjawab `401` dengan kode `unauthorized`.
     - `X-Edit-Token`: khusus publish dan hapus.
 
     **CORS**
@@ -459,6 +460,12 @@ components:
           maximum: 500000
           description: Byte.
 
+    CoverMeta:
+      description: Gambar depan dari foto user. Batasnya sama dengan foto isi.
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/ImageMeta'
+
     PhotoMeta:
       unevaluatedProperties: false
       allOf:
@@ -500,7 +507,7 @@ components:
         cover:
           description: Wajib kalau `design.illustration` bernilai `upload`, selain itu harus kosong. Tidak dihitung ke batas 4 foto.
           oneOf:
-            - $ref: '#/components/schemas/ImageMeta'
+            - $ref: '#/components/schemas/CoverMeta'
             - type: 'null'
         photos:
           type: array
