@@ -2,6 +2,7 @@ import { del, get, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
 import { toStoredPhoto, type DraftPhoto, type StoredPhoto } from '~/utils/letter-draft'
 import { uniqueId } from '~/utils/letter-gesture'
+import { requestPersistentStorage } from '~/utils/pwa'
 import {
   SPINE_COLORS,
   albumShelf,
@@ -95,6 +96,8 @@ export const useMemories = defineStore('memories', () => {
       ids.push(id)
     }
     await persist({ ...data.value, moments })
+    // Foto kenangan tidak boleh ikut terhapus saat browser membersihkan penyimpanan (PRD Risiko).
+    void requestPersistentStorage()
     return ids
   }
 

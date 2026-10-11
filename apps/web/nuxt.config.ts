@@ -80,7 +80,8 @@ export default defineNuxtConfig({
       // ini hanya melayani `/offline.html`. Revisi berkas tetap dihitung Workbox.
       manifestTransforms: [],
       clientsClaim: true,
-      globPatterns: ['**/*.{js,css,svg,png}', 'offline.html'],
+      // Stiker WebP ikut disimpan supaya kantong Pocket dan editor surat tetap lengkap offline.
+      globPatterns: ['**/*.{js,css,svg,png,webp}', 'offline.html'],
       globIgnores: ['samples/**'],
       runtimeCaching: [
         {
@@ -145,6 +146,8 @@ export default defineNuxtConfig({
     '/letter/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // TV, Booth, dan Pocket membaca data dari IndexedDB dan kamera, jadi cukup di browser.
     '/tv': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    '/pocket': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    '/pocket/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // Surat penerima di-SSR supaya meta OG terbaca crawler WhatsApp, tapi tidak boleh diindeks.
     '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
   },

@@ -2,8 +2,9 @@
 import { byId, tv } from '@postpocket/presets'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 import { BOOTH_LAYOUTS, beep, captureShot, type BoothLayout } from '~/utils/booth'
+import { readExifDate } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
-import { dayKey, type AlbumView } from '~/utils/memories'
+import { dayAlbum, dayKey, type AlbumView } from '~/utils/memories'
 
 useSeoMeta({ title: 'Memori TV · PostPocket', robots: 'noindex' })
 
@@ -12,6 +13,7 @@ useSeoMeta({ title: 'Memori TV · PostPocket', robots: 'noindex' })
  * TV memutar slideshow dengan filter retro. Album bulanan dibuat otomatis dari Pocket.
  */
 const memories = useMemories()
+const route = useRoute()
 onMounted(() => memories.load())
 
 const CLAY_KEY = 'postpocket:tv-clay'
@@ -50,16 +52,38 @@ const NEW_ALBUM: AlbumView = {
   moments: [],
   kind: 'custom',
 }
-const albums = computed(() => (memories.shelf.length ? memories.shelf : [NEW_ALBUM]))
+// "Putar di TV" dari Pocket (/tv?hari=YYYY-MM-DD): isi kantong hari itu jadi CD paling depan.
+const pocketDay = computed(() =>
+  typeof route.query.hari === 'string' ? memories.data.days[route.query.hari] : undefined,
+)
+const pocketCd = computed(() =>
+  pocketDay.value?.moments.length ? dayAlbum(pocketDay.value) : null,
+)
+const albums = computed(() => {
+  const list = pocketCd.value ? [pocketCd.value, ...memories.shelf] : memories.shelf
+  return list.length ? list : [NEW_ALBUM]
+})
 const shelfIndex = ref(0)
 const playingId = ref<string | null>(null)
 const playing = computed(() => albums.value.find((album) => album.id === playingId.value))
+
+// Kantongnya langsung diputar, begitu halaman dibuka atau begitu data di perangkat terbaca.
+watch(
+  () => pocketCd.value?.id,
+  (id) => {
+    if (!id) return
+    shelfIndex.value = 0
+    playingId.value = id
+  },
+  { immediate: true },
+)
 
 function insert(album: AlbumView) {
   playingId.value = album.id
 }
 
-// "+ Foto": foto disimpan sebagai momen hari ini (atau di bulan album itu), lalu masuk album.
+// "+ Foto": foto disimpan sebagai momen hari ini (di bulan album itu, atau di kantong yang sedang
+// diputar), lalu masuk album.
 const fileInput = ref<HTMLInputElement | null>(null)
 const target = ref<AlbumView | null>(null)
 const adding = ref(false)
@@ -80,13 +104,24 @@ async function onFiles(event: Event) {
   error.value = ''
   try {
     const photos = []
-    for (const file of files) photos.push({ photo: await preparePhoto(file) })
+    for (const file of files) {
+      const takenAt = (await readExifDate(file)) ?? undefined
+      photos.push({ photo: await preparePhoto(file), takenAt })
+    }
     const today = dayKey(new Date())
-    const month = album.id.startsWith('bulan-') ? album.id.slice(6) : null
-    const day = month && !today.startsWith(month) ? `${month}-01` : today
+    const month = album.kind === 'month' ? album.id.slice(6) : null
+    const day =
+      album.kind === 'day'
+        ? album.id.slice(5)
+        : month && !today.startsWith(month)
+          ? `${month}-01`
+          : today
     const ids = await memories.addMoments(photos, { day, source: 'upload' })
+    const pocket = memories.data.days[day]
     if (album.id === NEW_ALBUM.id) await memories.createAlbum('Album pertama', '📀', ids)
     else if (album.kind === 'custom') await memories.addToAlbum(album.id, ids)
+    else if (album.kind === 'day' && pocket)
+      await memories.saveDay({ ...pocket, moments: [...pocket.moments, ...ids] })
   } catch (problem) {
     error.value = problem instanceof PhotoError ? problem.message : 'Foto gagal disimpan.'
   } finally {
@@ -129,7 +164,6 @@ async function removeAlbum() {
 }
 
 // Booth (PRD): layar TV jadi kamera dengan filter aktif. /tv?booth=1 langsung membukanya.
-const route = useRoute()
 const booth = ref(false)
 const facing = ref<'user' | 'environment'>('user')
 const cameraReady = ref(false)
