@@ -1,4 +1,5 @@
 import type { Raster } from './foil-map'
+import { heicToJpeg, isHeic } from './heic'
 import type { DraftPhoto } from './letter-draft'
 
 /** Sisi panjang maksimal foto depan setelah dikompres (PRD: 2048 px). */
@@ -19,20 +20,34 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Prom
 }
 
 /**
+ * Buka foto user sebagai bitmap yang sudah diputar sesuai EXIF. Foto HEIC yang tidak bisa dibuka
+ * browser (Chrome, Firefox) diubah dulu ke JPEG di Web Worker; Safari membukanya sendiri.
+ */
+export async function decodePhoto(file: Blob): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch {
+    if (!(await isHeic(file))) {
+      throw new PhotoError('Format foto ini belum bisa dibaca. Coba JPG atau PNG.')
+    }
+  }
+  try {
+    return await createImageBitmap(await heicToJpeg(file), { imageOrientation: 'from-image' })
+  } catch {
+    throw new PhotoError('Foto HEIC ini belum bisa dibuka. Coba simpan sebagai JPG dulu.')
+  }
+}
+
+/**
  * Siapkan foto user untuk gambar depan: putar sesuai EXIF, perkecil, lalu simpan ulang sebagai
  * JPEG. Menyimpan ulang lewat kanvas membuang semua metadata, termasuk lokasi (PRD: privasi).
  */
 export async function preparePhoto(file: Blob): Promise<DraftPhoto> {
-  if (!file.type.startsWith('image/')) {
-    throw new PhotoError('Pilih file gambar, misalnya JPG, PNG, atau WebP.')
+  if (!file.type.startsWith('image/') && !(await isHeic(file))) {
+    throw new PhotoError('Pilih file gambar, misalnya JPG, PNG, WebP, atau HEIC.')
   }
   if (file.size > PHOTO_MAX_BYTES) throw new PhotoError('Foto terlalu besar, maksimal 25 MB.')
-  let bitmap: ImageBitmap
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  } catch {
-    throw new PhotoError('Format foto ini belum bisa dibaca. Coba JPG atau PNG.')
-  }
+  const bitmap = await decodePhoto(file)
   const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const width = Math.max(1, Math.round(bitmap.width * scale))
   const height = Math.max(1, Math.round(bitmap.height * scale))

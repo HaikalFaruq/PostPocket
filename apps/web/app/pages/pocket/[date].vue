@@ -171,7 +171,7 @@ const editOpen = ref(false)
               :disabled="busy"
               @click="fileInput?.click()"
             >
-              <Icon name="plus" :size="15" /> Tambah foto
+              <Icon name="plus" :size="15" /> {{ busy ? 'Menyiapkan foto…' : 'Tambah foto' }}
             </button>
             <button type="button" class="pocket-action" @click="editOpen = true">
               Ganti desain kantong

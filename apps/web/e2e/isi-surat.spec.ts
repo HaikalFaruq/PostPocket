@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 const cardPage = (page: Page) => page.getByTestId('letter-page')
@@ -93,6 +94,21 @@ test('editor: blok teks baru bisa diketik dan diatur', async ({ page }) => {
   await expect(editor(page)).toHaveCount(0)
   await expect(page.getByTestId('open-content-editor')).toBeFocused()
   await expect(cardPage(page).getByText('P.S. kangen')).toBeAttached()
+})
+
+test('foto HEIC tanpa tipe (seperti di Windows) tetap masuk ke isi surat', async ({ page }) => {
+  const heic = readFileSync(new URL('./fixtures/foto.heic', import.meta.url))
+  await chooseTemplate(page, '1 foto + teks')
+  await openEditor(page)
+  await page
+    .getByTestId('content-photo-upload')
+    .setInputFiles({ name: 'IMG_0002.HEIC', mimeType: 'application/octet-stream', buffer: heic })
+  await expect(editorPage(page).locator('[data-kind="photo"] img')).toHaveAttribute(
+    'src',
+    /^blob:/,
+    { timeout: 20_000 },
+  )
+  await expect(editor(page).getByRole('alert')).toHaveCount(0)
 })
 
 test('foto isi surat mengisi slot template dan tetap ada setelah dimuat ulang', async ({

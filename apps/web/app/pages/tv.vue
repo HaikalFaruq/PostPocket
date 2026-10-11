@@ -3,7 +3,7 @@ import { byId, tv } from '@postpocket/presets'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 import { BOOTH_LAYOUTS, beep, captureShot, type BoothLayout } from '~/utils/booth'
 import { readExifDate } from '~/utils/exif'
-import { PhotoError, preparePhoto } from '~/utils/front-image'
+import { PhotoError, decodePhoto, preparePhoto } from '~/utils/front-image'
 import { dayAlbum, dayKey, type AlbumView } from '~/utils/memories'
 
 useSeoMeta({ title: 'Memori TV · PostPocket', robots: 'noindex' })
@@ -235,7 +235,7 @@ async function onBoothFiles(event: Event) {
   const taken: HTMLCanvasElement[] = []
   for (const file of files) {
     try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      const bitmap = await decodePhoto(file)
       taken.push(captureShot(bitmap, filter.value, false))
       bitmap.close()
     } catch {

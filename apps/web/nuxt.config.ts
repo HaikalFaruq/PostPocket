@@ -16,6 +16,21 @@ export default defineNuxtConfig({
     optimizeDeps: { include: ['reka-ui'] },
   },
 
+  hooks: {
+    // Worker HEIC berisi libheif (sekitar 2 MB). Tanpa ini, halaman yang memakai front-image.ts
+    // (termasuk halaman surat penerima) ikut mem-preload-nya. Worker-nya cukup diunduh saat ada
+    // foto HEIC yang tidak bisa dibuka browser (utils/heic.ts).
+    'build:manifest'(manifest) {
+      for (const entry of Object.values(manifest)) {
+        entry.assets = entry.assets?.filter((file) => !file.includes('heic.worker'))
+        if (entry.file.includes('heic.worker')) {
+          entry.preload = false
+          entry.prefetch = false
+        }
+      }
+    },
+  },
+
   app: {
     head: {
       htmlAttrs: { lang: 'id' },
@@ -82,7 +97,9 @@ export default defineNuxtConfig({
       clientsClaim: true,
       // Stiker WebP ikut disimpan supaya kantong Pocket dan editor surat tetap lengkap offline.
       globPatterns: ['**/*.{js,css,svg,png,webp}', 'offline.html'],
-      globIgnores: ['samples/**'],
+      // Pengubah HEIC (sekitar 2 MB) hanya dipakai kalau ada foto HEIC, jadi tidak ikut precache;
+      // setelah sekali dipakai, aturan /_nuxt/ di bawah tetap menyimpannya untuk offline.
+      globIgnores: ['samples/**', '**/heic.worker-*.js'],
       runtimeCaching: [
         {
           // Halaman: jaringan dulu, salinan terakhir kalau offline. Surat penerima (/l/…)
