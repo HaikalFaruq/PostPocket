@@ -292,11 +292,13 @@ const marquee = computed(() =>
       </header>
 
       <div class="text-center">
+        <!-- Halaman yang sama dipakai TV dan Booth; judulnya mengikuti yang sedang dibuka. -->
         <h1 class="font-tv text-[clamp(40px,10vw,64px)] leading-none tracking-[0.22em]">
-          MEMORI <span class="text-tv-accent">TV</span>
+          <template v-if="booth">PHOTO <span class="text-tv-accent">BOOTH</span></template>
+          <template v-else>MEMORI <span class="text-tv-accent">TV</span></template>
         </h1>
         <p class="mt-2 font-mono text-[11px] tracking-[0.3em] text-ink-muted uppercase">
-          Putar kenangan dari kantongmu
+          {{ booth ? 'Pilih tata letak, lalu tekan Rekam' : 'Putar kenangan dari kantongmu' }}
         </p>
       </div>
 

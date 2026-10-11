@@ -8,6 +8,8 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   test.setTimeout(45_000)
   await page.goto('/tv?booth=1')
   await expect(page.getByTestId('booth-camera')).toBeVisible()
+  // Judul halaman mengikuti Booth, bukan TV.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/PHOTO\s+BOOTH/)
   const record = page.getByTestId('booth-record')
   await expect(record).toBeEnabled({ timeout: 10_000 })
   await page.getByRole('radio', { name: 'Noir' }).click()
