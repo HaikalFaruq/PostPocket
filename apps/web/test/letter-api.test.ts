@@ -110,6 +110,20 @@ describe('createLetterApi', () => {
     await expect(api.remove('id', 't')).resolves.toBeUndefined()
   })
 
+  it('409 di endpoint selain publish tetap error', async () => {
+    const conflict = () => respond(409, { error: { code: 'invalid_request', message: 'bentrok' } })
+    const fetch = vi.fn(async () => conflict())
+    const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch })
+    for (const request of [
+      () => api.create(buildCreateRequest(input)),
+      () => api.get('x7Kp2qLm9A'),
+      () => api.open('x7Kp2qLm9A'),
+      () => api.remove('id', 't'),
+    ]) {
+      await expect(request()).rejects.toMatchObject({ code: 'invalid_request', status: 409 })
+    }
+  })
+
   it('jaringan putus jadi kode network', async () => {
     const fetch = vi.fn(async () => Promise.reject(new TypeError('Failed to fetch')))
     const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch })
