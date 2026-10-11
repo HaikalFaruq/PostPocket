@@ -37,6 +37,22 @@ export function snappedRotation(degrees: number, tolerance = 4): number {
   return Math.abs(normalized - nearest) <= tolerance ? nearest : normalized
 }
 
+/**
+ * Cubit dua jari: rasio jarak antarjari mengubah ukuran, perubahan sudutnya memutar, dan
+ * pergeseran titik tengahnya memindah elemen. `dx` dan `dy` adalah pecahan lebar dan tinggi
+ * halaman; putarannya tetap menempel ke kelipatan 90°.
+ */
+export function pinched(
+  start: LetterElement,
+  pinch: { factor: number; turn: number; dx: number; dy: number },
+) {
+  return {
+    ...scaled(start, pinch.factor),
+    rotation: snappedRotation(start.rotation + pinch.turn),
+    ...moved(start, pinch.dx, pinch.dy),
+  }
+}
+
 /** Id baru yang belum dipakai, misalnya `s4k2x9`. */
 export function uniqueId(prefix: string, taken: ReadonlySet<string>): string {
   for (;;) {
