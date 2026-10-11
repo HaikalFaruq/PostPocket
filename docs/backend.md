@@ -76,7 +76,8 @@ Satu job `pg_cron` per jam memanggil Edge Function pembersih lewat `pg_net`. Fun
 
 - draf yang tidak pernah di-publish setelah 24 jam, beserta filenya;
 - foto surat yang `opened_at`-nya sudah lewat 7 hari, beserta cover dan gambar OG kalau gambar depannya foto user;
-- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya.
+- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya;
+- baris `rate_limit_hits` yang lebih tua dari 1 jam (baris per IP hanya dibersihkan saat IP itu membuat surat lagi).
 
 File harus dihapus lewat Storage API (`storage.remove()`) di Edge Function. Menghapus baris `storage.objects` lewat SQL meninggalkan file yatim yang tetap memakan kuota ([Supabase: Delete Objects](https://supabase.com/docs/guides/storage/management/delete-objects)).
 
@@ -95,17 +96,17 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 1 (minggu 2–3)**
 
-- [ ] `POST /letters` dengan URL upload bertanda tangan
-- [ ] Rate limit pembuatan surat per IP untuk pengguna anonim
-- [ ] Hapus EXIF di sisi server sebagai lapis kedua
+- [x] `POST /letters` dengan URL upload bertanda tangan
+- [x] Rate limit pembuatan surat per IP untuk pengguna anonim
+- [x] Hapus EXIF di sisi server sebagai lapis kedua (saat publish, lihat bagian Edge Functions)
 
 **Sprint 2 (minggu 4–5)**
 
-- [ ] `POST /letters/:id/publish`: validasi isi serta foto dan gambar OG yang sudah diunggah, slug, status `sent`
+- [x] `POST /letters/:id/publish`: validasi isi serta foto dan gambar OG yang sudah diunggah, slug, status `sent`
 - [ ] Job pembersihan file (`pg_cron` + `pg_net` + Edge Function), lihat bagian Pembersihan file
-- [ ] `GET /l/:slug` dan `POST /l/:slug/open`
-- [ ] `DELETE /letters/:id`
-- [ ] `noindex` untuk surat, dikoordinasikan dengan Kall karena halaman `/l/:slug` dirender frontend
+- [x] `GET /l/:slug` dan `POST /l/:slug/open`
+- [x] `DELETE /letters/:id`
+- [x] `noindex` untuk surat: halaman `/l/:slug` memakai `robots: noindex` (Kall), respons API memakai `Cache-Control: no-store`
 - [ ] Gerbang rilis: link surat terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
 
 **Sprint 3 (minggu 6–7)**
@@ -126,6 +127,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 | --- | --- |
 | `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `status`, `edit_token_hash`, `reply_to_id`, `created_at`, `draft_expires_at`, `published_at`, `expires_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at` |
 | `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`cover`/`og`), `key` (kunci foto di `content`, khusus `photo`), `mime`, `size`, `width`, `height`, `uploaded_at` |
+| `rate_limit_hits` | `bucket`, `key` (HMAC dari IP, bukan IP mentah), `created_at`. Diisi `take_rate_limit()` |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
 - `owner_id` boleh kosong selama belum ada login.
@@ -137,6 +139,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
 - Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key.
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
+- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), dan `take_rate_limit()`. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -155,6 +158,43 @@ Detail request, respons, dan kode error ada di [`docs/api/openapi.yaml`](api/ope
 | GET | `/l/:slug` | Ambil surat untuk halaman penerima (design, content, URL foto) | Publik |
 | POST | `/l/:slug/open` | Catat waktu pertama kali dibuka | Publik, sekali per surat |
 | DELETE | `/letters/:id` | Hapus surat dan fotonya | Header `X-Edit-Token` (pemilik akun di fase 2) |
+
+## Edge Functions
+
+Dua fungsi di `supabase/functions/`, keduanya dengan `verify_jwt = false`:
+
+| Fungsi | Endpoint |
+| --- | --- |
+| `letters` | `POST /letters`, `POST /letters/{id}/publish`, `DELETE /letters/{id}` |
+| `l` | `GET /l/{slug}`, `POST /l/{slug}/open` |
+
+Kode bersama ada di `_shared/`:
+
+- `http.ts`: CORS sesuai kontrak, cek header `apikey` (harus publishable key proyek), dan bentuk error.
+- `validate.ts`: body `POST /letters` dicek dengan skema dari kontrak (`_shared/openapi.json`, hasil `scripts/bundle-contract.sh`), lalu aturan isi dicek dengan preset dan `contentLimits` dari `packages/presets`, sama seperti mock frontend.
+- `image.ts`: membaca tipe dan dimensi dari isi berkas, lalu membuang EXIF, XMP, IPTC, dan komentar tanpa kompres ulang.
+- `db.ts`: klien secret key. Secret key diambil dari env yang disediakan Supabase (`SUPABASE_SECRET_KEYS`), jadi tidak perlu `secrets set`.
+
+Yang terjadi saat publish: setiap berkas diunduh dari Storage, ukurannya harus sama persis dengan metadata, tipe dan dimensinya dibaca dari isi berkas (bukan dari header). Kalau ada metadata yang tersisa atau content-type dari browser salah, berkasnya ditulis ulang tanpa metadata. Baru setelah itu `slug` dibuat dan status jadi `sent`.
+
+Rate limit memakai IP dari `cf-connecting-ip`. Di proyek Supabase request lewat Cloudflare, yang mengisi header itu dengan IP asli dan menolak request yang mengirimnya sendiri; `x-forwarded-for` dari klien juga ditimpa (dicek langsung di proyek, Oktober 2026). IPv6 dihitung per /64.
+
+```sh
+# Stack lokal lengkap (DB, Storage, Edge Functions)
+supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta
+
+# Dari supabase/functions
+deno test tests/unit.test.ts
+API_URL=http://127.0.0.1:54321 PUBLISHABLE_KEY=<dari supabase status> deno test -A tests/api.test.ts
+
+# Setelah kontrak berubah
+scripts/bundle-contract.sh
+
+# Deploy (setelah migrasi baru di-push dengan supabase db push)
+supabase functions deploy letters l
+```
+
+Di stack lokal, Kong menimpa header CORS dengan `*`, jadi test CORS di `api.test.ts` hanya jalan kalau `API_URL` menunjuk proyek Supabase asli.
 
 ## Storage
 
