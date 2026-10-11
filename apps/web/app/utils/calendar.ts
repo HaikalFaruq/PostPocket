@@ -41,6 +41,11 @@ export function longDate(day: string): string {
   })
 }
 
+/** Tanggal pendek bahasa Indonesia, misalnya "10 Oktober". */
+export function shortDate(day: string): string {
+  return parseDay(day).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' })
+}
+
 /** Tanggal `YYYY-MM-DD` yang benar-benar ada dan sudah lewat atau hari ini: bisa diisi di Pocket. */
 export function isPocketDay(value: string, today = dayKey(new Date())): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && dayKey(parseDay(value)) === value && value <= today

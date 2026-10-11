@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPocketDay, longDate, monthGrid, shiftMonth } from '../app/utils/calendar'
+import { isPocketDay, longDate, monthGrid, shiftMonth, shortDate } from '../app/utils/calendar'
 import { parseExifDate, readExifDate } from '../app/utils/exif'
 
 /** JPEG kecil dengan segmen EXIF berisi tanggal, di IFD Exif (asli) atau di IFD0. */
@@ -77,6 +77,7 @@ describe('kalender', () => {
 
   it('tanggal lengkap bahasa Indonesia', () => {
     expect(longDate('2026-10-10')).toBe('Sabtu, 10 Oktober 2026')
+    expect(shortDate('2026-10-05')).toBe('5 Oktober')
   })
 
   it('hanya tanggal nyata yang sudah lewat atau hari ini yang bisa diisi', () => {

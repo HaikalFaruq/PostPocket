@@ -90,7 +90,8 @@ function onChange(event: Event) {
       @change="onChange"
     />
     <p class="min-w-0 flex-1 text-caption text-ink-muted">
-      atau drop / paste foto. Foto tetap di browser sampai kamu membuat link.
+      <span class="pointer-coarse:hidden">atau drop / paste foto. </span>Foto tetap di perangkatmu
+      sampai kamu membuat link.
     </p>
   </div>
   <p

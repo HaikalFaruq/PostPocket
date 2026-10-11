@@ -3,6 +3,7 @@ import {
   byId,
   contentLimits,
   contentPhotoKeys,
+  isFilledElement,
   letter,
   normalizeContent,
   surprise,
@@ -13,6 +14,7 @@ import {
 } from '@postpocket/presets'
 import { del, get, keys, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
+import type { SentLetter } from '~/utils/letter-api'
 import { uniqueId } from '~/utils/letter-gesture'
 import { requestPersistentStorage } from '~/utils/pwa'
 import {
@@ -29,6 +31,8 @@ const DRAFT_KEY = 'postpocket:letter-draft'
 // Foto disimpan terpisah, jadi mengetik isi surat tidak menulis ulang foto berukuran megabyte.
 const PHOTO_KEY = 'postpocket:letter-draft-photo'
 const CONTENT_PHOTO_PREFIX = 'postpocket:letter-draft-photo:'
+// Surat yang sudah dibuat linknya dari draf ini, bersama sidik draf saat itu.
+const SENT_KEY = 'postpocket:letter-draft-sent'
 
 type ElementKind = LetterElement['kind']
 
@@ -56,6 +60,22 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   const isPhotoFront = computed(() => design.value.illustration === PHOTO_FRONT && !!photo.value)
   /** Rasio kartu, juga rasio halaman surat. */
   const ratio = computed(() => cardRatio(design.value, photo.value))
+  /** Draf belum berisi apa pun yang bisa dikirim: tanpa isi surat dan tanpa foto depan. */
+  const blank = computed(() => !isPhotoFront.value && !content.value.elements.some(isFilledElement))
+
+  // Sidik draf: desain, isi, dan foto depan. Berubah begitu user mengubah apa pun.
+  const signature = computed(() =>
+    JSON.stringify([
+      design.value,
+      content.value,
+      photo.value && [photo.value.blob.size, photo.value.width, photo.value.height],
+    ]),
+  )
+  const sentMark = shallowRef<{ signature: string; letter: SentLetter } | null>(null)
+  /** Surat yang sudah dibuat linknya dari draf ini, selama drafnya belum diubah sejak itu. */
+  const sent = computed(() =>
+    sentMark.value?.signature === signature.value ? sentMark.value.letter : null,
+  )
 
   const photoUrl = ref<string | null>(null)
   watch(photo, (next) => {
@@ -97,6 +117,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       photos.value = draft.photos
       replyTo.value = draft.replyTo
       savedPhotoKeys = new Set(Object.keys(draft.photos))
+      const mark = (await get(SENT_KEY)) as { signature?: unknown; letter?: SentLetter } | undefined
+      sentMark.value =
+        typeof mark?.signature === 'string' && mark.letter?.url
+          ? { signature: mark.signature, letter: mark.letter }
+          : null
       await nextTick()
       photoDirty = false
       dirtyPhotos.clear()
@@ -321,6 +346,28 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     replyTo.value = slug && SLUG_PATTERN.test(slug) ? slug : null
   }
 
+  /** Tandai draf ini sudah jadi link `letter`. Tanda hilang sendiri kalau drafnya diubah. */
+  async function markSent(letter: SentLetter) {
+    // Simpan draf saat itu juga, supaya draf yang tersimpan sama dengan yang ditandai terkirim.
+    clearTimeout(timer)
+    await save()
+    sentMark.value = { signature: signature.value, letter: { ...letter } }
+    try {
+      await set(SENT_KEY, { signature: signature.value, letter: { ...letter } })
+    } catch {
+      // Tanpa IndexedDB tanda ini hanya bertahan sampai halaman ditutup.
+    }
+  }
+
+  async function clearSent() {
+    sentMark.value = null
+    try {
+      await del(SENT_KEY)
+    } catch {
+      // Tidak ada yang perlu dihapus.
+    }
+  }
+
   async function reset() {
     clearTimeout(timer)
     const fresh = emptyDraft()
@@ -332,9 +379,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     replyTo.value = null
     savedPhotoKeys = new Set()
     dirtyPhotos.clear()
+    sentMark.value = null
     try {
       await Promise.all([
         del(DRAFT_KEY),
+        del(SENT_KEY),
         del(PHOTO_KEY),
         ...stale.map((key) => del(CONTENT_PHOTO_PREFIX + key)),
       ])
@@ -348,6 +397,10 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     photo,
     photoUrl,
     isPhotoFront,
+    blank,
+    sent,
+    markSent,
+    clearSent,
     ratio,
     content,
     photos,

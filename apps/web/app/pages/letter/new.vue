@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import { byId, isFilledElement, letter } from '@postpocket/presets'
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+} from 'reka-ui'
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
-import { MESSAGE_LIMIT } from '~/utils/letter-draft'
+import { MESSAGE_LIMIT, type DraftPhoto } from '~/utils/letter-draft'
+import { takePendingPhoto } from '~/utils/pending-photo'
 
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
 
@@ -14,10 +24,48 @@ onMounted(async () => {
   await draft.load()
   const reply = route.query.balas
   if (typeof reply === 'string') {
+    // Balasan dimulai dari kertas kosong kalau draf sebelumnya sudah dikirim.
+    if (draft.sent) await draft.reset()
     draft.setReplyTo(reply)
     router.replace({ query: {} })
   }
+  // Foto dari "Kirim sebagai surat" (Pocket) atau "Pakai di surat" (Booth): /letter/new?foto=1.
+  if (route.query.foto !== undefined) {
+    router.replace({ query: {} })
+    const pending = await takePendingPhoto()
+    if (!pending) return
+    // Draf yang kosong atau sudah jadi link langsung diganti; draf yang belum dikirim tidak ditimpa
+    // tanpa bertanya, supaya isinya tidak terkirim ke orang lain.
+    if (draft.blank || draft.sent) await startWithPhoto(pending)
+    else waitingPhoto.value = pending
+  }
 })
+
+const notice = ref('')
+const waitingPhoto = shallowRef<{ photo: DraftPhoto; from: string } | null>(null)
+
+/** Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. */
+async function startWithPhoto(pending: { photo: DraftPhoto; from: string }) {
+  waitingPhoto.value = null
+  await draft.reset()
+  draft.setTemplate('photo-1')
+  draft.addPhoto(pending.photo)
+  await draft.save()
+  notice.value = `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu buat link.`
+  open.value = true
+}
+
+async function addToDraft(pending: { photo: DraftPhoto; from: string }) {
+  waitingPhoto.value = null
+  if (!draft.addPhoto(pending.photo)) {
+    notice.value =
+      'Isi surat ini sudah berisi 4 foto. Hapus satu dulu lewat "Atur foto dan stiker".'
+    return
+  }
+  await draft.save()
+  notice.value = `Foto dari ${pending.from} ditambahkan ke isi surat.`
+  open.value = true
+}
 
 const isDesktop = useMediaQuery('(min-width: 1024px)')
 const open = ref(false)
@@ -121,8 +169,43 @@ const contentSummary = computed(() => {
   return parts.length ? parts.join(' · ') : 'Belum ada foto atau stiker.'
 })
 
-// "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG.
+// "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG. Draf yang sudah jadi link
+// cukup menampilkan link-nya lagi, dan surat kosong tidak bisa dikirim.
 const sending = ref(false)
+const emptyWarning = ref(false)
+const messageField = ref<HTMLTextAreaElement | null>(null)
+watch(
+  () => filled.value.length,
+  (count) => {
+    if (count) emptyWarning.value = false
+  },
+)
+
+function startSending() {
+  if (draft.sent) {
+    sending.value = true
+    return
+  }
+  if (!filled.value.length) {
+    emptyWarning.value = true
+    expanded.value = true
+    nextTick(() => messageField.value?.focus())
+    return
+  }
+  sending.value = true
+}
+
+const sentUntil = computed(() =>
+  draft.sent
+    ? new Date(draft.sent.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' })
+    : '',
+)
+
+async function newLetter() {
+  open.value = false
+  notice.value = ''
+  await draft.reset()
+}
 const ogCard = computed(() => ({
   art: art.value,
   foilMask: mask.value,
@@ -195,7 +278,7 @@ async function startOver() {
         v-if="isDesktop"
         class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-subtle"
       >
-        Tap kartu untuk membuka · geser untuk memutar
+        Ketuk kartu untuk membuka · geser untuk memutar
       </p>
       <div
         v-if="dragging"
@@ -207,7 +290,7 @@ async function startOver() {
 
     <component :is="isDesktop ? SidePanel : BottomSheet" v-bind="panelProps">
       <template #peek>
-        <p class="text-caption text-ink-subtle">Tap kartu untuk membuka</p>
+        <p class="text-caption text-ink-subtle">Ketuk kartu untuk membuka</p>
       </template>
 
       <div class="px-6 pt-6 pb-1">
@@ -228,6 +311,47 @@ async function startOver() {
           >
             Batal membalas
           </button>
+        </div>
+        <p
+          v-if="notice"
+          role="status"
+          class="mt-3 flex items-start justify-between gap-3 rounded-control bg-fill px-3 py-2 text-caption"
+          data-testid="letter-notice"
+        >
+          <span>{{ notice }}</span>
+          <button
+            type="button"
+            class="shrink-0 font-medium underline underline-offset-2"
+            @click="notice = ''"
+          >
+            Oke
+          </button>
+        </p>
+        <div
+          v-if="draft.sent"
+          class="mt-3 rounded-control bg-fill px-3 py-2.5 text-caption"
+          data-testid="sent-banner"
+        >
+          <p class="font-semibold text-ink">Surat ini sudah jadi link.</p>
+          <p class="mt-0.5 text-ink-muted">
+            Bisa dibuka sampai {{ sentUntil }}. Kalau kamu mengubahnya, nanti dibuat link baru.
+          </p>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            <button
+              type="button"
+              class="font-semibold underline underline-offset-2"
+              @click="sending = true"
+            >
+              Lihat link
+            </button>
+            <button
+              type="button"
+              class="font-semibold underline underline-offset-2"
+              @click="newLetter"
+            >
+              Bikin surat baru
+            </button>
+          </div>
         </div>
         <p
           v-if="draft.saveFailed"
@@ -303,7 +427,15 @@ async function startOver() {
 
       <StepCard :step="5" title="Isi surat">
         <PillGroup v-model="template" label="Template isi surat" :options="templateOptions" />
+        <p
+          v-if="emptyWarning"
+          role="alert"
+          class="mt-3 rounded-control bg-[#fbefd2] px-3 py-2 text-caption text-[#7a5a14]"
+        >
+          Isi suratnya masih kosong. Tulis sesuatu dulu, yuk.
+        </p>
         <textarea
+          ref="messageField"
           v-model="draft.message"
           :maxlength="MESSAGE_LIMIT"
           rows="5"
@@ -339,15 +471,54 @@ async function startOver() {
       </div>
 
       <template #footer>
-        <StickyCTA :disabled="!draft.ready || maskBusy" @click="sending = true"
-          >Buat link untuk dikirim</StickyCTA
-        >
+        <StickyCTA :disabled="!draft.ready || maskBusy" @click="startSending">{{
+          draft.sent ? 'Lihat link surat' : 'Buat link untuk dikirim'
+        }}</StickyCTA>
       </template>
     </component>
 
     <Teleport to="body">
       <LetterEditor v-if="editing" @close="closeEditor" />
-      <SendLetter v-if="sending" :card="ogCard" @close="sending = false" />
+      <SendLetter v-if="sending" :card="ogCard" :existing="draft.sent" @close="sending = false" />
+      <DialogRoot
+        :open="!!waitingPhoto"
+        @update:open="(isOpen: boolean) => !isOpen && (waitingPhoto = null)"
+      >
+        <DialogPortal>
+          <DialogOverlay class="fixed inset-0 z-40 bg-ink/40 data-[state=open]:animate-fade-in" />
+          <DialogContent
+            class="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[24px]"
+            data-testid="photo-choice"
+          >
+            <DialogTitle class="text-title font-semibold">Masih ada draf surat</DialogTitle>
+            <DialogDescription class="mt-1 text-ink-muted">
+              Draf suratmu yang belum dikirim masih ada. Mulai surat baru dengan foto dari
+              {{ waitingPhoto?.from }}, atau tambahkan fotonya ke draf itu?
+            </DialogDescription>
+            <div class="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                type="button"
+                class="h-11 rounded-control sm:flex-1 bg-ink px-4 text-body font-semibold text-white"
+                @click="waitingPhoto && startWithPhoto(waitingPhoto)"
+              >
+                Mulai surat baru
+              </button>
+              <button
+                type="button"
+                class="h-11 rounded-control sm:flex-1 px-4 text-body font-semibold inset-ring inset-ring-line"
+                @click="waitingPhoto && addToDraft(waitingPhoto)"
+              >
+                Tambahkan ke draf
+              </button>
+            </div>
+            <DialogClose
+              class="mt-3 w-full text-center text-caption text-ink-muted underline underline-offset-2"
+            >
+              Batal, jangan pakai foto ini
+            </DialogClose>
+          </DialogContent>
+        </DialogPortal>
+      </DialogRoot>
     </Teleport>
   </div>
 </template>

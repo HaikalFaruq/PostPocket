@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { byId, letter, pocket } from '@postpocket/presets'
-import { isPocketDay, longDate } from '~/utils/calendar'
+import { isPocketDay, longDate, shortDate } from '~/utils/calendar'
 import { readExifDate } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
+import { sendPhotoToLetter } from '~/utils/pending-photo'
 
 useSeoMeta({ title: 'Kantong · PostPocket', robots: 'noindex' })
 
@@ -20,7 +21,6 @@ definePageMeta({
 const route = useRoute()
 const day = computed(() => String(route.params.date))
 const memories = useMemories()
-const draft = useLetterDraft()
 onMounted(() => memories.load())
 
 const saved = computed(() => memories.data.days[day.value])
@@ -84,14 +84,7 @@ async function sendAsLetter() {
   const id = selected.value
   if (!id) return
   const photo = await memories.photo(id)
-  if (!photo) return
-  await draft.load()
-  if (!draft.addPhoto(photo)) {
-    error.value = 'Surat sudah berisi 4 foto. Hapus satu dulu di editor isi surat.'
-    return
-  }
-  await draft.save()
-  await navigateTo('/letter/new')
+  if (photo) await sendPhotoToLetter(photo, `Pocket ${shortDate(day.value)}`)
 }
 
 const editOpen = ref(false)
