@@ -48,3 +48,17 @@ test('Lapor masalah membuka kanal laporan dengan halaman, versi, dan perangkat',
   expect(body).toContain('Versi: lokal')
   expect(body).toMatch(/Perangkat: Mozilla\//)
 })
+
+test('halaman surat punya jalan lapor masalah tanpa membocorkan link suratnya', async ({
+  page,
+  context,
+}) => {
+  await context.route('https://github.com/**', (route) => route.fulfill({ body: 'ok' }))
+  const response = await page.goto('/l/AbCdEfGhIj')
+  expect(response?.status()).toBe(404)
+  const popup = context.waitForEvent('page')
+  await page.getByRole('contentinfo').getByTestId('feedback-link').click()
+  const body = new URL((await popup).url()).searchParams.get('body') ?? ''
+  expect(body).toContain('Halaman: /l/…')
+  expect(body).not.toContain('AbCdEfGhIj')
+})

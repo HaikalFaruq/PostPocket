@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// Tanpa NUXT_PUBLIC_FEEDBACK_URL, "Lapor masalah" membuka GitHub Issues yang publik.
+const publicReports = !useRuntimeConfig().public.feedbackUrl
+
 useSeoMeta({
   title: 'Privasi · PostPocket',
   description: 'Apa yang disimpan PostPocket di perangkatmu, dan apa yang dikirim ke server.',
@@ -46,7 +49,10 @@ useSeoMeta({
     <ul>
       <li>Surat bisa dibuka 30 hari sejak dikirim, lalu dihapus.</li>
       <li>Foto di dalamnya dihapus 7 hari setelah surat pertama kali dibuka.</li>
-      <li>Surat yang belum sempat diterbitkan dihapus dalam 24 jam.</li>
+      <li>
+        Kalau pembuatan link gagal di tengah jalan, data yang sempat terunggah dihapus dari server
+        dalam 24 jam.
+      </li>
       <li>
         Kamu bisa menghapus surat kapan saja lewat "Surat terkirim" di halaman tulis surat, dari
         browser yang dipakai untuk mengirimnya.
@@ -56,7 +62,7 @@ useSeoMeta({
     <h2>Pembatasan spam</h2>
     <p>
       Satu jaringan bisa membuat paling banyak 10 surat per jam. Untuk menghitungnya, server
-      menyimpan sidik acak dari alamat IP pengirim, bukan alamat IP-nya.
+      menyimpan versi tersandi (hash berkunci) dari alamat IP pengirim, bukan alamat IP-nya.
     </p>
 
     <h2>Tanpa iklan dan pelacak</h2>
@@ -66,6 +72,10 @@ useSeoMeta({
     <p>
       Kirim lewat <FeedbackLink>Lapor masalah</FeedbackLink>. Laporan otomatis menyertakan halaman,
       versi aplikasi, dan jenis perangkatmu, tanpa link suratmu.
+      <template v-if="publicReports">
+        Selama beta, laporan masuk ke GitHub Issues: perlu akun GitHub dan bisa dibaca publik, jadi
+        jangan tulis data pribadi di sana.
+      </template>
     </p>
   </InfoPage>
 </template>

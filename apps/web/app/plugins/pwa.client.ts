@@ -15,6 +15,8 @@ export default defineNuxtPlugin((nuxtApp) => {
   // Editor surat, Pocket, dan TV ikut disimpan: datanya di IndexedDB dan halamannya hanya
   // dirender di browser, jadi salinan halamannya tidak memuat data pribadi.
   nuxtApp.hook('service-worker:activated', () => {
-    warmPages(['/', '/letter/new', '/pocket', '/tv', window.location.pathname])
+    // Halaman galat (misalnya 404) tidak disimpan; menyimpannya hanya menghasilkan request gagal.
+    const current = nuxtApp.payload.error ? [] : [window.location.pathname]
+    warmPages(['/', '/letter/new', '/pocket', '/tv', ...current])
   })
 })

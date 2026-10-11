@@ -139,5 +139,10 @@ const formatDate = (value: string | null | undefined) =>
         Bikin surat sendiri
       </NuxtLink>
     </main>
+
+    <footer class="py-6 text-center text-caption text-ink-muted">
+      PostPocket versi beta · ada yang tidak beres?
+      <FeedbackLink class="font-semibold text-ink underline underline-offset-2" />
+    </footer>
   </div>
 </template>
