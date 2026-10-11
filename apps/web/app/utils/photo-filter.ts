@@ -222,3 +222,49 @@ export function drawFiltered(
   applyFilterSteps(image.data, width, height, parseCssFilter(css))
   ctx.putImageData(image, 0, 0)
 }
+
+/** Jumlah garis scanline per tinggi gambar, sama di layar (CSS) dan di hasil unduhan. */
+export const SCANLINE_ROWS = 120
+
+/**
+ * Efek TV dari preset (`rgb-split`, `noise`, `scanlines`) di kanvas, setelah `drawFiltered`.
+ * Ukurannya relatif terhadap gambar, jadi hasil unduhan Booth sama dengan lapisan di layar.
+ */
+export function applyTvEffects(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  effects: readonly string[],
+  random: () => number = Math.random,
+): void {
+  if (effects.includes('rgb-split') || effects.includes('noise')) {
+    const image = ctx.getImageData(0, 0, width, height)
+    const data = image.data
+    if (effects.includes('rgb-split')) {
+      // Merah bergeser ke kanan, biru ke kiri, seperti pita yang meleset.
+      const shift = Math.max(1, Math.round(width * 0.006))
+      const source = new Uint8ClampedArray(data)
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4
+          data[i] = source[(y * width + Math.max(0, x - shift)) * 4]!
+          data[i + 2] = source[(y * width + Math.min(width - 1, x + shift)) * 4 + 2]!
+        }
+      }
+    }
+    if (effects.includes('noise')) {
+      for (let i = 0; i < data.length; i += 4) {
+        const grain = (random() - 0.5) * 36
+        data[i] = data[i]! + grain
+        data[i + 1] = data[i + 1]! + grain
+        data[i + 2] = data[i + 2]! + grain
+      }
+    }
+    ctx.putImageData(image, 0, 0)
+  }
+  if (effects.includes('scanlines')) {
+    const pitch = height / SCANLINE_ROWS
+    ctx.fillStyle = 'rgb(0 0 0 / 0.18)'
+    for (let y = 0; y < height; y += pitch) ctx.fillRect(0, y, width, Math.max(1, pitch / 3))
+  }
+}

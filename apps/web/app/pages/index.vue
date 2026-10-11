@@ -23,6 +23,7 @@ const doors: { title: string; text: string; icon: IconName; to?: string }[] = [
     title: 'Booth',
     text: 'Foto 4 frame dengan filter retro, langsung jadi strip.',
     icon: 'camera',
+    to: '/tv?booth=1',
   },
   { title: 'Pocket', text: 'Simpan satu hari kecil di kantong berstiker.', icon: 'calendar' },
   {
