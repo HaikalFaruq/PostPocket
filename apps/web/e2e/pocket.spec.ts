@@ -158,6 +158,36 @@ test('putar di TV: isi kantong langsung diputar, foto baru masuk ke kantong yang
   await expect(page.getByTestId('moment')).toHaveCount(3)
 })
 
+test('foto kenangan pertama meminta penyimpanan permanen, sekali saja', async ({ page }) => {
+  // Penyimpanan permanen dipalsukan supaya bisa dihitung; browser sungguhan bisa menolaknya.
+  // Dipasang di prototype karena WebKit bisa membuat ulang objek navigator.storage.
+  await page.addInitScript(() => {
+    const state = { granted: false, calls: 0 }
+    Object.assign(window, { storageState: state })
+    if (!('StorageManager' in window)) return
+    StorageManager.prototype.persisted = async () => state.granted
+    StorageManager.prototype.persist = async () => {
+      state.calls++
+      state.granted = true
+      return true
+    }
+  })
+  const calls = () =>
+    page.evaluate(
+      () => (window as unknown as { storageState: { calls: number } }).storageState.calls,
+    )
+  await page.goto('/pocket')
+  test.skip(!(await page.evaluate(() => 'StorageManager' in window)), 'StorageManager tidak ada')
+  await saveDay(page, TODAY, [20])
+  await expect.poll(calls).toBe(1)
+
+  await page.goto(`/pocket/${TODAY}`)
+  await page.getByRole('button', { name: 'Buka kantong' }).click()
+  await page.getByTestId('pocket-upload').setInputFiles(await photos(page, [200]))
+  await expect(page.getByTestId('moment')).toHaveCount(2)
+  expect(await calls()).toBe(1)
+})
+
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({
   page,
 }) => {

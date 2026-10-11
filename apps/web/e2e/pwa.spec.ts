@@ -89,6 +89,46 @@ test('editor surat tetap bisa dipakai offline sejak kunjungan pertama', async ({
   await context.setOffline(false)
 })
 
+test('Pocket dan TV tetap terbuka offline, lengkap dengan stiker dan kenangan di perangkat', async ({
+  page,
+  context,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Service worker di Playwright hanya andal di Chromium')
+  await page.goto('/pocket')
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const registration = await navigator.serviceWorker.getRegistration()
+          if (registration?.active?.state !== 'activated') return false
+          const pages = await caches.open('pages')
+          return !!(await pages.match('/pocket')) && !!(await pages.match('/tv'))
+        }),
+      { timeout: 15_000 },
+    )
+    .toBe(true)
+
+  // Hari ini adalah tanggal terakhir yang bisa diisi di kalender.
+  const today = page.locator('[data-day]').last()
+  await today.click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  // Modal baru tertutup setelah data tertulis di IndexedDB.
+  await expect(dialog).toBeHidden()
+  await expect(today).toHaveAttribute('data-saved', 'true')
+
+  await context.setOffline(true)
+  await page.reload()
+  await expect(today).toHaveAttribute('data-saved', 'true')
+  await expect
+    .poll(() => today.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0)
+  await page.goto('/tv')
+  await expect(page.getByTestId('tv-idle')).toContainText('NO SIGNAL')
+  await context.setOffline(false)
+})
+
 test('kartu Pasang memanggil dialog pasang bawaan browser', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'beforeinstallprompt hanya ada di Chromium')
   await page.goto('/')

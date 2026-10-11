@@ -80,7 +80,8 @@ export default defineNuxtConfig({
       // ini hanya melayani `/offline.html`. Revisi berkas tetap dihitung Workbox.
       manifestTransforms: [],
       clientsClaim: true,
-      globPatterns: ['**/*.{js,css,svg,png}', 'offline.html'],
+      // Stiker WebP ikut disimpan supaya kantong Pocket dan editor surat tetap lengkap offline.
+      globPatterns: ['**/*.{js,css,svg,png,webp}', 'offline.html'],
       globIgnores: ['samples/**'],
       runtimeCaching: [
         {

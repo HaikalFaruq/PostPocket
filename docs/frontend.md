@@ -187,14 +187,15 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 
 | Yang disimpan | Cara | Kenapa |
 | --- | --- | --- |
-| JS, CSS, ilustrasi, ikon, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
-| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat memang ada di IndexedDB |
+| JS, CSS, ilustrasi, ikon, stiker, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
+| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, Pocket, TV, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat dan kenangan memang ada di IndexedDB, dan Pocket serta TV hanya dirender di browser, jadi salinan halamannya tidak memuat data pribadi |
 | Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
 | Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
 
 - Halaman yang belum pernah tersimpan menampilkan `offline.html` saat offline.
 - Versi baru tidak langsung dipakai. Toast "Versi baru PostPocket siap" muncul dan user memilih kapan memuat ulang, supaya tulisan yang sedang diketik tidak hilang.
 - Kartu "Pasang PostPocket" di Beranda memakai dialog pasang bawaan Chrome, atau petunjuk Tambah ke Layar Utama di iPhone. Aplikasi yang terpasang meminta `navigator.storage.persist()`, dan Safari tidak menghapus datanya setelah 7 hari.
+- Begitu foto pertama tersimpan di perangkat (kenangan Pocket, Booth, foto dari TV, atau foto draf surat), browser juga diminta menyimpan secara permanen. Chrome dan Safari memutuskannya sendiri, Firefox menanyakan izin sekali.
 - Halaman baru yang menampilkan data pribadi wajib dikecualikan dari cache: tambahkan ke `isPrivatePath()` di `app/utils/pwa.ts` dan aturan `runtimeCaching` di `nuxt.config.ts`.
 - Ikon aplikasi dibuat ulang dengan `node scripts/pwa-icons.mjs` dari folder `apps/web`.
 

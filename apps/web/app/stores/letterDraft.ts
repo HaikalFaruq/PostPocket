@@ -14,6 +14,7 @@ import {
 import { del, get, keys, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
 import { uniqueId } from '~/utils/letter-gesture'
+import { requestPersistentStorage } from '~/utils/pwa'
 import {
   PHOTO_FRONT,
   SLUG_PATTERN,
@@ -124,10 +125,12 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     }
     try {
       await set(DRAFT_KEY, draft)
+      let wrotePhoto = false
       if (photoDirty) {
         const current = photo.value
         if (current) await set(PHOTO_KEY, await toStoredPhoto(current))
         else await del(PHOTO_KEY)
+        wrotePhoto = !!current
         photoDirty = false
       }
       for (const key of [...dirtyPhotos]) {
@@ -135,9 +138,12 @@ export const useLetterDraft = defineStore('letterDraft', () => {
         if (item) {
           await set(CONTENT_PHOTO_PREFIX + key, await toStoredPhoto(item))
           savedPhotoKeys.add(key)
+          wrotePhoto = true
         }
         dirtyPhotos.delete(key)
       }
+      // Draf berfoto ikut dijaga dari pembersihan penyimpanan browser.
+      if (wrotePhoto) void requestPersistentStorage()
       for (const key of [...savedPhotoKeys]) {
         if (photos.value[key]) continue
         await del(CONTENT_PHOTO_PREFIX + key)
