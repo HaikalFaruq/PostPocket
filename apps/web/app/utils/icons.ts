@@ -17,6 +17,10 @@ export const iconPaths = {
     'M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM4 10h16M9 4v4M15 4v4',
   play: 'M8 5.5v13l10.5-6.5z',
   link: 'M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
+  download: 'M12 4v11M7 10l5 5 5-5M5 19h14',
+  // Tombol Bagikan Safari, untuk petunjuk Tambah ke Layar Utama.
+  share:
+    'M12 3v12M8 7l4-4 4 4M8 11H7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1',
 } as const
 
 export type IconName = keyof typeof iconPaths

@@ -133,7 +133,7 @@ Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `
 
 **CORS** perlu mengizinkan `https://postpocket.vercel.app`, preview `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
 
-**Mock API.** `apps/web/server/routes/mock-api/` meniru kelima endpoint di atas (validasi, kode error, upload ke URL bertanda tangan) dengan data di memori, supaya alur "Buat link" dan halaman penerima bisa dibangun sebelum backend siap. Nyalakan dengan `NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api` (contohnya di `apps/web/.env.example`); E2E selalu memakainya, produksi tidak. `/lab/kirim` menjalankan alur kirim dari ujung ke ujung: kompres foto, render gambar OG, kirim, baca, buka, lalu hapus.
+**Mock API.** `apps/web/server/routes/mock-api/` meniru kelima endpoint di atas (validasi, kode error, upload ke URL bertanda tangan) dengan data di memori, supaya alur "Buat link" dan halaman penerima bisa dibangun sebelum backend siap. Body `POST /letters` diperiksa langsung dengan skema di `docs/api/openapi.yaml` (ajv, `server/utils/contract.ts`): yang tidak sesuai skema dijawab `400` beserta `details` berisi lokasi field-nya, sedangkan isi yang ditolak (preset tidak dikenal, kunci foto tidak cocok, cover, `replyTo`, batas per jenis elemen) dijawab `422`. Jadi kalau kontraknya berubah, mock ikut berubah. `test/contract.test.ts` memastikan body dari klien lolos skema, dan E2E `mock-api.spec.ts` mencocokkan setiap respons mock dengan skemanya. Nyalakan dengan `NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api` (contohnya di `apps/web/.env.example`); E2E selalu memakainya, produksi tidak. `/lab/kirim` menjalankan alur kirim dari ujung ke ujung: kompres foto, render gambar OG, kirim, baca, buka, lalu hapus.
 
 ## Checklist per sprint
 
@@ -178,8 +178,25 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 4 dan beta (minggu 8–10)**
 
 - [x] Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV
-- [ ] `navigator.storage.persist()` dan ajakan pasang PWA
+- [x] `navigator.storage.persist()` dan ajakan pasang PWA ([PWA](#pwa))
 - [ ] Uji di 3 HP; perbaiki bug dari tester
+
+## PWA
+
+PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan service worker). Service worker hanya ada di build production; `pnpm dev` tidak memakainya, jadi cek PWA lewat `pnpm build && node apps/web/.output/server/index.mjs` atau `pnpm test:e2e`.
+
+| Yang disimpan | Cara | Kenapa |
+| --- | --- | --- |
+| JS, CSS, ilustrasi, ikon, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
+| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat memang ada di IndexedDB |
+| Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
+| Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
+
+- Halaman yang belum pernah tersimpan menampilkan `offline.html` saat offline.
+- Versi baru tidak langsung dipakai. Toast "Versi baru PostPocket siap" muncul dan user memilih kapan memuat ulang, supaya tulisan yang sedang diketik tidak hilang.
+- Kartu "Pasang PostPocket" di Beranda memakai dialog pasang bawaan Chrome, atau petunjuk Tambah ke Layar Utama di iPhone. Aplikasi yang terpasang meminta `navigator.storage.persist()`, dan Safari tidak menghapus datanya setelah 7 hari.
+- Halaman baru yang menampilkan data pribadi wajib dikecualikan dari cache: tambahkan ke `isPrivatePath()` di `app/utils/pwa.ts` dan aturan `runtimeCaching` di `nuxt.config.ts`.
+- Ikon aplikasi dibuat ulang dengan `node scripts/pwa-icons.mjs` dari folder `apps/web`.
 
 ## Uji di HP sungguhan
 

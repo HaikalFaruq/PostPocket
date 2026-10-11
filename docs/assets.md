@@ -9,6 +9,7 @@ Setiap aset yang masuk repo dicatat di sini (PRD bagian Risiko: lisensi aset tid
 | Ikon garis (chevron, tutup, kamera, dan lainnya) | `apps/web/app/utils/icons.ts` | Digambar sendiri | Milik sendiri |
 | Ikon bunga di swatch warna foil | `apps/web/app/components/letter/FoilSwatchIcon.vue` | Digambar sendiri (SVG) | Milik sendiri |
 | Favicon amplop | `apps/web/public/favicon.svg` | Digambar sendiri | Milik sendiri |
+| Ikon aplikasi (PWA dan layar utama iPhone) | `apps/web/public/pwa-*.png`, `maskable-icon-512x512.png`, `apple-touch-icon-180x180.png` | Dibuat sendiri dari amplop favicon, hasil `apps/web/scripts/pwa-icons.mjs` | Milik sendiri |
 | Foto contoh pantai senja | `apps/web/public/samples/contoh-foto.svg` | Digambar sendiri (SVG) | Milik sendiri |
 | Gambar OG bawaan (`og-surat.jpg`, `og-beranda.jpg`) | `apps/web/public/` | Disusun dari ilustrasi padang bunga, favicon, dan warna foil emas sendiri, hasil `apps/web/scripts/og-images.mjs` (font Inter dari Google Fonts) | Milik sendiri; Inter SIL Open Font License 1.1 |
 | Kantong snack Pocket dan jepitan kayunya | `apps/web/app/components/pocket/SnackPacket.vue` | Digambar sendiri dengan CSS (gradien dan clip-path bergerigi), tanpa file gambar | Milik sendiri |
