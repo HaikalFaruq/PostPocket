@@ -48,6 +48,8 @@ test('Booth tanpa izin kamera menawarkan foto dari galeri', async ({ page, brows
   test.skip(browserName !== 'webkit', 'Di WebKit Playwright kamera tidak tersedia')
   await page.goto('/tv?booth=1')
   await expect(page.getByTestId('booth-denied')).toBeVisible({ timeout: 10_000 })
+  // Petunjuknya tidak menyuruh menekan Rekam selagi kamera mati.
+  await expect(page.getByTestId('tv-subtitle')).toHaveText(/kamera mati/i)
   const base64 = await page.evaluate(() => {
     const canvas = document.createElement('canvas')
     canvas.width = 640
@@ -93,6 +95,10 @@ test('strip yang belum disimpan tidak dibuang tanpa bertanya', async ({ page, br
   await record.click()
   const result = page.getByTestId('booth-result')
   await expect(result).toBeVisible({ timeout: 10_000 })
+  // Fokus mulai di tombol utama dan tidak keluar dari lembar ini.
+  await expect(result.getByRole('button', { name: 'Simpan ke Pocket hari ini' })).toBeFocused()
+  for (let i = 0; i < 12; i++) await page.keyboard.press('Tab')
+  expect(await result.evaluate((el) => el.contains(document.activeElement))).toBe(true)
 
   let asked = ''
   page.once('dialog', (dialog) => {

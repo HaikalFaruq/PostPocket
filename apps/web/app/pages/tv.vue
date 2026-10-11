@@ -266,13 +266,23 @@ async function onBoothFiles(event: Event) {
   shots.value = taken
 }
 
+const boothHint = computed(() =>
+  !booth.value
+    ? 'Putar kenangan dari kantongmu'
+    : cameraError.value
+      ? 'Kamera mati, pakai foto dari galeri'
+      : 'Pilih tata letak, lalu tekan Rekam',
+)
+
 const marquee = computed(() =>
   booth.value
     ? progress.value
       ? `● MEMOTRET · FOTO ${progress.value.shot} DARI ${progress.value.total}`
       : countdown.value !== null
         ? '● BERSIAP · LIHAT KE KAMERA'
-        : '● PHOTO BOOTH · PILIH TATA LETAK LALU TEKAN REKAM'
+        : cameraError.value
+          ? '● KAMERA MATI · PILIH FOTO DARI GALERI'
+          : '● PHOTO BOOTH · PILIH TATA LETAK LALU TEKAN REKAM'
     : playing.value
       ? `♪ SEDANG DIPUTAR · ${playing.value.title.toUpperCase()} · ${playing.value.moments.length} FOTO ♪`
       : 'BELUM ADA CD · PILIH ALBUM DI ARSIP LALU MASUKKAN',
@@ -297,8 +307,11 @@ const marquee = computed(() =>
           <template v-if="booth">PHOTO <span class="text-tv-accent">BOOTH</span></template>
           <template v-else>MEMORI <span class="text-tv-accent">TV</span></template>
         </h1>
-        <p class="mt-2 font-mono text-[11px] tracking-[0.3em] text-ink-muted uppercase">
-          {{ booth ? 'Pilih tata letak, lalu tekan Rekam' : 'Putar kenangan dari kantongmu' }}
+        <p
+          class="mt-2 font-mono text-[11px] tracking-[0.3em] text-ink-muted uppercase"
+          data-testid="tv-subtitle"
+        >
+          {{ boothHint }}
         </p>
       </div>
 

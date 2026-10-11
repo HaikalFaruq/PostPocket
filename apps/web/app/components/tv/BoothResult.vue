@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { byId, letter, pocket } from '@postpocket/presets'
+import { FocusScope } from 'reka-ui'
 import { canvasBlob, composeStrip, SHOT_HEIGHT, SHOT_WIDTH, type BoothLayout } from '~/utils/booth'
 import { isDark } from '~/utils/color'
 import { dayKey } from '~/utils/memories'
@@ -140,6 +141,13 @@ function discard(then: 'close' | 'retake'): boolean {
 
 // Back di HP menutup hasil Booth dengan pertanyaan yang sama, bukan meninggalkan TV.
 useBackToClose(true, () => discard('close'))
+
+// Fokus terkunci di dalam lembar ini, dimulai dari tombol utamanya.
+const primaryButton = ref<HTMLButtonElement | null>(null)
+function focusPrimary(event: Event) {
+  event.preventDefault()
+  primaryButton.value?.focus()
+}
 </script>
 
 <template>
@@ -148,59 +156,62 @@ useBackToClose(true, () => discard('close'))
     data-testid="booth-result"
     @click.self="discard('close')"
   >
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="booth-result-title"
-      class="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-[24px] bg-surface p-5"
-    >
-      <div class="flex items-center justify-between">
-        <h2 id="booth-result-title" class="text-title font-semibold">Hasil Booth</h2>
-        <IconButton label="Tutup" size="sm" variant="ghost" @click="discard('close')">
-          <Icon name="close" :size="15" />
-        </IconButton>
-      </div>
-      <div class="mt-3 grid place-items-center rounded-[16px] bg-fill p-3">
-        <img
-          v-if="stripUrl"
-          :src="stripUrl"
-          alt="Strip hasil Booth"
-          class="max-h-[44vh] w-auto rounded-[4px] shadow-raised"
-          data-testid="booth-strip"
-        />
-      </div>
-      <div class="mt-3 flex flex-wrap items-center gap-3">
-        <span class="text-caption text-ink-muted">Bingkai</span>
-        <SwatchGroup v-model="frameColor" label="Warna bingkai" :options="frameOptions" />
-      </div>
-      <button
-        type="button"
-        class="mt-4 h-11 w-full rounded-control bg-ink text-body font-semibold text-white disabled:opacity-55"
-        :disabled="busy || saved.pocket"
-        @click="saveToPocket"
+    <FocusScope as-child trapped loop @mount-auto-focus="focusPrimary">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booth-result-title"
+        class="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-[24px] bg-surface p-5"
       >
-        {{ saved.pocket ? '✓ Tersimpan di Pocket' : 'Simpan ke Pocket hari ini' }}
-      </button>
-      <div class="mt-2 grid grid-cols-3 gap-2">
-        <button type="button" class="booth-action" :disabled="busy || saved.cd" @click="putInCd">
-          {{ saved.cd ? '✓ Di CD' : 'Masukkan ke CD' }}
+        <div class="flex items-center justify-between">
+          <h2 id="booth-result-title" class="text-title font-semibold">Hasil Booth</h2>
+          <IconButton label="Tutup" size="sm" variant="ghost" @click="discard('close')">
+            <Icon name="close" :size="15" />
+          </IconButton>
+        </div>
+        <div class="mt-3 grid place-items-center rounded-[16px] bg-fill p-3">
+          <img
+            v-if="stripUrl"
+            :src="stripUrl"
+            alt="Strip hasil Booth"
+            class="max-h-[44vh] w-auto rounded-[4px] shadow-raised"
+            data-testid="booth-strip"
+          />
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <span class="text-caption text-ink-muted">Bingkai</span>
+          <SwatchGroup v-model="frameColor" label="Warna bingkai" :options="frameOptions" />
+        </div>
+        <button
+          ref="primaryButton"
+          type="button"
+          class="mt-4 h-11 w-full rounded-control bg-ink text-body font-semibold text-white disabled:opacity-55"
+          :disabled="busy || saved.pocket"
+          @click="saveToPocket"
+        >
+          {{ saved.pocket ? '✓ Tersimpan di Pocket' : 'Simpan ke Pocket hari ini' }}
         </button>
-        <button type="button" class="booth-action" :disabled="busy" @click="useInLetter">
-          Pakai di surat
-        </button>
-        <button type="button" class="booth-action" :disabled="busy" @click="download">
-          {{ saved.file ? '✓ Diunduh' : 'Unduh PNG' }}
+        <div class="mt-2 grid grid-cols-3 gap-2">
+          <button type="button" class="booth-action" :disabled="busy || saved.cd" @click="putInCd">
+            {{ saved.cd ? '✓ Di CD' : 'Masukkan ke CD' }}
+          </button>
+          <button type="button" class="booth-action" :disabled="busy" @click="useInLetter">
+            Pakai di surat
+          </button>
+          <button type="button" class="booth-action" :disabled="busy" @click="download">
+            {{ saved.file ? '✓ Diunduh' : 'Unduh PNG' }}
+          </button>
+        </div>
+        <p v-if="message" role="status" class="mt-3 text-caption text-ink-muted">{{ message }}</p>
+        <button
+          type="button"
+          class="mt-4 h-10 w-full rounded-control text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+          @click="discard('retake')"
+        >
+          Ulangi
         </button>
       </div>
-      <p v-if="message" role="status" class="mt-3 text-caption text-ink-muted">{{ message }}</p>
-      <button
-        type="button"
-        class="mt-4 h-10 w-full rounded-control text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
-        @click="discard('retake')"
-      >
-        Ulangi
-      </button>
-    </div>
+    </FocusScope>
   </div>
 </template>
 
