@@ -37,6 +37,10 @@ export default defineNuxtConfig({
   },
 
   fonts: {
+    // Huruf Latin saja (Indonesia dan nama berhuruf aksen). Tanpa ini setiap ketebalan Inter ikut
+    // membawa @font-face Cyrillic, Yunani, dan Vietnam, dan CSS awal yang memblokir render jadi
+    // sepertiganya deklarasi font.
+    defaults: { subsets: ['latin', 'latin-ext'] },
     families: [
       { name: 'Inter', provider: 'google', weights: [400, 500, 600, 700] },
       { name: 'Caveat', provider: 'google', weights: [400, 500, 600] },

@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { byId, letter as letterPresets } from '@postpocket/presets'
 import { LetterApiError } from '~/utils/letter-api'
+import { PHOTO_FRONT } from '~/utils/letter-draft'
 
 /**
  * Halaman penerima surat (PRD: Kirim dan buka). Di-SSR supaya meta OG terbaca crawler WhatsApp
@@ -38,6 +40,26 @@ useSeoMeta({
   ogImageAlt: 'Sampul surat foil',
   twitterCard: 'summary_large_image',
   robots: 'noindex, nofollow',
+})
+
+// Gambar depan kartu adalah elemen terbesar (LCP) halaman ini, tapi kartunya baru dirender di
+// browser. Gambarnya di-preload dari HTML supaya unduhannya mulai bersamaan dengan halaman.
+const frontImages = computed(() => {
+  const design = letter.value?.design
+  if (!design) return []
+  if (design.illustration === PHOTO_FRONT)
+    return letter.value?.cover ? [letter.value.cover.url] : []
+  const art = byId(letterPresets.illustrations, design.illustration)
+  return art ? [art.art, art.foil].filter((href): href is string => !!href) : []
+})
+useHead({
+  link: () =>
+    frontImages.value.map((href, index) => ({
+      rel: 'preload',
+      as: 'image',
+      href,
+      fetchpriority: index === 0 ? 'high' : 'auto',
+    })),
 })
 
 const open = ref(false)
