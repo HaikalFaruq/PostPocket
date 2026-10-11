@@ -78,8 +78,18 @@ watch(
   { immediate: true },
 )
 
+// Di HP, rak CD ada di bawah layar; setelah CD dimasukkan, layar TV digulir ke pandangan.
+const tvRef = ref<HTMLElement | null>(null)
 function insert(album: AlbumView) {
   playingId.value = album.id
+  const tv = tvRef.value
+  if (tv && tv.getBoundingClientRect().top < 0) {
+    tv.scrollIntoView({ behavior: smoothScroll(), block: 'start' })
+  }
+}
+
+function smoothScroll(): ScrollBehavior {
+  return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 }
 
 // "+ Foto": foto disimpan sebagai momen hari ini (di bulan album itu, atau di kantong yang sedang
@@ -172,6 +182,9 @@ const layout = ref<BoothLayout>('strip')
 const layoutOptions = BOOTH_LAYOUTS.map(({ value, label }) => ({ value, label }))
 const recording = ref(false)
 const countdown = ref<number | null>(null)
+/** Jepretan ke berapa dari berapa, selama Booth memotret. */
+const progress = ref<{ shot: number; total: number } | null>(null)
+const recordButton = ref<HTMLButtonElement | null>(null)
 const flash = ref(0)
 const shots = ref<HTMLCanvasElement[] | null>(null)
 const camera = ref<{ video: HTMLVideoElement | null } | null>(null)
@@ -184,6 +197,12 @@ function openBooth() {
   booth.value = true
   cameraReady.value = false
   cameraError.value = ''
+}
+
+// Di layar HP yang pendek, tombol REKAM ada di bawah layar kamera; gulir sampai kelihatan.
+function onCameraReady() {
+  cameraReady.value = true
+  nextTick(() => recordButton.value?.scrollIntoView({ behavior: smoothScroll(), block: 'nearest' }))
 }
 
 function closeBooth() {
@@ -213,6 +232,7 @@ async function record() {
     const total = BOOTH_LAYOUTS.find((item) => item.value === layout.value)?.shots ?? 4
     const taken: HTMLCanvasElement[] = []
     for (let shot = 0; shot < total; shot++) {
+      progress.value = { shot: shot + 1, total }
       flash.value++
       beep(1320, 0.05)
       taken.push(captureShot(video, filter.value, facing.value === 'user'))
@@ -222,6 +242,7 @@ async function record() {
   } finally {
     recording.value = false
     countdown.value = null
+    progress.value = null
   }
 }
 
@@ -247,7 +268,11 @@ async function onBoothFiles(event: Event) {
 
 const marquee = computed(() =>
   booth.value
-    ? '● PHOTO BOOTH · PILIH TATA LETAK LALU TEKAN REKAM'
+    ? progress.value
+      ? `● MEMOTRET · FOTO ${progress.value.shot} DARI ${progress.value.total}`
+      : countdown.value !== null
+        ? '● BERSIAP · LIHAT KE KAMERA'
+        : '● PHOTO BOOTH · PILIH TATA LETAK LALU TEKAN REKAM'
     : playing.value
       ? `♪ SEDANG DIPUTAR · ${playing.value.title.toUpperCase()} · ${playing.value.moments.length} FOTO ♪`
       : 'BELUM ADA CD · PILIH ALBUM DI ARSIP LALU MASUKKAN',
@@ -275,120 +300,129 @@ const marquee = computed(() =>
         </p>
       </div>
 
-      <TvSet class="mt-6" :clay="clayColor">
-        <template #screen>
-          <template v-if="booth">
-            <BoothCamera
-              v-if="!cameraError"
-              ref="camera"
-              :filter="filter"
-              :facing="facing"
-              :countdown="countdown"
-              :flash="flash"
-              @ready="cameraReady = true"
-              @error="cameraError = $event"
-            />
-            <div
-              v-else
-              class="absolute inset-0 grid place-items-center p-6 text-center"
-              data-testid="booth-denied"
+      <div ref="tvRef" class="scroll-mt-4">
+        <TvSet class="mt-6" :clay="clayColor">
+          <template #screen>
+            <template v-if="booth">
+              <BoothCamera
+                v-if="!cameraError"
+                ref="camera"
+                :filter="filter"
+                :facing="facing"
+                :countdown="countdown"
+                :progress="progress"
+                :flash="flash"
+                @ready="onCameraReady"
+                @error="cameraError = $event"
+              />
+              <div
+                v-else
+                class="absolute inset-0 grid place-items-center p-6 text-center"
+                data-testid="booth-denied"
+              >
+                <div>
+                  <p class="font-tv text-[30px] tracking-[0.14em] text-white">KAMERA MATI</p>
+                  <p class="mt-2 text-caption text-white/80">
+                    {{ cameraError }} Kamu tetap bisa pakai foto dari galeri.
+                  </p>
+                  <button
+                    type="button"
+                    class="mt-4 h-10 rounded-control bg-white px-4 text-body font-semibold text-ink"
+                    @click="boothInput?.click()"
+                  >
+                    Pilih foto dari galeri
+                  </button>
+                </div>
+              </div>
+            </template>
+            <TvSlideshow v-else-if="playing" :album="playing" :filter="filter" />
+            <TvIdle v-else />
+          </template>
+          <template #panel>
+            <div class="overflow-hidden rounded-[10px] bg-black/40 py-1.5" aria-live="polite">
+              <p
+                class="tv-marquee font-tv text-[18px] tracking-[0.12em] whitespace-nowrap text-tv-accent"
+              >
+                {{ marquee }}
+              </p>
+            </div>
+            <RadioGroupRoot
+              v-model="filterId"
+              aria-label="Filter TV"
+              class="grid grid-cols-4 gap-1.5 sm:grid-cols-2"
+              loop
             >
-              <div>
-                <p class="font-tv text-[30px] tracking-[0.14em] text-white">KAMERA MATI</p>
-                <p class="mt-2 text-caption text-white/80">
-                  {{ cameraError }} Kamu tetap bisa pakai foto dari galeri.
-                </p>
+              <RadioGroupItem
+                v-for="item in tv.filters"
+                :key="item.id"
+                :value="item.id"
+                class="tv-filter h-9 rounded-[10px] font-tv text-[17px] tracking-[0.1em] uppercase"
+              >
+                {{ item.label }}
+              </RadioGroupItem>
+            </RadioGroupRoot>
+            <div class="mt-auto flex flex-col gap-2">
+              <template v-if="booth">
+                <RadioGroupRoot
+                  v-model="layout"
+                  aria-label="Tata letak Booth"
+                  class="grid grid-cols-3 gap-1.5"
+                  loop
+                >
+                  <RadioGroupItem
+                    v-for="item in layoutOptions"
+                    :key="item.value"
+                    :value="item.value"
+                    class="tv-filter h-9 rounded-[10px] font-tv text-[15px] tracking-[0.06em] uppercase"
+                  >
+                    {{ item.label }}
+                  </RadioGroupItem>
+                </RadioGroupRoot>
+                <button
+                  ref="recordButton"
+                  type="button"
+                  class="h-11 rounded-[12px] bg-tv-accent font-tv text-[20px] tracking-[0.16em] text-white disabled:opacity-50"
+                  :disabled="!cameraReady || recording"
+                  data-testid="booth-record"
+                  @click="record"
+                >
+                  ● {{ recording ? 'MEREKAM' : 'REKAM' }}
+                </button>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    class="tv-control"
+                    :disabled="recording || !!cameraError"
+                    @click="switchCamera"
+                  >
+                    GANTI KAMERA
+                  </button>
+                  <button
+                    type="button"
+                    class="tv-control"
+                    :disabled="recording"
+                    @click="closeBooth"
+                  >
+                    KELUAR
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <button v-if="playing" type="button" class="tv-control" @click="playingId = null">
+                  KELUARKAN CD
+                </button>
                 <button
                   type="button"
-                  class="mt-4 h-10 rounded-control bg-white px-4 text-body font-semibold text-ink"
-                  @click="boothInput?.click()"
+                  class="inline-flex h-11 items-center justify-center gap-2 rounded-[12px] font-tv text-[20px] tracking-[0.16em] text-tv-accent inset-ring-2 inset-ring-tv-accent hover:bg-tv-accent/10"
+                  @click="openBooth"
                 >
-                  Pilih foto dari galeri
+                  <Icon name="camera" :size="18" /> PHOTO BOOTH
                 </button>
-              </div>
+              </template>
             </div>
           </template>
-          <TvSlideshow v-else-if="playing" :album="playing" :filter="filter" />
-          <TvIdle v-else />
-        </template>
-        <template #panel>
-          <div class="overflow-hidden rounded-[10px] bg-black/40 py-1.5" aria-live="polite">
-            <p
-              class="tv-marquee font-tv text-[18px] tracking-[0.12em] whitespace-nowrap text-tv-accent"
-            >
-              {{ marquee }}
-            </p>
-          </div>
-          <RadioGroupRoot
-            v-model="filterId"
-            aria-label="Filter TV"
-            class="grid grid-cols-4 gap-1.5 sm:grid-cols-2"
-            loop
-          >
-            <RadioGroupItem
-              v-for="item in tv.filters"
-              :key="item.id"
-              :value="item.id"
-              class="tv-filter h-9 rounded-[10px] font-tv text-[17px] tracking-[0.1em] uppercase"
-            >
-              {{ item.label }}
-            </RadioGroupItem>
-          </RadioGroupRoot>
-          <div class="mt-auto flex flex-col gap-2">
-            <template v-if="booth">
-              <RadioGroupRoot
-                v-model="layout"
-                aria-label="Tata letak Booth"
-                class="grid grid-cols-3 gap-1.5"
-                loop
-              >
-                <RadioGroupItem
-                  v-for="item in layoutOptions"
-                  :key="item.value"
-                  :value="item.value"
-                  class="tv-filter h-9 rounded-[10px] font-tv text-[15px] tracking-[0.06em] uppercase"
-                >
-                  {{ item.label }}
-                </RadioGroupItem>
-              </RadioGroupRoot>
-              <button
-                type="button"
-                class="h-11 rounded-[12px] bg-tv-accent font-tv text-[20px] tracking-[0.16em] text-white disabled:opacity-50"
-                :disabled="!cameraReady || recording"
-                data-testid="booth-record"
-                @click="record"
-              >
-                ● {{ recording ? 'MEREKAM' : 'REKAM' }}
-              </button>
-              <div class="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  class="tv-control"
-                  :disabled="recording || !!cameraError"
-                  @click="switchCamera"
-                >
-                  GANTI KAMERA
-                </button>
-                <button type="button" class="tv-control" :disabled="recording" @click="closeBooth">
-                  KELUAR
-                </button>
-              </div>
-            </template>
-            <template v-else>
-              <button v-if="playing" type="button" class="tv-control" @click="playingId = null">
-                KELUARKAN CD
-              </button>
-              <button
-                type="button"
-                class="inline-flex h-11 items-center justify-center gap-2 rounded-[12px] font-tv text-[20px] tracking-[0.16em] text-tv-accent inset-ring-2 inset-ring-tv-accent hover:bg-tv-accent/10"
-                @click="openBooth"
-              >
-                <Icon name="camera" :size="18" /> PHOTO BOOTH
-              </button>
-            </template>
-          </div>
-        </template>
-      </TvSet>
+        </TvSet>
+      </div>
 
       <div class="mt-6 flex justify-center">
         <div

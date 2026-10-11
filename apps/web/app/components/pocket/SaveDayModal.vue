@@ -134,16 +134,26 @@ async function save() {
   }
 }
 
+/** Foto yang sudah dipilih tapi belum disimpan tidak dibuang tanpa bertanya. */
+function setOpen(next: boolean) {
+  if (!next && added.value.length && !busy.value) {
+    if (!window.confirm('Foto yang kamu pilih belum disimpan. Tetap tutup?')) return
+    clearAdded()
+  }
+  open.value = next
+}
+
 onBeforeUnmount(clearAdded)
 </script>
 
 <template>
   <Modal
-    v-model:open="open"
+    :open="open"
     tone="pocket"
     eyebrow="Kapsul waktu kecilmu"
     :title="existing ? 'Ganti desain kantong' : 'Simpan satu hari kecil'"
     :description="longDate(day)"
+    @update:open="setOpen"
   >
     <template #preview>
       <div class="grid h-full place-items-center" data-testid="packet-preview">
@@ -270,7 +280,7 @@ onBeforeUnmount(clearAdded)
     </StepCard>
 
     <template #footer>
-      <button type="button" class="text-body text-ink-muted hover:text-ink" @click="open = false">
+      <button type="button" class="text-body text-ink-muted hover:text-ink" @click="setOpen(false)">
         Nanti saja
       </button>
       <button

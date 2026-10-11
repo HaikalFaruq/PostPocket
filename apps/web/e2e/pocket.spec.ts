@@ -119,6 +119,8 @@ test('buka kantong: disobek, foto keluar, lalu dikirim sebagai surat', async ({ 
   await expect(day).toHaveAttribute('data-torn', 'true')
   const moments = page.getByTestId('moment')
   await expect(moments).toHaveCount(2)
+  // Di HP pendek, tombol-tombolnya digulir sampai kelihatan setelah kantong disobek.
+  await expect(page.getByRole('button', { name: 'Kirim sebagai surat' })).toBeInViewport()
   await expect(moments.first()).toHaveAttribute('aria-selected', 'true')
   await expect(moments.nth(1).locator('img')).toHaveAttribute('src', /^blob:/)
 
@@ -186,6 +188,23 @@ test('foto kenangan pertama meminta penyimpanan permanen, sekali saja', async ({
   await page.getByTestId('pocket-upload').setInputFiles(await photos(page, [200]))
   await expect(page.getByTestId('moment')).toHaveCount(2)
   expect(await calls()).toBe(1)
+})
+
+test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ page }) => {
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await page.getByTestId('moment-upload').setInputFiles(await photos(page, [20]))
+  await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
+
+  page.once('dialog', (confirm) => confirm.dismiss())
+  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(dialog).toBeVisible()
+
+  page.once('dialog', (confirm) => confirm.accept())
+  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
 })
 
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({

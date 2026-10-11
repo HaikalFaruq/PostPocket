@@ -13,6 +13,8 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   await page.getByRole('radio', { name: 'Noir' }).click()
   await record.click()
   await expect(page.getByTestId('booth-camera')).toContainText('3')
+  // Selama memotret, layar menunjukkan jepretan ke berapa.
+  await expect(page.getByTestId('booth-progress')).toContainText(/FOTO \d\/4/, { timeout: 10_000 })
 
   const result = page.getByTestId('booth-result')
   await expect(result).toBeVisible({ timeout: 15_000 })
@@ -77,4 +79,31 @@ test('Pakai di surat membawa strip ke editor surat', async ({ page, browserName 
     /^blob:/,
   )
   await expect(page.getByText('1 foto', { exact: true })).toBeVisible()
+})
+
+test('strip yang belum disimpan tidak dibuang tanpa bertanya', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Kamera palsu hanya ada di Chromium')
+  test.setTimeout(45_000)
+  await page.goto('/tv?booth=1')
+  await page.getByRole('radio', { name: 'Satu foto' }).click()
+  const record = page.getByTestId('booth-record')
+  await expect(record).toBeEnabled({ timeout: 10_000 })
+  await record.click()
+  const result = page.getByTestId('booth-result')
+  await expect(result).toBeVisible({ timeout: 10_000 })
+
+  let asked = ''
+  page.once('dialog', (dialog) => {
+    asked = dialog.message()
+    dialog.dismiss()
+  })
+  await result.getByRole('button', { name: 'Ulangi' }).click()
+  expect(asked).toContain('belum disimpan')
+  await expect(result).toBeVisible()
+
+  // Setelah disimpan, menutup tidak bertanya lagi.
+  await result.getByRole('button', { name: /Simpan ke Pocket/ }).click()
+  await expect(result).toContainText('Tersimpan di kantong hari ini')
+  await result.getByRole('button', { name: 'Tutup' }).click()
+  await expect(result).toBeHidden()
 })

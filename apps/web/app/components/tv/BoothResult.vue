@@ -24,7 +24,7 @@ const frameOptions = pocket.frameColors.map((item) => ({
 const stripUrl = ref<string | null>(null)
 let strip: HTMLCanvasElement | null = null
 const today = dayKey(new Date())
-const saved = reactive({ pocket: false, cd: false })
+const saved = reactive({ pocket: false, cd: false, file: false })
 const busy = ref(false)
 const message = ref('')
 let momentIds: string[] | null = null
@@ -125,14 +125,24 @@ const download = () =>
     link.download = `postpocket-booth-${today}.png`
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+    saved.file = true
+    message.value = 'Strip diunduh ke perangkatmu.'
   })
+
+/** Strip yang belum disimpan ke mana pun tidak dibuang tanpa bertanya. */
+function discard(then: 'close' | 'retake') {
+  const kept = saved.pocket || saved.cd || saved.file
+  if (!kept && !window.confirm('Buang strip ini? Strip-nya belum disimpan.')) return
+  if (then === 'close') emit('close')
+  else emit('retake')
+}
 </script>
 
 <template>
   <div
     class="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4"
     data-testid="booth-result"
-    @click.self="emit('close')"
+    @click.self="discard('close')"
   >
     <div
       role="dialog"
@@ -142,7 +152,7 @@ const download = () =>
     >
       <div class="flex items-center justify-between">
         <h2 id="booth-result-title" class="text-title font-semibold">Hasil Booth</h2>
-        <IconButton label="Tutup" size="sm" variant="ghost" @click="emit('close')">
+        <IconButton label="Tutup" size="sm" variant="ghost" @click="discard('close')">
           <Icon name="close" :size="15" />
         </IconButton>
       </div>
@@ -159,15 +169,15 @@ const download = () =>
         <span class="text-caption text-ink-muted">Bingkai</span>
         <SwatchGroup v-model="frameColor" label="Warna bingkai" :options="frameOptions" />
       </div>
-      <div class="mt-4 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          class="booth-action"
-          :disabled="busy || saved.pocket"
-          @click="saveToPocket"
-        >
-          {{ saved.pocket ? '✓ Di Pocket' : 'Simpan ke Pocket' }}
-        </button>
+      <button
+        type="button"
+        class="mt-4 h-11 w-full rounded-control bg-ink text-body font-semibold text-white disabled:opacity-55"
+        :disabled="busy || saved.pocket"
+        @click="saveToPocket"
+      >
+        {{ saved.pocket ? '✓ Tersimpan di Pocket' : 'Simpan ke Pocket hari ini' }}
+      </button>
+      <div class="mt-2 grid grid-cols-3 gap-2">
         <button type="button" class="booth-action" :disabled="busy || saved.cd" @click="putInCd">
           {{ saved.cd ? '✓ Di CD' : 'Masukkan ke CD' }}
         </button>
@@ -175,14 +185,14 @@ const download = () =>
           Pakai di surat
         </button>
         <button type="button" class="booth-action" :disabled="busy" @click="download">
-          Unduh PNG
+          {{ saved.file ? '✓ Diunduh' : 'Unduh PNG' }}
         </button>
       </div>
       <p v-if="message" role="status" class="mt-3 text-caption text-ink-muted">{{ message }}</p>
       <button
         type="button"
-        class="mt-4 h-10 w-full rounded-control bg-ink text-body font-semibold text-white"
-        @click="emit('retake')"
+        class="mt-4 h-10 w-full rounded-control text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+        @click="discard('retake')"
       >
         Ulangi
       </button>
@@ -192,7 +202,9 @@ const download = () =>
 
 <style scoped>
 .booth-action {
-  height: 40px;
+  min-height: 44px;
+  padding: 6px;
+  line-height: 1.2;
   border-radius: var(--radius-control);
   background-color: var(--color-surface);
   box-shadow: inset 0 0 0 1px var(--color-line);

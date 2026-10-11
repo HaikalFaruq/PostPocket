@@ -48,9 +48,15 @@ watch(
 
 const torn = ref(false)
 const selected = ref<string | null>(null)
+const actions = ref<HTMLElement | null>(null)
 function tear() {
   torn.value = true
   selected.value ??= saved.value?.moments[0] ?? null
+  // Di HP yang pendek, foto dan tombolnya muncul di bawah kantong; gulir sampai kelihatan.
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  nextTick(() =>
+    actions.value?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' }),
+  )
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -162,7 +168,7 @@ const editOpen = ref(false)
             Kantong ini masih kosong. Tambahkan foto pertamamu.
           </p>
 
-          <div class="mt-2 flex flex-wrap justify-center gap-2">
+          <div ref="actions" class="mt-2 flex scroll-mb-6 flex-wrap justify-center gap-2">
             <button
               type="button"
               class="pocket-action"
