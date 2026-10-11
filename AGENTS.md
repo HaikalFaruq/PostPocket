@@ -117,7 +117,19 @@ Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
 
 Sebelum push, pastikan `pnpm check` dan `pnpm test:e2e` lolos. Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. CI menjalankan semuanya di setiap PR (workflow `Web` dan `No AI attribution`).
 
-Siapa pun yang membuat `supabase/` wajib menambahkan perintahnya ke tabel ini, beserta job CI-nya.
+Perintah backend memakai Supabase CLI lewat `npx supabase@2.120.0` (atau `supabase` kalau sudah terpasang) dan butuh Docker yang menyala:
+
+| Perintah | Fungsi |
+| --- | --- |
+| `supabase db start` | Postgres lokal dengan semua migrasi di `supabase/migrations/` |
+| `supabase db reset` | Hapus DB lokal dan terapkan ulang semua migrasi |
+| `supabase migration new <nama>` | Buat file migrasi baru |
+| `supabase db lint --level warning` | Lint skema (plpgsql_check) |
+| `supabase test db` | Test pgTAP di `supabase/tests/database/` |
+| `npx @redocly/cli@1 lint docs/api/openapi.yaml` | Validasi kontrak API |
+| `supabase stop` | Matikan stack lokal |
+
+CI menjalankan lint skema, test pgTAP, dan lint kontrak di workflow `Backend` setiap kali `supabase/` atau `docs/api/` berubah. Migrasi yang sudah diterapkan ke proyek Supabase tidak diedit lagi; perubahan skema selalu lewat file migrasi baru.
 
 ## 7. Struktur repo
 
@@ -125,7 +137,8 @@ Yang bertanda *(belum)* dibuat oleh pemiliknya di Sprint 0.
 
 ```text
 apps/web/               Nuxt, dipegang Kall
-supabase/migrations/    skema SQL dan RLS, dipegang Bintang (belum)
+supabase/migrations/    skema SQL dan RLS, dipegang Bintang
+supabase/tests/         test pgTAP untuk skema
 supabase/functions/     Edge Functions, dipegang Bintang (belum)
 packages/presets/       preset JSON kertas, foil, kantong, bingkai, filter + helper
 docs/prd/               PRD (Markdown dan PDF) beserta gambarnya

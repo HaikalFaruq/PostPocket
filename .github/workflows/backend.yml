@@ -1,0 +1,58 @@
+name: Backend
+
+# Migrasi, test database, dan kontrak API. Hanya jalan kalau supabase/ atau kontraknya berubah.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - 'docs/api/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'docs/api/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    name: database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Jalankan Postgres lokal dan terapkan migrasi
+        run: supabase db start
+
+      - name: Lint skema
+        run: supabase db lint --level warning --fail-on warning
+
+      - name: Test pgTAP
+        run: supabase test db
+
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          # packageManager di package.json root menyalakan cache pnpm otomatis, padahal job ini
+          # tidak memasang pnpm.
+          package-manager-cache: false
+
+      - name: Lint openapi.yaml
+        run: npx --yes @redocly/cli@1 lint docs/api/openapi.yaml
