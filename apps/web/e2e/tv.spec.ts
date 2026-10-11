@@ -61,7 +61,7 @@ test('foto masuk album, CD diputar dengan filter, lalu dikeluarkan', async ({ pa
 
   await page.getByRole('button', { name: 'KELUARKAN CD' }).click()
   await expect(page.getByTestId('tv-idle')).toBeVisible()
-  await expect(page.getByText(/geser piringan untuk memasukkan/i)).toBeVisible()
+  await expect(page.getByText(/ketuk piringan untuk memutar/i)).toBeVisible()
 })
 
 test('rak CD bisa digeser lewat tombol panah dan keyboard, dan tetap ada setelah dimuat ulang', async ({
