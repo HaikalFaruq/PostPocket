@@ -136,6 +136,11 @@ export default defineNuxtConfig({
       supabasePublishableKey: '',
       // Kosong berarti fungsi Supabase (<supabaseUrl>/functions/v1); `/mock-api` untuk mock.
       apiBase: '',
+      // Kanal "Lapor masalah" untuk tester; `{pesan}` diganti isi laporan. Kosong berarti GitHub
+      // Issues repo ini (lihat utils/feedback.ts dan .env.example).
+      feedbackUrl: '',
+      // Versi yang ditulis di laporan: commit yang di-deploy Vercel, atau "lokal".
+      appVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'lokal',
     },
   },
 

@@ -27,3 +27,24 @@ test('alamat yang tidak ada mendapat halaman 404 berbahasa Indonesia', async ({ 
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 })
+
+test('Lapor masalah membuka kanal laporan dengan halaman, versi, dan perangkat', async ({
+  page,
+  context,
+}) => {
+  // Jangan sampai test membuka GitHub sungguhan.
+  await context.route('https://github.com/**', (route) => route.fulfill({ body: 'ok' }))
+  await page.goto('/')
+  await expect(page.getByRole('contentinfo')).toContainText('Versi beta (lokal)')
+  const popup = context.waitForEvent('page')
+  await page.getByRole('contentinfo').getByTestId('feedback-link').click()
+  const report = new URL((await popup).url())
+  expect(report.origin + report.pathname).toBe(
+    'https://github.com/HaikalFaruq/PostPocket/issues/new',
+  )
+  const body = report.searchParams.get('body') ?? ''
+  expect(body).toContain('bisa dibaca publik')
+  expect(body).toContain('Halaman: /')
+  expect(body).toContain('Versi: lokal')
+  expect(body).toMatch(/Perangkat: Mozilla\//)
+})

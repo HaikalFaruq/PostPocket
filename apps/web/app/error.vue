@@ -62,6 +62,10 @@ const reload = () => window.location.reload()
           Ke Beranda
         </button>
       </div>
+      <p v-if="!missing" class="mt-6 text-caption text-ink-muted">
+        Masih begini setelah dimuat ulang?
+        <FeedbackLink class="font-semibold text-ink underline underline-offset-2" />
+      </p>
     </main>
   </div>
 </template>

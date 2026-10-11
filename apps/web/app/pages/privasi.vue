@@ -61,5 +61,11 @@ useSeoMeta({
 
     <h2>Tanpa iklan dan pelacak</h2>
     <p>PostPocket tidak memakai iklan, cookie pelacak, atau analitik pihak ketiga.</p>
+
+    <h2>Ada pertanyaan atau masalah?</h2>
+    <p>
+      Kirim lewat <FeedbackLink>Lapor masalah</FeedbackLink>. Laporan otomatis menyertakan halaman,
+      versi aplikasi, dan jenis perangkatmu, tanpa link suratmu.
+    </p>
   </InfoPage>
 </template>
