@@ -2,7 +2,8 @@
 // lalu diperkecil ke WebP 192 px dengan Chromium milik Playwright supaya halaman penerima
 // tetap ringan. Daftar id dan label ada di packages/presets/letter.json (`stickers`).
 //
-//   node scripts/stickers.mjs
+//   node scripts/stickers.mjs            semua stiker
+//   node scripts/stickers.mjs dog cat    hanya stiker tertentu, supaya berkas lain tidak berubah
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -14,10 +15,12 @@ const SIZE = 192
 /** Nama aset di repo fluentui-emoji untuk tiap id stiker. */
 const sources = {
   heart: 'Red heart',
+  'smiling-face': 'Smiling face with hearts',
   sparkles: 'Sparkles',
   star: 'Glowing star',
   'cherry-blossom': 'Cherry blossom',
   tulip: 'Tulip',
+  sunflower: 'Sunflower',
   ribbon: 'Ribbon',
   gift: 'Wrapped gift',
   balloon: 'Balloon',
@@ -28,6 +31,7 @@ const sources = {
   moon: 'Crescent moon',
   cat: 'Cat face',
   bear: 'Teddy bear',
+  dog: 'Dog face',
   'love-letter': 'Love letter',
   clover: 'Four leaf clover',
   strawberry: 'Strawberry',
@@ -39,9 +43,11 @@ const presets = JSON.parse(
 const outDir = fileURLToPath(new URL('../public/stickers/', import.meta.url))
 mkdirSync(outDir, { recursive: true })
 
+const only = process.argv.slice(2)
 const browser = await chromium.launch()
 const page = await browser.newPage()
 for (const { id } of presets.stickers) {
+  if (only.length && !only.includes(id)) continue
   const name = sources[id]
   if (!name) throw new Error(`Sumber stiker "${id}" belum ada di scripts/stickers.mjs`)
   const file = `${name.toLowerCase().replaceAll(' ', '_')}_3d.png`
