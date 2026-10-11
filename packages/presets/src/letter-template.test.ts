@@ -170,6 +170,7 @@ describe('freeSpot', () => {
     expect(freeSpot({ version: 1, elements: [] }, 0.22, 0.22 * 0.75, 0.75)).toEqual({
       x: 0.5,
       y: 0.5,
+      coversText: false,
     })
   })
 
@@ -187,6 +188,29 @@ describe('freeSpot', () => {
         bottom: spot.y + half,
       }
       expect(overlap(sticker, textBounds(message, 0.75))).toBe(false)
+    }
+  })
+
+  it('halaman penuh: lebih baik menutupi pinggir foto daripada tulisan', () => {
+    // Kolase 4 foto terisi, dengan pesan di bawahnya.
+    const elements = templateElements(template('collage-4'), 0.75).map((element) =>
+      element.kind === 'photo'
+        ? { ...element, photo: `f-${element.id}` }
+        : { ...element, text: 'Terima kasih untuk kemarin, aku senang sekali.' },
+    )
+    const message = elements.find((element) => element.kind === 'text')!
+    const content = normalizeContent({ elements })
+    for (const seed of [0, 0.5, 0.99]) {
+      const spot = freeSpot(content, 0.22, 0.22 * 0.75, 0.75, () => seed)
+      const half = (0.22 * 0.75) / 2
+      const sticker = {
+        left: spot.x - 0.11,
+        right: spot.x + 0.11,
+        top: spot.y - half,
+        bottom: spot.y + half,
+      }
+      expect(overlap(sticker, textBounds(message, 0.75))).toBe(false)
+      expect(spot.coversText).toBe(false)
     }
   })
 

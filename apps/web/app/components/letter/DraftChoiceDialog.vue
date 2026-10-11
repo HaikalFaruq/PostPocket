@@ -66,7 +66,7 @@ function focusSafeChoice(event: Event) {
           Draf yang belum kamu kirim:
           <span class="font-letter text-[19px] text-ink" data-testid="draft-summary"
             >“{{ asking?.draft }}”</span
-          >.
+          >{{ /[.!?…]$/.test(asking?.draft ?? '') ? '' : '.' }}
           <template v-if="asking?.replyingElsewhere">
             Draf ini sudah jadi balasan untuk surat lain.
           </template>

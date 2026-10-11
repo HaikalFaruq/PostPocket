@@ -139,14 +139,32 @@ function elementBox(element: LetterElement, pageRatio: number) {
   }
 }
 
-// Teks paling dijaga supaya tetap terbaca, lalu foto, lalu stiker lain.
-const COVER_COST = { text: 3, photo: 2, sticker: 1 } as const
+interface Spot {
+  x: number
+  y: number
+  /** Luas yang tertutup per jenis elemen, dalam pecahan halaman. */
+  text: number
+  photo: number
+  sticker: number
+  distance: number
+}
+
+const EPSILON = 1e-4
+
+/** Urutan tempat: tulisan tidak pernah kalah, lalu foto, lalu stiker lain, lalu dekat tengah. */
+function rank(a: Spot, b: Spot): number {
+  for (const key of ['text', 'photo', 'sticker'] as const) {
+    if (Math.abs(a[key] - b[key]) > EPSILON) return a[key] - b[key]
+  }
+  return a.distance - b.distance
+}
 
 /**
  * Titik tengah untuk elemen baru selebar `width` (pecahan lebar halaman) dan setinggi `height`
- * (pecahan tinggi halaman) yang paling sedikit menutupi isi surat, supaya stiker atau foto baru
- * tidak menimpa tulisan. Halaman kosong tetap mendapat tengah halaman; tempat yang sama baiknya
- * dipilih acak lewat `random`.
+ * (pecahan tinggi halaman). Tempat yang tidak menutupi tulisan selalu dipilih lebih dulu, baru
+ * yang paling sedikit menutupi foto, lalu stiker lain; halaman kosong tetap mendapat tengah
+ * halaman, dan tempat yang sama baiknya dipilih acak lewat `random`. `coversText` bernilai
+ * benar kalau semua tempat menutupi tulisan, supaya pemanggil bisa mencoba ukuran lebih kecil.
  */
 export function freeSpot(
   content: LetterContent,
@@ -154,30 +172,42 @@ export function freeSpot(
   height: number,
   pageRatio: number,
   random: () => number = Math.random,
-): { x: number; y: number } {
+): { x: number; y: number; coversText: boolean } {
   const boxes = content.elements.map((element) => ({
     box: elementBox(element, pageRatio),
-    cost: COVER_COST[element.kind],
+    kind: element.kind,
   }))
   const within = (value: number, half: number) =>
     half >= 0.48 ? 0.5 : Math.min(1 - half - 0.02, Math.max(half + 0.02, value))
   const spots = [0.2, 0.5, 0.8].flatMap((x) =>
-    [0.14, 0.32, 0.5, 0.68, 0.86].map((y) => {
-      const spot = { x: within(x, width / 2), y: within(y, height / 2) }
-      const cover = boxes.reduce((sum, { box, cost }) => {
+    [0.14, 0.32, 0.5, 0.68, 0.86].map((y): Spot => {
+      const spot: Spot = {
+        x: within(x, width / 2),
+        y: within(y, height / 2),
+        text: 0,
+        photo: 0,
+        sticker: 0,
+        distance: 0,
+      }
+      spot.distance = Math.hypot(spot.x - 0.5, spot.y - 0.5)
+      for (const { box, kind } of boxes) {
         const w = Math.min(spot.x + width / 2, box.right) - Math.max(spot.x - width / 2, box.left)
         const h = Math.min(spot.y + height / 2, box.bottom) - Math.max(spot.y - height / 2, box.top)
-        return sum + (w > 0 && h > 0 ? w * h * cost : 0)
-      }, 0)
-      return { ...spot, cover, distance: Math.hypot(spot.x - 0.5, spot.y - 0.5) }
+        if (w > 0 && h > 0) spot[kind] += w * h
+      }
+      return spot
     }),
   )
-  const least = Math.min(...spots.map((spot) => spot.cover))
-  const quiet = spots.filter((spot) => spot.cover <= least + 1e-4)
-  const nearest = Math.min(...quiet.map((spot) => spot.distance))
-  const best = quiet.filter((spot) => spot.distance <= nearest + 1e-6)
+  spots.sort(rank)
+  const best = spots.filter(
+    (spot) =>
+      Math.abs(spot.text - spots[0]!.text) <= EPSILON &&
+      Math.abs(spot.photo - spots[0]!.photo) <= EPSILON &&
+      Math.abs(spot.sticker - spots[0]!.sticker) <= EPSILON &&
+      spot.distance <= spots[0]!.distance + 1e-6,
+  )
   const pick = best[Math.min(best.length - 1, Math.floor(random() * best.length))]!
-  return { x: round(pick.x), y: round(pick.y) }
+  return { x: round(pick.x), y: round(pick.y), coversText: pick.text > EPSILON }
 }
 
 function overlaps(a: ReturnType<typeof elementBox>, b: ReturnType<typeof elementBox>): boolean {
@@ -201,18 +231,17 @@ export function tidyStickers(
   const elements = content.elements.map((element) => {
     if (element.kind !== 'sticker') return element
     const box = elementBox(element, pageRatio)
-    const next = blockers.some((other) => overlaps(box, other))
-      ? {
-          ...element,
-          ...freeSpot(
-            { version: 1, elements: settled },
-            element.width,
-            element.width * pageRatio,
-            pageRatio,
-            random,
-          ),
-        }
-      : element
+    let next = element
+    if (blockers.some((other) => overlaps(box, other))) {
+      const { x, y } = freeSpot(
+        { version: 1, elements: settled },
+        element.width,
+        element.width * pageRatio,
+        pageRatio,
+        random,
+      )
+      next = { ...element, x, y }
+    }
     settled.push(next)
     return next
   })

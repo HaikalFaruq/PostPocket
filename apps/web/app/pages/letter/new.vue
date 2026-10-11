@@ -516,7 +516,7 @@ async function startOver() {
           placeholder="Tulis sesuatu untuk dia…"
           class="mt-4 block w-full resize-y rounded-control bg-surface px-3.5 py-3 font-letter text-[19px] leading-snug inset-ring inset-ring-line placeholder:text-ink-subtle focus:outline-2 focus:outline-ink"
         />
-        <p class="mt-1 text-right text-caption text-ink-subtle">
+        <p class="mt-1 text-right text-caption text-ink-muted">
           {{ draft.message.length }}/{{ MESSAGE_LIMIT }}
         </p>
         <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">

@@ -281,11 +281,17 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     if (count('text') >= contentLimits.text) return null
     const id = uniqueId('t', takenIds())
     const size = 0.06 * Math.min(1, 1 / ratio.value)
-    const spot = freeSpot(content.value, 0.7, 2 * size * 1.25 * ratio.value, ratio.value, random)
+    const { x, y } = freeSpot(
+      content.value,
+      0.7,
+      2 * size * 1.25 * ratio.value,
+      ratio.value,
+      random,
+    )
     setContent({
       elements: [
         ...content.value.elements,
-        { kind: 'text', id, ...spot, width: 0.7, rotation: 0, text: '', size, align: 'center' },
+        { kind: 'text', id, x, y, width: 0.7, rotation: 0, text: '', size, align: 'center' },
       ],
     })
     return id
@@ -295,12 +301,12 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     if (count('sticker') >= contentLimits.sticker || !byId(letter.stickers, sticker)) return null
     const id = uniqueId('s', takenIds())
     const width = 0.22
-    const spot = freeSpot(content.value, width, width * ratio.value, ratio.value, random)
+    const { x, y } = freeSpot(content.value, width, width * ratio.value, ratio.value, random)
     const rotation = Math.round(jitter(random, 24))
     setContent({
       elements: [
         ...content.value.elements,
-        { kind: 'sticker', id, ...spot, width, rotation, sticker },
+        { kind: 'sticker', id, x, y, width, rotation, sticker },
       ],
     })
     return id
@@ -330,11 +336,24 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     const id = uniqueId('p', takenIds())
     const rotation = Math.round(jitter(random, 8))
     const aspect = next.width / next.height
-    const width = 0.55
-    const spot = freeSpot(content.value, width, (width / aspect) * ratio.value, ratio.value, random)
-    setContent({
-      elements: [...elements, { kind: 'photo', id, ...spot, width, rotation, photo: key, aspect }],
-    })
+    // Foto baru diperkecil kalau perlu, supaya tidak menimpa tulisan, dan diletakkan di bawah
+    // stiker supaya stiker yang sudah ada tidak tertutup.
+    let place = { x: 0.5, y: 0.5, width: 0.55 }
+    for (const width of [0.55, 0.45, 0.36, 0.28]) {
+      const spot = freeSpot(
+        content.value,
+        width,
+        (width / aspect) * ratio.value,
+        ratio.value,
+        random,
+      )
+      place = { x: spot.x, y: spot.y, width }
+      if (!spot.coversText) break
+    }
+    const firstSticker = elements.findIndex((e) => e.kind === 'sticker')
+    const at = firstSticker < 0 ? elements.length : firstSticker
+    const element = { kind: 'photo', id, ...place, rotation, photo: key, aspect }
+    setContent({ elements: [...elements.slice(0, at), element, ...elements.slice(at)] })
     return id
   }
 
@@ -358,12 +377,15 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     setContent(tidiedStickers(content.value, ratio.value, random))
   }
 
-  /** Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah. */
+  /**
+   * Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah; stiker
+   * yang jadi menutupi tulisan atau foto dipindah ke tempat kosong.
+   */
   function setTemplate(id: string) {
     const template = byId(letter.templates, id)
     if (!template) return
     design.value = { ...design.value, template: id }
-    setContent(applyTemplate(content.value, template, ratio.value))
+    setContent(tidiedStickers(applyTemplate(content.value, template, ratio.value), ratio.value))
   }
 
   /** Blok teks pertama, yang ditulis langsung dari kolom isi surat di langkah 5. */
@@ -381,7 +403,9 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     const next = surprise(design.value, random, { keepIllustration: isPhotoFront.value })
     design.value = next
     const template = byId(letter.templates, next.template)
-    if (template) setContent(applyTemplate(content.value, template, ratio.value))
+    if (template) {
+      setContent(tidiedStickers(applyTemplate(content.value, template, ratio.value), ratio.value))
+    }
   }
 
   /** Tandai draf ini sebagai balasan untuk surat `slug`, atau `null` untuk batal membalas. */

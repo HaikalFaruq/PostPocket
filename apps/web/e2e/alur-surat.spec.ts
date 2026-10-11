@@ -324,6 +324,41 @@ test('link lama tetap ada di "Surat terkirim" dan bisa dihapus dari sana', async
   expect((await page.request.get(url)).status()).toBe(404)
 })
 
+test('stiker tidak menutupi tulisan, juga setelah template diganti manual', async ({ page }) => {
+  await message(page).fill(
+    'Selamat ulang tahun, Rara! Semoga tahun ini penuh hal baik, tawa, dan kejutan manis.',
+  )
+  await page.getByTestId('open-content-editor').click()
+  const editor = page.getByTestId('content-editor')
+  const editorPage = page.getByTestId('content-page')
+  for (const name of ['Hati', 'Bintang', 'Kucing']) {
+    await editor.getByRole('button', { name: 'Stiker', exact: true }).click()
+    await editor.getByRole('button', { name, exact: true }).click()
+    // Stiker baru langsung terpilih; lepas dulu supaya tombol tambah muncul lagi.
+    await editor.getByRole('button', { name: 'Lepas pilihan' }).click()
+  }
+  await expect(editorPage.locator('[data-kind="sticker"]')).toHaveCount(3)
+
+  /** Stiker yang kotaknya menutupi kotak tulisan lebih dari sedikit (bayangan dan putaran). */
+  const coveringText = () =>
+    editorPage.evaluate((pageEl) => {
+      const text = pageEl.querySelector('[data-kind="text"]')!.getBoundingClientRect()
+      return [...pageEl.querySelectorAll('[data-kind="sticker"]')].filter((sticker) => {
+        const box = sticker.getBoundingClientRect()
+        const w = Math.min(box.right, text.right) - Math.max(box.left, text.left)
+        const h = Math.min(box.bottom, text.bottom) - Math.max(box.top, text.top)
+        return w > 0 && h > 0 && (w * h) / (box.width * box.height) > 0.15
+      }).length
+    })
+  expect(await coveringText()).toBe(0)
+
+  // Ganti template manual: tulisannya pindah, stiker yang jadi menutupinya ikut pindah.
+  await editor.getByRole('radio', { name: '2 foto + teks' }).click()
+  await expect.poll(coveringText).toBe(0)
+  await editor.getByRole('radio', { name: 'Teks saja' }).click()
+  await expect.poll(coveringText).toBe(0)
+})
+
 test('Back di HP menutup lembar di editor surat, bukan meninggalkan halaman', async ({ page }) => {
   await page.getByTestId('open-content-editor').click()
   const contentEditor = page.getByTestId('content-editor')
