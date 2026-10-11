@@ -49,12 +49,13 @@ Catat jawabannya di PRD bagian Pertanyaan terbuka (centang dan tulis keputusanny
 | Keputusan | Isi |
 | --- | --- |
 | Backend | **Supabase**, bukan stack sendiri. Kalau storage 1 GB tidak cukup, foto dipindah ke Cloudflare R2 dan database tetap di Supabase |
-| Gambar OG | **Dirender browser** waktu "Buat link" dari kartu yang sama dengan yang dilihat pengirim (PNG 1200×630, di bawah sekitar 300 KB), lalu diunggah lewat URL bertanda tangan seperti foto. Backend hanya memvalidasi tipe, ukuran, dan dimensi saat publish, lalu mencatatnya di `og_path`. Kalau dirender di Edge Function, tampilan foil harus dibuat ulang di sana |
+| Gambar OG | **Dirender browser** waktu "Buat link" dari kartu yang sama dengan yang dilihat pengirim (JPEG 1200×630, maksimal 300.000 byte; PNG juga diterima tapi dari foto hampir selalu melewati batas), lalu diunggah lewat URL bertanda tangan seperti foto. Backend hanya memvalidasi tipe, ukuran, dan dimensi saat publish, lalu mencatatnya di `og_path`. Kalau dirender di Edge Function, tampilan foil harus dibuat ulang di sana |
 | Bucket `letter-assets` | **Publik untuk baca**, path acak tak tertebak per surat (`<letter_id>/<uuid>.<ext>`). Upload hanya lewat URL bertanda tangan dari `POST /letters`; tidak ada policy listing. Publik dipilih supaya crawler WhatsApp bisa mengambil gambar OG dan file bisa di-cache CDN (hemat egress) |
-| Batas foto | Maksimal **4 foto per surat** (sesuai template kolase), maksimal **500 KB per foto** setelah dikompres, tipe JPEG atau WebP. Gambar OG maksimal 300 KB |
+| Batas foto | Maksimal **4 foto per surat** (sesuai template kolase), maksimal **500 KB per foto** setelah dikompres, tipe JPEG atau WebP. Cover (gambar depan dari foto user) punya batas yang sama tapi **tidak dihitung** ke 4 foto. Gambar OG maksimal 300 KB |
 | Masa berlaku surat | Surat (data, link, dan gambar OG) dihapus **30 hari setelah publish** |
-| Masa berlaku foto | Foto dihapus **7 hari setelah surat pertama kali dibuka** (`opened_at`). Kalau tidak pernah dibuka, foto ikut terhapus bersama suratnya di hari ke-30. Setelah foto dihapus, halaman penerima tetap menampilkan kartu dan teks, dengan placeholder di slot foto |
-| Repo | **Public**. Alasannya, Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Apakah repo public membebaskan batasan itu belum terbukti; dicek begitu proyek Vercel tersambung |
+| Masa berlaku foto | Foto dihapus **7 hari setelah surat pertama kali dibuka** (`opened_at`). Kalau tidak pernah dibuka, foto ikut terhapus bersama suratnya di hari ke-30. Kalau gambar depannya foto user, cover dan gambar OG ikut dihapus saat itu karena gambar OG memuat foto yang sama. Setelah dihapus, halaman penerima tetap menampilkan kartu dan teks dengan placeholder, dan memakai gambar OG bawaan |
+| Rate limit | `POST /letters` maksimal **10 surat per jam per IP** untuk awal, dievaluasi selama beta. Operator seluler di Indonesia banyak memakai CGNAT, jadi satu IP bisa dipakai banyak orang; kalau 429 mulai sering muncul, kuncinya digabung dengan penanda per perangkat |
+| Repo | **Public**. Alasannya, Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Sudah terbukti di PR #6: commit dari akun Bintang ter-deploy di proyek Vercel milik Kall |
 
 Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karena foto hidup paling lama 7 hari setelah dibuka, yang perlu dipantau adalah jumlah surat aktif, bukan total surat.
 
@@ -74,7 +75,7 @@ Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karen
 Satu job `pg_cron` per jam memanggil Edge Function pembersih lewat `pg_net`. Fungsi itu menghapus:
 
 - draf yang tidak pernah di-publish setelah 24 jam, beserta filenya;
-- foto surat yang `opened_at`-nya sudah lewat 7 hari;
+- foto surat yang `opened_at`-nya sudah lewat 7 hari, beserta cover dan gambar OG kalau gambar depannya foto user;
 - surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya.
 
 File harus dihapus lewat Storage API (`storage.remove()`) di Edge Function. Menghapus baris `storage.objects` lewat SQL meninggalkan file yatim yang tetap memakan kuota ([Supabase: Delete Objects](https://supabase.com/docs/guides/storage/management/delete-objects)).
@@ -89,7 +90,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Buat proyek Supabase, lalu kirim URL dan anon key ke Kall lewat jalur privat, bukan lewat commit
 - [ ] Job CI untuk lint dan test backend (workflow `no-ai-attribution` sudah ada)
 - [ ] Migrasi `letters` dan `letter_assets`
-- [ ] `docs/api/openapi.yaml` untuk lima endpoint rilis 1, supaya Kall bisa jalan dengan mock
+- [x] `docs/api/openapi.yaml` untuk lima endpoint rilis 1, supaya Kall bisa jalan dengan mock
 - [x] Putuskan bucket `letter-assets` publik atau bertanda tangan
 
 **Sprint 1 (minggu 2–3)**
@@ -124,12 +125,14 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 | Tabel | Kolom penting |
 | --- | --- |
 | `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `cover_path`, `og_path`, `status`, `edit_token_hash`, `reply_to_id`, `opened_at`, `published_at`, `expires_at`, `photos_deleted_at`, `created_at` |
-| `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`sticker`), `width`, `height` |
+| `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`cover`/`og`), `key` (kunci foto di `content`, khusus `photo`), `mime`, `size`, `width`, `height`, `uploaded_at` |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
 - `owner_id` boleh kosong selama belum ada login.
 - `design` menyimpan **id preset** (gambar depan, bentuk, mode foil, bingkai foil, warna foil, kertas, template), bukan nilai warnanya, supaya preset bisa dipoles tanpa merusak surat lama. Id-nya berasal dari `packages/presets/*.json` milik Kall.
-- `content` menyimpan elemen kanvas (teks, foto, stiker) beserta posisi, skala, dan rotasi. Bentuk pastinya disepakati di `openapi.yaml`.
+- `content` menyimpan elemen kanvas (teks, foto, stiker) beserta posisi, lebar, dan rotasi. Bentuknya ada di [`docs/api/openapi.yaml`](api/openapi.yaml) (`LetterContent`) dan sama dengan `packages/presets/src/letter-content.ts`.
+- `letter_assets` dibuat saat `POST /letters` dari metadata yang dikirim frontend. Stiker tidak diunggah karena berasal dari preset.
+- `cover_path` dan `og_path` boleh tetap ada di `letters` sebagai jalan pintas, atau diganti baris `letter_assets` berjenis `cover` dan `og`. Diputuskan di PR migrasi.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -139,13 +142,15 @@ Tabel fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) ada d
 
 ## Endpoint rilis 1
 
+Detail request, respons, dan kode error ada di [`docs/api/openapi.yaml`](api/openapi.yaml). Semua endpoint dilayani dua Edge Function: `letters` (`/letters/…`) dan `l` (`/l/…`), dengan `verify_jwt` mati karena publishable key bukan JWT. Semua request membawa header `apikey`.
+
 | Method | Path | Fungsi | Auth |
 | --- | --- | --- | --- |
 | POST | `/letters` | Buat draf, kembalikan `id`, `edit_token`, dan URL upload bertanda tangan untuk tiap foto (maksimal 4) dan gambar OG | Anonim boleh, kena rate limit |
-| POST | `/letters/:id/publish` | Validasi isi serta foto dan gambar OG yang sudah diunggah, buat `slug`, ubah status jadi `sent` | `edit_token` |
+| POST | `/letters/:id/publish` | Validasi isi serta foto dan gambar OG yang sudah diunggah, buat `slug`, ubah status jadi `sent` | Header `X-Edit-Token` |
 | GET | `/l/:slug` | Ambil surat untuk halaman penerima (design, content, URL foto) | Publik |
 | POST | `/l/:slug/open` | Catat waktu pertama kali dibuka | Publik, sekali per surat |
-| DELETE | `/letters/:id` | Hapus surat dan fotonya | `edit_token` atau pemilik |
+| DELETE | `/letters/:id` | Hapus surat dan fotonya | Header `X-Edit-Token` (pemilik akun di fase 2) |
 
 ## Storage
 
