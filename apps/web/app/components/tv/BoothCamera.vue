@@ -9,6 +9,8 @@ const props = defineProps<{
   filter: PhotoFilter
   facing: 'user' | 'environment'
   countdown: number | null
+  /** Jepretan ke berapa dari berapa, selama memotret. */
+  progress?: { shot: number; total: number } | null
   flash: number
 }>()
 const emit = defineEmits<{ ready: []; error: [message: string] }>()
@@ -81,6 +83,14 @@ const filterCss = computed(() => {
     >
       {{ countdown }}
     </div>
+    <p
+      v-if="progress"
+      class="absolute top-3 right-4 font-tv text-[22px] tracking-[0.12em] text-white"
+      style="text-shadow: 0 0 8px rgb(0 0 0 / 0.7)"
+      data-testid="booth-progress"
+    >
+      FOTO {{ progress.shot }}/{{ progress.total }}
+    </p>
     <div v-if="flash" :key="flash" class="booth-flash absolute inset-0 bg-white" />
   </div>
 </template>
