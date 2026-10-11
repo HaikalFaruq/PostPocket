@@ -1,18 +1,10 @@
 <script setup lang="ts">
-import { byId, isFilledElement, letter } from '@postpocket/presets'
-import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from 'reka-ui'
+import { byId, isFilledElement, letter, templateForPhotos } from '@postpocket/presets'
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { MESSAGE_LIMIT } from '~/utils/letter-draft'
 import { takePendingPhoto, type PendingPhoto } from '~/utils/pending-photo'
+import { listSent } from '~/utils/sent-letters'
 
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
 
@@ -24,51 +16,96 @@ onMounted(async () => {
   await draft.load()
   const reply = route.query.balas
   if (typeof reply === 'string') {
-    // Balasan dimulai dari kertas kosong kalau draf sebelumnya sudah dikirim.
-    if (draft.sent) await draft.reset()
-    draft.setReplyTo(reply)
     router.replace({ query: {} })
+    await startReply(reply)
   }
   // Foto dari "Kirim sebagai surat" (Pocket) atau "Pakai di surat" (Booth): /letter/new?foto=1.
+  // Pilihan untuk draf yang belum dikirim sudah ditanyakan di sana; kalau belum, ditanya di sini.
   if (route.query.foto !== undefined) {
     router.replace({ query: {} })
     const pending = await takePendingPhoto()
     if (!pending) return
-    // Draf yang kosong atau sudah jadi link langsung diganti; draf yang belum dikirim tidak ditimpa
-    // tanpa bertanya, supaya isinya tidak terkirim ke orang lain.
-    if (draft.blank || draft.sent) await startWithPhoto(pending)
-    else waitingPhoto.value = pending
+    const mode =
+      pending.mode ??
+      (draft.blank || draft.sent
+        ? 'new'
+        : await askDraftChoice({ kind: 'photo', from: pending.from }))
+    if (mode === 'new') await startWithPhoto(pending)
+    else if (mode === 'add') await addToDraft(pending)
   }
 })
 
-const notice = ref('')
-const waitingPhoto = shallowRef<PendingPhoto | null>(null)
+/**
+ * Mulai membalas surat `slug`. Draf yang belum dikirim tidak diam-diam jadi balasan, supaya
+ * isinya tidak terkirim ke orang yang salah; kalau dibatalkan, kembali ke surat tadi.
+ */
+async function startReply(slug: string) {
+  if (draft.replyTo === slug) return
+  if (draft.blank || draft.sent) {
+    if (draft.sent) await draft.reset()
+    draft.setReplyTo(slug)
+    return
+  }
+  const choice = await askDraftChoice({ kind: 'reply' })
+  if (choice === 'new') await draft.reset()
+  if (choice) {
+    draft.setReplyTo(slug)
+    return
+  }
+  const letterPath = `/l/${encodeURIComponent(slug)}`
+  if (window.history.state?.back === letterPath) router.back()
+  else await navigateTo(letterPath, { replace: true })
+}
 
-/** Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. */
+const notice = ref('')
+
+/**
+ * Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. Bingkainya
+ * mengikuti bentuk foto, jadi strip Booth dan foto tegak tampil utuh.
+ */
 async function startWithPhoto(pending: PendingPhoto) {
-  waitingPhoto.value = null
   await draft.reset()
   draft.setTemplate('photo-1')
   draft.addPhoto(pending.photo)
+  draft.fitPhotos({ grow: 1.4 })
   await draft.save()
   notice.value = `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu buat link.`
   open.value = true
 }
 
+/**
+ * Tambahkan foto ke draf. Kalau slot template-nya tidak cukup, tata letaknya diganti ke template
+ * dengan slot sebanyak fotonya, supaya foto baru tidak menumpuk di atas foto lama.
+ */
 async function addToDraft(pending: PendingPhoto) {
-  waitingPhoto.value = null
-  if (!draft.addPhoto(pending.photo)) {
+  const id = draft.addPhoto(pending.photo)
+  if (!id) {
     notice.value =
       'Isi surat ini sudah berisi 4 foto. Hapus satu dulu lewat "Atur foto dan stiker".'
     return
   }
+  const count = draft.content.elements.filter((e) => e.kind === 'photo' && e.photo).length
+  const current = byId(letter.templates, draft.design.template)
+  const next =
+    current && current.photos >= count ? null : templateForPhotos(letter.templates, count)
+  if (next) {
+    draft.setTemplate(next.id)
+    draft.fitPhotos({ grow: count === 1 ? 1.4 : 1 })
+  } else {
+    draft.fitPhotos({ ids: [id] })
+  }
   await draft.save()
-  notice.value = `Foto dari ${pending.from} ditambahkan ke isi surat.`
+  notice.value = next
+    ? `Foto dari ${pending.from} ditambahkan. Tata letaknya diganti ke "${next.label}" supaya fotonya tidak bertumpuk.`
+    : `Foto dari ${pending.from} ditambahkan ke isi surat.`
   open.value = true
 }
 
 const isDesktop = useMediaQuery('(min-width: 1024px)')
 const open = ref(false)
+const cardHint = computed(() =>
+  open.value ? 'Ketuk kartu untuk menutup' : 'Ketuk kartu untuk membuka',
+)
 const expanded = ref(true)
 const card = ref<{ turnBy: (degrees: number) => void } | null>(null)
 const busy = ref(false)
@@ -195,6 +232,17 @@ function startSending() {
   sending.value = true
 }
 
+// Surat yang pernah dibuat linknya di sini, supaya link lama tetap bisa disalin atau dihapus.
+const sentCount = ref(0)
+const showSent = ref(false)
+async function refreshSent() {
+  sentCount.value = (await listSent()).filter(
+    (item) => Date.parse(item.expiresAt) > Date.now(),
+  ).length
+}
+onMounted(refreshSent)
+watch(() => draft.sent, refreshSent)
+
 const sentUntil = computed(() =>
   draft.sent
     ? new Date(draft.sent.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' })
@@ -203,8 +251,9 @@ const sentUntil = computed(() =>
 
 async function newLetter() {
   open.value = false
-  notice.value = ''
   await draft.reset()
+  notice.value = 'Surat tadi tetap bisa dibuka. Link-nya ada di "Surat terkirim".'
+  void refreshSent()
 }
 const ogCard = computed(() => ({
   art: art.value,
@@ -276,9 +325,9 @@ async function startOver() {
       </FoilCard>
       <p
         v-if="isDesktop"
-        class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-subtle"
+        class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-muted"
       >
-        Ketuk kartu untuk membuka · geser untuk memutar
+        {{ cardHint }} · geser untuk memutar
       </p>
       <div
         v-if="dragging"
@@ -290,7 +339,7 @@ async function startOver() {
 
     <component :is="isDesktop ? SidePanel : BottomSheet" v-bind="panelProps">
       <template #peek>
-        <p class="text-caption text-ink-subtle">Ketuk kartu untuk membuka</p>
+        <p class="text-caption text-ink-muted" data-testid="card-hint">{{ cardHint }}</p>
       </template>
 
       <div class="px-6 pt-6 pb-1">
@@ -298,6 +347,15 @@ async function startOver() {
         <p class="mt-1 text-ink-muted">
           Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu kirim lewat link.
         </p>
+        <button
+          v-if="sentCount"
+          type="button"
+          class="mt-2 text-caption font-semibold underline underline-offset-2"
+          data-testid="open-sent-letters"
+          @click="showSent = true"
+        >
+          Surat terkirim ({{ sentCount }})
+        </button>
         <div
           v-if="draft.replyTo"
           class="mt-3 flex items-center justify-between gap-3 rounded-control bg-fill px-3 py-2 text-caption"
@@ -480,45 +538,7 @@ async function startOver() {
     <Teleport to="body">
       <LetterEditor v-if="editing" @close="closeEditor" />
       <SendLetter v-if="sending" :card="ogCard" :existing="draft.sent" @close="sending = false" />
-      <DialogRoot
-        :open="!!waitingPhoto"
-        @update:open="(isOpen: boolean) => !isOpen && (waitingPhoto = null)"
-      >
-        <DialogPortal>
-          <DialogOverlay class="fixed inset-0 z-40 bg-ink/40 data-[state=open]:animate-fade-in" />
-          <DialogContent
-            class="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[24px]"
-            data-testid="photo-choice"
-          >
-            <DialogTitle class="text-title font-semibold">Masih ada draf surat</DialogTitle>
-            <DialogDescription class="mt-1 text-ink-muted">
-              Draf suratmu yang belum dikirim masih ada. Mulai surat baru dengan foto dari
-              {{ waitingPhoto?.from }}, atau tambahkan fotonya ke draf itu?
-            </DialogDescription>
-            <div class="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-              <button
-                type="button"
-                class="h-11 rounded-control sm:flex-1 bg-ink px-4 text-body font-semibold text-white"
-                @click="waitingPhoto && startWithPhoto(waitingPhoto)"
-              >
-                Mulai surat baru
-              </button>
-              <button
-                type="button"
-                class="h-11 rounded-control sm:flex-1 px-4 text-body font-semibold inset-ring inset-ring-line"
-                @click="waitingPhoto && addToDraft(waitingPhoto)"
-              >
-                Tambahkan ke draf
-              </button>
-            </div>
-            <DialogClose
-              class="mt-3 w-full text-center text-caption text-ink-muted underline underline-offset-2"
-            >
-              Batal, jangan pakai foto ini
-            </DialogClose>
-          </DialogContent>
-        </DialogPortal>
-      </DialogRoot>
+      <SentLetters v-model:open="showSent" @changed="refreshSent" />
     </Teleport>
   </div>
 </template>

@@ -1,10 +1,15 @@
 import type { Template } from './index'
 import {
+  contentLimits,
   isFilledElement,
   normalizeContent,
   type LetterContent,
   type LetterElement,
 } from './letter-content'
+
+function round(value: number): number {
+  return Math.round(value * 10_000) / 10_000
+}
 
 /** Halaman yang lebih lebar dari ini (lebar dibagi tinggi) memakai tata letak `wide`. */
 export const WIDE_PAGE_FROM = 1.1
@@ -75,4 +80,37 @@ export function applyTemplate(
   })
   const kept = content.elements.filter((e) => !used.has(e.id) && isFilledElement(e))
   return normalizeContent({ version: 1, elements: [...placed, ...kept] })
+}
+
+/** Template dengan slot foto paling sedikit yang masih cukup untuk `count` foto. */
+export function templateForPhotos(templates: readonly Template[], count: number): Template | null {
+  const fitting = templates.filter((item) => item.photos >= Math.max(1, count))
+  return fitting.reduce<Template | null>(
+    (best, item) => (!best || item.photos < best.photos ? item : best),
+    null,
+  )
+}
+
+/**
+ * Bingkai foto dibentuk ulang mengikuti bentuk fotonya sendiri, jadi foto tampil utuh tanpa
+ * terpotong (misalnya strip Booth yang tinggi). Fotonya dimuat di dalam kotak bingkai lama dengan
+ * titik tengah yang sama. `grow` membolehkan kotak itu lebih tinggi untuk foto tegak, selama
+ * fotonya tetap di dalam halaman.
+ */
+export function fitPhoto<T extends { y: number; width: number; aspect: number }>(
+  element: T,
+  photoAspect: number,
+  pageRatio: number,
+  { grow = 1 }: { grow?: number } = {},
+): T {
+  const ratio = pageRatio > 0 && Number.isFinite(pageRatio) ? pageRatio : 0.75
+  const { min, max } = contentLimits.aspect
+  const aspect = Math.min(max, Math.max(min, photoAspect > 0 ? photoAspect : element.aspect))
+  // Semua ukuran dalam pecahan lebar halaman; tinggi halaman = 1 / ratio.
+  const boxHeight = element.width / element.aspect
+  const room = (2 * Math.min(element.y - 0.03, 0.97 - element.y)) / ratio
+  const height = Math.max(0, Math.min(boxHeight * grow, room))
+  const width = Math.min(element.width, height * aspect)
+  const clamped = Math.min(contentLimits.width.max, Math.max(contentLimits.width.min, width))
+  return { ...element, width: round(clamped), aspect: round(aspect) }
 }

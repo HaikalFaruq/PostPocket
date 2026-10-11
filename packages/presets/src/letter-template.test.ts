@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { byId, letter } from './index'
-import { normalizeContent, type LetterContent, type LetterElement } from './letter-content'
-import { applyTemplate, templateElements } from './letter-template'
+import {
+  normalizeContent,
+  type LetterContent,
+  type LetterElement,
+  type PhotoElement,
+} from './letter-content'
+import { applyTemplate, fitPhoto, templateElements, templateForPhotos } from './letter-template'
 
 const template = (id: string) => byId(letter.templates, id)!
 // Ilustrasi (0.72), Portrait, Square, dan Landscape.
@@ -110,5 +115,41 @@ describe('applyTemplate', () => {
         expect(next.elements.some((e) => e.kind === 'sticker')).toBe(true)
       }
     }
+  })
+})
+
+describe('fitPhoto', () => {
+  const slot = templateElements(template('photo-1'), 0.72)[0] as PhotoElement
+
+  it('strip Booth yang tinggi tampil utuh dan tetap di dalam halaman', () => {
+    const strip = fitPhoto(slot, 620 / 1846, 0.72, { grow: 1.4 })
+    expect(strip.aspect).toBeCloseTo(620 / 1846, 3)
+    expect(strip.width).toBeLessThan(slot.width)
+    const box = bounds(strip, 0.72)
+    expect(box.top).toBeGreaterThanOrEqual(0)
+    // Lebih tinggi dari kotak template, tapi tidak sampai ke slot teks di bawahnya (y 0.8).
+    expect(box.bottom - box.top).toBeGreaterThan(0.44)
+    expect(box.bottom).toBeLessThan(0.7)
+  })
+
+  it('foto landscape selebar slot, foto tegak setinggi kotak template', () => {
+    expect(fitPhoto(slot, 4 / 3, 0.72).width).toBeCloseTo(slot.width, 4)
+    const tall = fitPhoto(slot, 3 / 4, 0.72)
+    expect((tall.width / tall.aspect) * 0.72).toBeCloseTo(0.44, 3)
+  })
+
+  it('rasio foto di luar batas kontrak dipotong ke batasnya', () => {
+    expect(fitPhoto(slot, 0.05, 0.72).aspect).toBe(0.2)
+    expect(fitPhoto(slot, 9, 0.72).aspect).toBe(5)
+  })
+})
+
+describe('templateForPhotos', () => {
+  it('memilih template dengan slot foto paling sedikit yang masih cukup', () => {
+    expect(templateForPhotos(letter.templates, 1)?.id).toBe('photo-1')
+    expect(templateForPhotos(letter.templates, 2)?.id).toBe('photo-2')
+    expect(templateForPhotos(letter.templates, 3)?.id).toBe('collage-4')
+    expect(templateForPhotos(letter.templates, 4)?.id).toBe('collage-4')
+    expect(templateForPhotos(letter.templates, 5)).toBeNull()
   })
 })

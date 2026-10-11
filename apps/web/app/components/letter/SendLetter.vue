@@ -78,7 +78,7 @@ async function send() {
         if (done === count) phase.value = 'publish'
       },
     )
-    await rememberSent(result)
+    await rememberSent({ ...result, preview: previewText() })
     await draft.markSent(result)
     sent.value = result
     state.value = 'done'
@@ -86,6 +86,12 @@ async function send() {
     error.value = errorMessage(problem)
     state.value = 'error'
   }
+}
+
+/** Potongan teks pertama surat, untuk daftar "Surat terkirim". */
+function previewText(): string | undefined {
+  const text = draft.content.elements.find((e) => e.kind === 'text' && e.text.trim())
+  return text?.kind === 'text' ? Array.from(text.text.trim()).slice(0, 80).join('') : undefined
 }
 
 async function copy() {
@@ -223,7 +229,7 @@ onMounted(() => {
             target="_blank"
             rel="noopener"
             class="inline-flex h-9 items-center rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
-            >Lihat surat</a
+            >Pratinjau surat</a
           >
         </div>
         <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>

@@ -3,6 +3,7 @@ import {
   byId,
   contentLimits,
   contentPhotoKeys,
+  fitPhoto,
   isFilledElement,
   letter,
   normalizeContent,
@@ -315,6 +316,21 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     return id
   }
 
+  /**
+   * Bingkai foto isi mengikuti bentuk fotonya, jadi foto dari Pocket atau Booth tampil utuh.
+   * Tanpa `ids`, semua foto isi; `grow` lihat `fitPhoto()`.
+   */
+  function fitPhotos({ ids, grow }: { ids?: string[]; grow?: number } = {}) {
+    setContent({
+      elements: content.value.elements.map((element) => {
+        if (element.kind !== 'photo' || !element.photo) return element
+        if (ids && !ids.includes(element.id)) return element
+        const item = photos.value[element.photo]
+        return item ? fitPhoto(element, item.width / item.height, ratio.value, { grow }) : element
+      }),
+    })
+  }
+
   /** Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah. */
   function setTemplate(id: string) {
     const template = byId(letter.templates, id)
@@ -418,6 +434,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     removeElement,
     bringToFront,
     addText,
+    fitPhotos,
     addSticker,
     addPhoto,
     setTemplate,
