@@ -65,10 +65,7 @@ function openDay(day: string) {
           </div>
         </NuxtLink>
         <div class="flex items-center gap-2">
-          <p
-            class="hidden font-mono text-[11px] tracking-[0.16em] text-pocket-muted uppercase sm:block"
-            data-testid="saved-count"
-          >
+          <p class="hidden text-caption text-pocket-muted sm:block" data-testid="saved-count">
             {{ memories.savedDays }} hari tersimpan
           </p>
           <MonthPicker :year="year" :month="month" @pick="show" />
@@ -93,10 +90,7 @@ function openDay(day: string) {
       <section class="mt-5 rounded-[30px] bg-surface p-4 shadow-raised sm:p-7">
         <div class="flex flex-wrap items-start justify-between gap-3 px-1 sm:px-0">
           <div>
-            <p class="font-mono text-[11px] tracking-[0.2em] text-pocket-muted uppercase">
-              Kapsul waktu kecilmu
-            </p>
-            <h1 class="mt-1 text-[clamp(28px,7vw,40px)] font-semibold tracking-[-0.035em]">
+            <h1 class="text-[clamp(28px,7vw,40px)] font-semibold tracking-[-0.035em]">
               {{ title }}
             </h1>
             <p class="mt-1 text-body text-pocket-muted">
@@ -121,7 +115,7 @@ function openDay(day: string) {
           <div
             v-for="weekday in WEEKDAYS"
             :key="weekday"
-            class="border-r border-b border-line-soft py-2 text-center font-mono text-[10px] tracking-[0.14em] text-pocket-muted uppercase"
+            class="border-r border-b border-line-soft py-2 text-center text-[11px] font-medium text-pocket-muted"
             aria-hidden="true"
           >
             {{ weekday }}
@@ -143,7 +137,7 @@ function openDay(day: string) {
             >
               <!-- Di HP selnya sempit: hari ini cukup ditebalkan, pil hanya di layar lebar. -->
               <span
-                class="absolute top-1 left-1 font-mono text-[11px] sm:top-1.5 sm:left-1.5"
+                class="absolute top-1 left-1 text-[12px] font-medium tabular-nums sm:top-1.5 sm:left-1.5"
                 :class="
                   cell.day === today &&
                   'font-bold sm:rounded-full sm:bg-pocket-ink sm:px-1.5 sm:font-normal sm:text-white'
@@ -172,7 +166,7 @@ function openDay(day: string) {
             </button>
             <span
               v-else
-              class="absolute top-1 left-1 font-mono text-[11px] text-pocket-muted sm:top-1.5 sm:left-1.5"
+              class="absolute top-1 left-1 text-[12px] tabular-nums text-pocket-muted sm:top-1.5 sm:left-1.5"
               aria-hidden="true"
               >{{ cell.date }}</span
             >

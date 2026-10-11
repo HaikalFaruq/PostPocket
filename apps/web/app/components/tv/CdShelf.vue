@@ -168,8 +168,8 @@ function caseLabel(album: AlbumView) {
       </IconButton>
       <div v-if="current" class="min-w-0 text-center">
         <p class="truncate text-[15px] font-semibold">{{ current.emoji }} {{ current.title }}</p>
-        <p class="font-mono text-[11px] tracking-[0.14em] text-ink-muted uppercase">
-          {{ current.moments.length }} foto ·
+        <p class="text-caption text-ink-muted">
+          {{ current.moments.length }} foto,
           {{ playing === current.id ? 'sedang diputar di TV' : 'ketuk piringan untuk memutar' }}
         </p>
       </div>

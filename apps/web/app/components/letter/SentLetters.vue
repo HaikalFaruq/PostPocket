@@ -111,7 +111,7 @@ async function remove(item: SentRecord) {
               {{ item.preview || 'Surat tanpa teks' }}
             </p>
             <p class="mt-0.5 text-caption text-ink-muted">
-              Dibuat {{ date(item.publishedAt) }} · bisa dibuka sampai {{ date(item.expiresAt) }}
+              Dibuat {{ date(item.publishedAt) }}, bisa dibuka sampai {{ date(item.expiresAt) }}
             </p>
             <div class="mt-2.5 flex flex-wrap gap-2">
               <button

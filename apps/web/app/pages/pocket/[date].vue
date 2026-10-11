@@ -110,7 +110,6 @@ const editOpen = ref(false)
         </NuxtLink>
       </header>
 
-      <p class="font-mono text-[11px] tracking-[0.2em] text-pocket-muted uppercase">Isi kantong</p>
       <h1 class="mt-1 text-[clamp(24px,6vw,32px)] font-semibold tracking-[-0.03em]">
         {{ longDate(day) }}
       </h1>

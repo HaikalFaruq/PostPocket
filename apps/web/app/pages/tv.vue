@@ -309,10 +309,7 @@ const marquee = computed(() =>
           <template v-if="booth">PHOTO <span class="text-tv-accent">BOOTH</span></template>
           <template v-else>MEMORI <span class="text-tv-accent">TV</span></template>
         </h1>
-        <p
-          class="mt-2 font-mono text-[11px] tracking-[0.3em] text-ink-muted uppercase"
-          data-testid="tv-subtitle"
-        >
+        <p class="mt-3 text-[14px] text-ink-muted" data-testid="tv-subtitle">
           {{ boothHint }}
         </p>
       </div>
@@ -445,23 +442,21 @@ const marquee = computed(() =>
         <div
           class="flex flex-col items-center gap-2 rounded-[24px] bg-surface px-4 py-3 shadow-raised sm:flex-row sm:gap-3 sm:rounded-full sm:py-2 sm:pr-3"
         >
-          <span class="font-mono text-[11px] tracking-[0.2em] text-ink-muted">CLAY</span>
+          <span class="text-caption font-medium text-ink-muted">Warna badan</span>
           <SwatchGroup v-model="clay" label="Warna TV" :options="clayOptions" size="sm" />
         </div>
       </div>
 
       <section class="mt-10" aria-labelledby="arsip-title">
         <div class="mb-2 flex items-center gap-2">
-          <h2 id="arsip-title" class="font-mono text-[12px] tracking-[0.24em] text-ink-muted">
-            ARSIP
-          </h2>
+          <h2 id="arsip-title" class="text-[17px] font-bold tracking-[-0.02em]">Arsip CD</h2>
           <button
             v-if="canEdit"
             type="button"
-            class="rounded-full bg-surface px-3 py-0.5 font-mono text-[11px] tracking-[0.16em] inset-ring inset-ring-line hover:bg-panel"
+            class="rounded-full bg-surface px-3 py-1 text-caption font-semibold inset-ring inset-ring-line hover:bg-panel"
             @click="editing ? (editing = false) : startEdit()"
           >
-            {{ editing ? 'TUTUP' : 'EDIT' }}
+            {{ editing ? 'Selesai' : 'Ubah' }}
           </button>
         </div>
         <ClientOnly>

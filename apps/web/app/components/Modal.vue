@@ -43,7 +43,7 @@ const open = defineModel<boolean>('open', { default: false })
           <header class="relative shrink-0 border-b border-line-soft px-6 pt-6 pb-4 md:px-8">
             <p
               v-if="eyebrow"
-              class="font-mono text-[11px] tracking-[0.2em] uppercase"
+              class="text-caption font-medium"
               :class="tone === 'pocket' ? 'text-pocket-muted' : 'text-ink-muted'"
             >
               {{ eyebrow }}

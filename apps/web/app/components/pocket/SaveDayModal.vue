@@ -54,8 +54,10 @@ const frameHex = computed(() =>
     ? customColor.value
     : (byId(pocket.frameColors, frameColor.value)?.color ?? '#fbf6ec'),
 )
-const comboName = computed(() =>
-  `${packetColor.value.flavor} / ${stickerItem.value?.label ?? ''}`.toUpperCase(),
+const comboName = computed(
+  () =>
+    // Seperti tulisan di kemasan jajan: rasa kantong dan stikernya.
+    `Rasa ${packetColor.value.flavor.toLowerCase()}, stiker ${(stickerItem.value?.label ?? '').toLowerCase()}`,
 )
 const previewPhoto = computed(() => added.value[0]?.url ?? existingUrl.value)
 
@@ -159,7 +161,6 @@ onBeforeUnmount(clearAdded)
   <Modal
     :open="open"
     tone="pocket"
-    eyebrow="Kapsul waktu kecilmu"
     :title="existing ? 'Ganti desain kantong' : 'Simpan satu hari kecil'"
     :description="longDate(day)"
     @update:open="setOpen"
@@ -180,7 +181,7 @@ onBeforeUnmount(clearAdded)
           />
         </div>
         <p
-          class="font-mono text-[11px] tracking-[0.18em] text-pocket-muted md:absolute md:bottom-5 md:left-6"
+          class="text-caption font-medium text-pocket-muted md:absolute md:bottom-5 md:left-6"
           data-testid="combo-name"
         >
           {{ comboName }}

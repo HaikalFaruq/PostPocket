@@ -217,7 +217,7 @@ const contentSummary = computed(() => {
   const photos = filled.value.filter((e) => e.kind === 'photo').length
   const stickers = filled.value.filter((e) => e.kind === 'sticker').length
   const parts = [photos && `${photos} foto`, stickers && `${stickers} stiker`].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'Belum ada foto atau stiker.'
+  return parts.length ? parts.join(', ') : 'Belum ada foto atau stiker.'
 })
 
 // "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG. Draf yang sudah jadi link
@@ -343,7 +343,7 @@ async function startOver() {
         v-if="isDesktop"
         class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-muted"
       >
-        {{ cardHint }} · geser untuk memutar
+        {{ cardHint }}, geser untuk memutar
       </p>
       <div
         v-if="dragging"

@@ -81,12 +81,12 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   const preview = page.getByTestId('packet-preview')
   const packet = preview.locator('.packet')
   const combo = page.getByTestId('combo-name')
-  await expect(combo).toHaveText('BLUEBERRY / HATI')
+  await expect(combo).toHaveText('Rasa blueberry, stiker hati')
   const blue = await packet.getAttribute('style')
   await dialog.getByRole('radio', { name: 'Pink' }).click()
   await expect(packet).not.toHaveAttribute('style', blue!)
   await dialog.getByRole('radio', { name: 'Bunga sakura' }).click()
-  await expect(combo).toHaveText('STROBERI / BUNGA SAKURA')
+  await expect(combo).toHaveText('Rasa stroberi, stiker bunga sakura')
   await expect(preview.locator('.packet__sticker')).toHaveAttribute('alt', 'Bunga sakura')
   // Nama kombinasi tidak tertimpa kantong, termasuk di layar HP yang sempit.
   const packetBox = (await packet.boundingBox())!
@@ -236,7 +236,7 @@ test('latar Pocket sampai ke tepi layar dan kembali normal setelah pindah halama
   await page.getByRole('link', { name: /PostPocket/ }).click()
   await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('html')).not.toHaveClass(/bg-pocket-page/)
-  await expect(themeColor).toHaveAttribute('content', '#f5f5f3')
+  await expect(themeColor).toHaveAttribute('content', '#f1f4f8')
 })
 
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({

@@ -17,9 +17,7 @@ const props = withDefaults(
 )
 
 const headingId = useId()
-const number = computed(() =>
-  props.variant === 'card' ? String(props.step).padStart(2, '0') : String(props.step),
-)
+const number = computed(() => String(props.step))
 </script>
 
 <template>
@@ -55,7 +53,7 @@ const number = computed(() =>
   >
     <div class="flex items-start gap-3">
       <span
-        class="grid size-8 shrink-0 place-items-center rounded-full bg-fill font-mono text-[11px] font-medium"
+        class="grid size-8 shrink-0 place-items-center rounded-full bg-fill text-[12px] font-semibold tabular-nums"
         aria-hidden="true"
         >{{ number }}</span
       >

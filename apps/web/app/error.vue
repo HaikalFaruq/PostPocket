@@ -29,10 +29,7 @@ const reload = () => window.location.reload()
       </button>
     </header>
     <main class="flex flex-1 flex-col items-center justify-center pb-16 text-center">
-      <p class="font-mono text-[11px] tracking-[0.2em] text-ink-muted uppercase">
-        {{ missing ? 'Galat 404' : `Galat ${error.statusCode || 500}` }}
-      </p>
-      <h1 class="mt-2 text-title font-semibold">
+      <h1 class="text-title font-semibold">
         {{ missing ? 'Halaman ini tidak ada' : 'Ada yang tidak beres' }}
       </h1>
       <p class="mt-2 max-w-sm text-body text-ink-muted">
