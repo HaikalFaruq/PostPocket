@@ -4,6 +4,7 @@ import {
   contentLimits,
   contentPhotoKeys,
   fitPhoto,
+  freeSpot,
   isFilledElement,
   letter,
   normalizeContent,
@@ -249,20 +250,22 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     setContent({ elements: [...content.value.elements.filter((item) => item.id !== id), element] })
   }
 
-  /** Sedikit acak supaya elemen baru tidak menumpuk persis di tengah. */
+  /** Putaran acak kecil untuk elemen baru, supaya terlihat ditempel tangan. */
   function jitter(random: () => number, spread: number): number {
     return (random() - 0.5) * spread
   }
+
+  // Elemen baru ditaruh di tempat yang paling kosong (`freeSpot`), supaya tidak menimpa tulisan.
 
   function addText(random: () => number = Math.random): string | null {
     if (count('text') >= contentLimits.text) return null
     const id = uniqueId('t', takenIds())
     const size = 0.06 * Math.min(1, 1 / ratio.value)
-    const element = { kind: 'text', id, x: 0.5, y: 0.5 + jitter(random, 0.1), width: 0.7 }
+    const spot = freeSpot(content.value, 0.7, 2 * size * 1.25 * ratio.value, ratio.value, random)
     setContent({
       elements: [
         ...content.value.elements,
-        { ...element, rotation: 0, text: '', size, align: 'center' },
+        { kind: 'text', id, ...spot, width: 0.7, rotation: 0, text: '', size, align: 'center' },
       ],
     })
     return id
@@ -271,13 +274,13 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   function addSticker(sticker: string, random: () => number = Math.random): string | null {
     if (count('sticker') >= contentLimits.sticker || !byId(letter.stickers, sticker)) return null
     const id = uniqueId('s', takenIds())
-    const x = 0.5 + jitter(random, 0.3)
-    const y = 0.5 + jitter(random, 0.3)
+    const width = 0.22
+    const spot = freeSpot(content.value, width, width * ratio.value, ratio.value, random)
     const rotation = Math.round(jitter(random, 24))
     setContent({
       elements: [
         ...content.value.elements,
-        { kind: 'sticker', id, x, y, width: 0.22, rotation, sticker },
+        { kind: 'sticker', id, ...spot, width, rotation, sticker },
       ],
     })
     return id
@@ -307,11 +310,10 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     const id = uniqueId('p', takenIds())
     const rotation = Math.round(jitter(random, 8))
     const aspect = next.width / next.height
+    const width = 0.55
+    const spot = freeSpot(content.value, width, (width / aspect) * ratio.value, ratio.value, random)
     setContent({
-      elements: [
-        ...elements,
-        { kind: 'photo', id, x: 0.5, y: 0.45, width: 0.55, rotation, photo: key, aspect },
-      ],
+      elements: [...elements, { kind: 'photo', id, ...spot, width, rotation, photo: key, aspect }],
     })
     return id
   }

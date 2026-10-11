@@ -114,3 +114,68 @@ export function fitPhoto<T extends { y: number; width: number; aspect: number }>
   const clamped = Math.min(contentLimits.width.max, Math.max(contentLimits.width.min, width))
   return { ...element, width: round(clamped), aspect: round(aspect) }
 }
+
+/** Kotak elemen sebelum diputar, dalam pecahan lebar dan tinggi halaman. Tinggi teks diperkirakan. */
+function elementBox(element: LetterElement, pageRatio: number) {
+  let height: number
+  if (element.kind === 'photo') height = (element.width / element.aspect) * pageRatio
+  else if (element.kind === 'sticker') height = element.width * pageRatio
+  else {
+    // Huruf Caveat rata-rata selebar setengah ukurannya, tinggi barisnya 1,25. Teks kosong (slot
+    // template) tetap dianggap dua baris, karena di situlah pesan user akan ditulis.
+    const perLine = Math.max(1, Math.floor(element.width / (element.size * 0.5)))
+    const lines = element.text.trim()
+      ? element.text
+          .split('\n')
+          .reduce((sum, line) => sum + Math.max(1, Math.ceil(Array.from(line).length / perLine)), 0)
+      : 2
+    height = lines * element.size * 1.25 * pageRatio
+  }
+  return {
+    left: element.x - element.width / 2,
+    right: element.x + element.width / 2,
+    top: element.y - height / 2,
+    bottom: element.y + height / 2,
+  }
+}
+
+// Teks paling dijaga supaya tetap terbaca, lalu foto, lalu stiker lain.
+const COVER_COST = { text: 3, photo: 2, sticker: 1 } as const
+
+/**
+ * Titik tengah untuk elemen baru selebar `width` (pecahan lebar halaman) dan setinggi `height`
+ * (pecahan tinggi halaman) yang paling sedikit menutupi isi surat, supaya stiker atau foto baru
+ * tidak menimpa tulisan. Halaman kosong tetap mendapat tengah halaman; tempat yang sama baiknya
+ * dipilih acak lewat `random`.
+ */
+export function freeSpot(
+  content: LetterContent,
+  width: number,
+  height: number,
+  pageRatio: number,
+  random: () => number = Math.random,
+): { x: number; y: number } {
+  const boxes = content.elements.map((element) => ({
+    box: elementBox(element, pageRatio),
+    cost: COVER_COST[element.kind],
+  }))
+  const within = (value: number, half: number) =>
+    half >= 0.48 ? 0.5 : Math.min(1 - half - 0.02, Math.max(half + 0.02, value))
+  const spots = [0.2, 0.5, 0.8].flatMap((x) =>
+    [0.14, 0.32, 0.5, 0.68, 0.86].map((y) => {
+      const spot = { x: within(x, width / 2), y: within(y, height / 2) }
+      const cover = boxes.reduce((sum, { box, cost }) => {
+        const w = Math.min(spot.x + width / 2, box.right) - Math.max(spot.x - width / 2, box.left)
+        const h = Math.min(spot.y + height / 2, box.bottom) - Math.max(spot.y - height / 2, box.top)
+        return sum + (w > 0 && h > 0 ? w * h * cost : 0)
+      }, 0)
+      return { ...spot, cover, distance: Math.hypot(spot.x - 0.5, spot.y - 0.5) }
+    }),
+  )
+  const least = Math.min(...spots.map((spot) => spot.cover))
+  const quiet = spots.filter((spot) => spot.cover <= least + 1e-4)
+  const nearest = Math.min(...quiet.map((spot) => spot.distance))
+  const best = quiet.filter((spot) => spot.distance <= nearest + 1e-6)
+  const pick = best[Math.min(best.length - 1, Math.floor(random() * best.length))]!
+  return { x: round(pick.x), y: round(pick.y) }
+}

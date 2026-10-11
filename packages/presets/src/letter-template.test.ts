@@ -6,7 +6,13 @@ import {
   type LetterElement,
   type PhotoElement,
 } from './letter-content'
-import { applyTemplate, fitPhoto, templateElements, templateForPhotos } from './letter-template'
+import {
+  applyTemplate,
+  fitPhoto,
+  freeSpot,
+  templateElements,
+  templateForPhotos,
+} from './letter-template'
 
 const template = (id: string) => byId(letter.templates, id)!
 // Ilustrasi (0.72), Portrait, Square, dan Landscape.
@@ -153,3 +159,57 @@ describe('templateForPhotos', () => {
     expect(templateForPhotos(letter.templates, 5)).toBeNull()
   })
 })
+
+describe('freeSpot', () => {
+  const overlap = (a: ReturnType<typeof bounds>, b: ReturnType<typeof bounds>) =>
+    Math.min(a.right, b.right) > Math.max(a.left, b.left) &&
+    Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top)
+
+  it('halaman kosong: stiker di tengah', () => {
+    expect(freeSpot({ version: 1, elements: [] }, 0.22, 0.22 * 0.75, 0.75)).toEqual({
+      x: 0.5,
+      y: 0.5,
+    })
+  })
+
+  it('stiker baru tidak menimpa pesan di tengah halaman', () => {
+    const [text] = templateElements(template('text'), 0.75)
+    const message = { ...text!, text: 'Selamat ulang tahun! '.repeat(8) } as LetterElement
+    const content: LetterContent = { version: 1, elements: [message] }
+    for (const seed of [0, 0.5, 0.99]) {
+      const spot = freeSpot(content, 0.22, 0.22 * 0.75, 0.75, () => seed)
+      const half = (0.22 * 0.75) / 2
+      const sticker = {
+        left: spot.x - 0.11,
+        right: spot.x + 0.11,
+        top: spot.y - half,
+        bottom: spot.y + half,
+      }
+      expect(overlap(sticker, textBounds(message, 0.75))).toBe(false)
+    }
+  })
+
+  it('stiker kedua tidak menumpuk di atas stiker pertama', () => {
+    const first = {
+      kind: 'sticker',
+      id: 's1',
+      x: 0.5,
+      y: 0.5,
+      width: 0.22,
+      rotation: 0,
+      sticker: 'heart',
+    }
+    const content = normalizeContent({ elements: [first] })
+    const spot = freeSpot(content, 0.22, 0.22 * 0.75, 0.75, () => 0)
+    expect(spot).not.toEqual({ x: 0.5, y: 0.5 })
+  })
+})
+
+/** Perkiraan kasar kotak teks untuk test: setiap baris setinggi 1,25 × ukuran huruf. */
+function textBounds(element: LetterElement, ratio: number) {
+  if (element.kind !== 'text') return bounds(element, ratio)
+  const perLine = Math.floor(element.width / (element.size * 0.5))
+  const lines = Math.ceil(Array.from(element.text).length / perLine)
+  const height = lines * element.size * 1.25 * ratio
+  return { ...bounds(element, ratio), top: element.y - height / 2, bottom: element.y + height / 2 }
+}
