@@ -129,6 +129,40 @@ function roundedRect(
   ctx.closePath()
 }
 
+/**
+ * Garis par avion merah dan biru di tepi gambar, seperti amplop surat udara (docs/desain.md).
+ * Warnanya sama dengan token --color-post-red dan --color-ink.
+ */
+function drawAirmail(ctx: CanvasRenderingContext2D, width: number, height: number, band: number) {
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, 0, width, height)
+  ctx.rect(band, band, width - band * 2, height - band * 2)
+  ctx.clip('evenodd')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+  const stripe = band * 0.9
+  const gap = stripe / 2
+  const period = (stripe + gap) * 2
+  for (let offset = -height; offset < width + height; offset += period) {
+    for (const [start, color] of [
+      [0, '#e23b3b'],
+      [stripe + gap, '#18204a'],
+    ] as const) {
+      const left = offset + start
+      ctx.beginPath()
+      ctx.moveTo(left, 0)
+      ctx.lineTo(left + stripe, 0)
+      ctx.lineTo(left + stripe - height, height)
+      ctx.lineTo(left - height, height)
+      ctx.closePath()
+      ctx.fillStyle = color
+      ctx.fill()
+    }
+  }
+  ctx.restore()
+}
+
 /** Gradien logam foil, sama arah dan warnanya dengan kartu di layar. */
 function metal(ctx: CanvasRenderingContext2D, foil: FoilColor, width: number, height: number) {
   const gradient = ctx.createLinearGradient(0, 0, width, height)
@@ -163,8 +197,9 @@ export async function renderOgImage(card: OgCard): Promise<UploadImage> {
   ])
   const draw = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const unit = width / OG_WIDTH
-    ctx.fillStyle = '#f5f5f3'
+    ctx.fillStyle = '#f1f4f8'
     ctx.fillRect(0, 0, width, height)
+    drawAirmail(ctx, width, height, 26 * unit)
     const maxH = 540 * unit
     const maxW = 980 * unit
     const cardH = Math.min(maxH, maxW / card.ratio)
