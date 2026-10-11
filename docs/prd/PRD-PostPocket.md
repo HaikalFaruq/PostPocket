@@ -317,8 +317,8 @@ Rilis 1 hanya butuh server untuk surat yang dikirim; Pocket, TV, dan Booth berja
 
 | Tabel | Kolom penting | Fase |
 | --- | --- | --- |
-| `letters` | `id`, `slug` (unik, 10 karakter acak), `owner_id` (boleh kosong), `design` jsonb, `content` jsonb, `cover_path`, `og_path`, `status` (draft/sent), `edit_token_hash`, `reply_to_id`, `opened_at`, `created_at` | 1 |
-| `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (photo/sticker), `width`, `height` | 1 |
+| `letters` | `id`, `slug` (unik, 10 karakter acak), `owner_id` (boleh kosong), `design` jsonb, `content` jsonb, `status` (draft/sent), `edit_token_hash`, `reply_to_id`, `opened_at`, `published_at`, `expires_at`, `photos_expire_at`, `photos_deleted_at`, `created_at` | 1 |
+| `letter_assets` | `id`, `letter_id`, `kind` (photo/cover/og), `key`, `storage_path`, `mime`, `size`, `width`, `height`, `uploaded_at` | 1 |
 | `profiles` | `id` (= user auth), `display_name`, `created_at` | 2 |
 | `pockets` | `id`, `owner_id`, `day` (unik per user), `packet_color`, `sticker_id`, `frame_style`, `frame_color` | 2 |
 | `moments` | `id`, `owner_id`, `pocket_id`, `storage_path`, `taken_at`, `source` (upload/booth), `width`, `height` | 2 |
@@ -388,7 +388,7 @@ Risiko terbesar ada di performa kartu 3D di HP murah dan di Safari iOS yang bisa
 
 - [ ] Domain dan handle sosial untuk PostPocket (nama sudah final); cek ketersediaan.
 - [x] Backend tetap Supabase atau stack sendiri? **Diputuskan: tetap Supabase**, proyeknya sudah dibuat. Kalau storage gratis 1 GB tidak cukup, foto dipindah ke Cloudflare R2 tanpa mengganti database.
-- [x] Gambar OG dirender di mana? **Diputuskan: browser waktu "Buat link"**, supaya sampulnya persis sama dengan kartu. Diunggah lewat URL bertanda tangan, divalidasi backend saat publish, disimpan di `og_path`. Frontend tidak memakai Nuxt OG Image; `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`.
+- [x] Gambar OG dirender di mana? **Diputuskan: browser waktu "Buat link"**, supaya sampulnya persis sama dengan kartu. Diunggah lewat URL bertanda tangan, divalidasi backend saat publish, dicatat sebagai `letter_assets` berjenis `og`. Frontend tidak memakai Nuxt OG Image; `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`.
 - [x] Repo public atau private? **Diputuskan: public**, karena Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Terbukti di PR #6: commit dari akun Bintang ter-deploy di proyek Vercel milik Kall.
 - [x] Bucket `letter-assets` publik atau bertanda tangan? **Diputuskan: publik untuk baca** dengan path acak; upload tetap lewat URL bertanda tangan.
 - [x] Surat yang dikirim berlaku selamanya atau kedaluwarsa? **Diputuskan: surat 30 hari setelah dikirim; foto 7 hari setelah surat pertama kali dibuka.** Dievaluasi lagi setelah beta.

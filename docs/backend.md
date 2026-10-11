@@ -49,7 +49,7 @@ Catat jawabannya di PRD bagian Pertanyaan terbuka (centang dan tulis keputusanny
 | Keputusan | Isi |
 | --- | --- |
 | Backend | **Supabase**, bukan stack sendiri. Kalau storage 1 GB tidak cukup, foto dipindah ke Cloudflare R2 dan database tetap di Supabase |
-| Gambar OG | **Dirender browser** waktu "Buat link" dari kartu yang sama dengan yang dilihat pengirim (JPEG 1200×630, maksimal 300.000 byte; PNG juga diterima tapi dari foto hampir selalu melewati batas), lalu diunggah lewat URL bertanda tangan seperti foto. Backend hanya memvalidasi tipe, ukuran, dan dimensi saat publish, lalu mencatatnya di `og_path`. Kalau dirender di Edge Function, tampilan foil harus dibuat ulang di sana |
+| Gambar OG | **Dirender browser** waktu "Buat link" dari kartu yang sama dengan yang dilihat pengirim (JPEG 1200×630, maksimal 300.000 byte; PNG juga diterima tapi dari foto hampir selalu melewati batas), lalu diunggah lewat URL bertanda tangan seperti foto. Backend hanya memvalidasi tipe, ukuran, dan dimensi saat publish, lalu mencatatnya sebagai baris `letter_assets` berjenis `og`. Kalau dirender di Edge Function, tampilan foil harus dibuat ulang di sana |
 | Bucket `letter-assets` | **Publik untuk baca**, path acak tak tertebak per surat (`<letter_id>/<uuid>.<ext>`). Upload hanya lewat URL bertanda tangan dari `POST /letters`; tidak ada policy listing. Publik dipilih supaya crawler WhatsApp bisa mengambil gambar OG dan file bisa di-cache CDN (hemat egress) |
 | Batas foto | Maksimal **4 foto per surat** (sesuai template kolase), maksimal **500 KB per foto** setelah dikompres, tipe JPEG atau WebP. Cover (gambar depan dari foto user) punya batas yang sama tapi **tidak dihitung** ke 4 foto. Gambar OG maksimal 300 KB |
 | Masa berlaku surat | Surat (data, link, dan gambar OG) dihapus **30 hari setelah publish** |
@@ -88,8 +88,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Buat repo GitHub (dibuat Kall)
 - [x] Buat proyek Supabase, lalu kirim URL dan anon key ke Kall lewat jalur privat, bukan lewat commit
-- [ ] Job CI untuk lint dan test backend (workflow `no-ai-attribution` sudah ada)
-- [ ] Migrasi `letters` dan `letter_assets`
+- [x] Job CI untuk lint dan test backend: workflow `Backend` (lint skema, test pgTAP, lint `openapi.yaml`)
+- [x] Migrasi `letters` dan `letter_assets` beserta RLS dan bucket `letter-assets`
 - [x] `docs/api/openapi.yaml` untuk lima endpoint rilis 1, supaya Kall bisa jalan dengan mock
 - [x] Putuskan bucket `letter-assets` publik atau bertanda tangan
 
@@ -124,7 +124,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 | Tabel | Kolom penting |
 | --- | --- |
-| `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `cover_path`, `og_path`, `status`, `edit_token_hash`, `reply_to_id`, `opened_at`, `published_at`, `expires_at`, `photos_deleted_at`, `created_at` |
+| `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `status`, `edit_token_hash`, `reply_to_id`, `created_at`, `draft_expires_at`, `published_at`, `expires_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at` |
 | `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`cover`/`og`), `key` (kunci foto di `content`, khusus `photo`), `mime`, `size`, `width`, `height`, `uploaded_at` |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
@@ -132,7 +132,11 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - `design` menyimpan **id preset** (gambar depan, bentuk, mode foil, bingkai foil, warna foil, kertas, template), bukan nilai warnanya, supaya preset bisa dipoles tanpa merusak surat lama. Id-nya berasal dari `packages/presets/*.json` milik Kall.
 - `content` menyimpan elemen kanvas (teks, foto, stiker) beserta posisi, lebar, dan rotasi. Bentuknya ada di [`docs/api/openapi.yaml`](api/openapi.yaml) (`LetterContent`) dan sama dengan `packages/presets/src/letter-content.ts`.
 - `letter_assets` dibuat saat `POST /letters` dari metadata yang dikirim frontend. Stiker tidak diunggah karena berasal dari preset.
-- `cover_path` dan `og_path` boleh tetap ada di `letters` sebagai jalan pintas, atau diganti baris `letter_assets` berjenis `cover` dan `og`. Diputuskan di PR migrasi.
+- Cover dan gambar OG dicatat sebagai baris `letter_assets` berjenis `cover` dan `og`, bukan kolom di `letters`, supaya semua berkas dibersihkan lewat satu tabel.
+- `letter_assets.letter_id` memakai `on delete restrict`: berkas di Storage dihapus lewat Storage API dulu, baru barisnya, lalu suratnya. Urutan lain gagal di database, jadi tidak ada file yatim.
+- Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
+- Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key.
+- Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
