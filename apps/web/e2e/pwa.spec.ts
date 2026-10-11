@@ -59,7 +59,7 @@ test('Beranda tetap terbuka offline, halaman yang belum tersimpan diganti halama
   await context.setOffline(true)
   const response = await page.reload()
   expect(response?.fromServiceWorker()).toBe(true)
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Tangkap momen')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Kenangan kecil')
   await expect(page.getByRole('button', { name: /Contoh surat/ })).toBeVisible()
 
   await page.goto('/lab')
