@@ -99,7 +99,7 @@ const editOpen = ref(false)
 
 <template>
   <div class="min-h-dvh bg-pocket-page text-pocket-ink">
-    <div class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
+    <main class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
       <header class="py-4">
         <NuxtLink
           to="/pocket"
@@ -213,7 +213,7 @@ const editOpen = ref(false)
         data-testid="pocket-upload"
         @change="onFiles"
       />
-    </div>
+    </main>
     <SaveDayModal v-model:open="editOpen" :day="day" />
   </div>
 </template>

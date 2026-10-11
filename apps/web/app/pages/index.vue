@@ -56,7 +56,7 @@ const open = ref(false)
 
     <main class="grid flex-1 items-center gap-10 py-6 lg:grid-cols-[1fr_1.05fr] lg:py-10">
       <div>
-        <p class="font-mono text-[11px] tracking-[0.2em] text-ink-subtle uppercase">
+        <p class="font-mono text-[11px] tracking-[0.2em] text-ink-muted uppercase">
           Booth · Pocket · Letter
         </p>
         <h1

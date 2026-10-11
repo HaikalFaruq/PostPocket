@@ -53,7 +53,7 @@ function openDay(day: string) {
 
 <template>
   <div class="min-h-dvh bg-pocket-page text-pocket-ink">
-    <div class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
+    <main class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
       <header class="flex items-center justify-between gap-3 py-5">
         <NuxtLink to="/" class="flex items-center gap-3">
           <img src="/favicon.svg" alt="" class="size-8" />
@@ -170,7 +170,7 @@ function openDay(day: string) {
             </button>
             <span
               v-else
-              class="absolute top-1 left-1 font-mono text-[11px] text-pocket-muted/60 sm:top-1.5 sm:left-1.5"
+              class="absolute top-1 left-1 font-mono text-[11px] text-pocket-muted sm:top-1.5 sm:left-1.5"
               aria-hidden="true"
               >{{ cell.date }}</span
             >
@@ -184,7 +184,7 @@ function openDay(day: string) {
         Foto dan kantongmu hanya tersimpan di perangkat ini. Kalau data browser dihapus, isinya ikut
         hilang.
       </p>
-    </div>
+    </main>
 
     <SaveDayModal v-model:open="modalOpen" :day="modalDay" />
   </div>
