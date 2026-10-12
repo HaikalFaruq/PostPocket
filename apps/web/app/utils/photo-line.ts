@@ -40,22 +40,44 @@ export function swingStep(
   return [clamp(angle + next * dt, -0.6, 0.6), next]
 }
 
-/** Foto yang paling dekat ke tengah untuk geseran tali `offset`. */
-export function nearestAt(offset: number, spacing: number, count: number): number {
-  return clamp(Math.round(offset / spacing), 0, Math.max(0, count - 1))
+/**
+ * Batas geseran tali `[lo, hi]` untuk `count` foto selebar `print` di tali selebar `width`:
+ * - semua foto muat: kelompoknya di tengah dan tali tidak bergeser;
+ * - layar lebar: tali tidak pernah menyisakan separuh tali kosong di ujung;
+ * - layar sempit: foto yang dilihat selalu di tengah.
+ */
+export function offsetRange(
+  count: number,
+  spacing: number,
+  width: number,
+  print: number,
+  pad = 16,
+): [number, number] {
+  const span = Math.max(0, count - 1) * spacing
+  if (span <= width - print - 2 * pad) return [span / 2, span / 2]
+  if (width >= 3 * spacing) return [width / 2 - print / 2 - pad, span - width / 2 + print / 2 + pad]
+  return [0, span]
+}
+
+/** Geseran tali yang menampilkan foto ke-`i`. */
+export function offsetFor(i: number, spacing: number, range: [number, number]): number {
+  return clamp(i * spacing, range[0], range[1])
 }
 
 /**
- * Foto tujuan setelah tali dilepas. `pointerVel` kecepatan jari saat dilepas (px/ms, positif ke
- * kanan): lemparan cepat meluncur melewati beberapa foto.
+ * Foto yang dilihat setelah tali dilepas. Tali yang diseret sejauh satu foto berpindah satu foto,
+ * dan lemparan cepat (`pointerVel`, px/ms, positif ke kanan) meluncur lebih jauh.
  */
-export function flingTarget(
+export function releaseIndex(
+  active: number,
+  startOffset: number,
   offset: number,
   pointerVel: number,
   spacing: number,
   count: number,
 ): number {
-  return nearestAt(offset - pointerVel * 180, spacing, count)
+  const projected = offset - pointerVel * 180
+  return clamp(active + Math.round((projected - startOffset) / spacing), 0, Math.max(0, count - 1))
 }
 
 /** Lebar foto mengikuti tempatnya: di HP mengecil supaya tetangganya tetap kelihatan di tepi. */

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {
   easeOutBack,
-  flingTarget,
   lineSpring,
-  nearestAt,
+  offsetFor,
+  offsetRange,
   pad2,
   printWidth,
+  releaseIndex,
   stringY,
   swingStep,
 } from '~/utils/photo-line'
@@ -14,8 +15,9 @@ import {
  * Foto kantong yang sudah dibuka, dijepit jepitan kayu di tali yang melengkung (gaya Polaroid Line
  * Carousel). Tali bisa diseret, diketuk fotonya, digeser panah keyboard, atau lewat tombol; foto
  * berayun di jepitannya mengikuti kecepatan geseran lalu tenang dengan sedikit pantulan, dan tetap
- * bergoyang pelan tertiup angin. Foto di tengah adalah yang sedang dilihat (`v-model:index`).
- * Simulasinya ditulis langsung ke DOM tiap frame, bukan lewat state Vue.
+ * bergoyang pelan tertiup angin. Foto yang disorot adalah yang sedang dilihat (`v-model:index`): di HP
+ * selalu di tengah; di layar lebar tali tidak menyisakan ujung yang kosong, dan kalau semua foto muat,
+ * kelompoknya di tengah. Simulasinya ditulis langsung ke DOM tiap frame, bukan lewat state Vue.
  */
 export interface LinePhoto {
   id: string
@@ -63,22 +65,26 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 // Tinggi ujung tali dari atas panggung.
 const Y0 = 24
-// Lama foto keluar dari kantong sampai dijepit, dan porsi waktu saat foto masih naik dari dalam.
-const FLIGHT_MS = 900
-const RISE = 0.28
+// Lama foto keluar dari kantong sampai dijepit, dan porsi waktu saat foto masih naik dari mulutnya.
+const FLIGHT_MS = 1100
+const RISE = 0.34
 
 const stage = ref<HTMLElement | null>(null)
 const path = ref<SVGPathElement | null>(null)
 const cards: (HTMLElement | null)[] = []
 const size = reactive({ w: 0, cw: 160, sag: props.sag, stageH: 320 })
 const dragging = ref(false)
+/** Tali dan keterangannya baru muncul saat foto pertama hampir dijepit. */
+const arriving = ref(!!props.from)
 
 const count = computed(() => props.photos.length)
 const spacing = computed(() => size.cw * 1.08)
 const current = computed(() => props.photos[clamp(index.value, 0, count.value - 1)])
+const range = computed(() => offsetRange(count.value, spacing.value, size.w, size.cw))
 
 // Keadaan simulasi: geseran tali, sudut dan putaran tiap foto.
 const sim = { off: 0, vel: 0, target: 0, angle: [] as number[], spin: [] as number[] }
+/** Foto yang dilihat: tujuan tali, bukan foto yang kebetulan lewat di tengah. */
 let active = clamp(index.value, 0, Math.max(0, count.value - 1))
 let drag: null | {
   id: number
@@ -89,12 +95,17 @@ let drag: null | {
   v: number
   moved: boolean
 } = null
-// Foto keluar dari kantong satu per satu: waktu mulai per foto dan titik asalnya.
-let entrance: { x: number; y: number; start: number[] } | null = null
+// Foto keluar dari kantong satu per satu: waktu mulai per foto, titik mulut kantong, dan tinggi
+// tiap foto (untuk memotong bagian yang masih di dalam kantong).
+let entrance: { x: number; y: number; start: number[]; heights: number[] } | null = null
 let userTook = false
+// Foto belum digambar sampai rencana keluar dari kantong siap, supaya tidak berkedip di tali.
+let pending = false
 
 function goTo(i: number) {
-  sim.target = clamp(i, 0, count.value - 1) * spacing.value
+  active = clamp(i, 0, Math.max(0, count.value - 1))
+  sim.target = offsetFor(active, spacing.value, range.value)
+  if (index.value !== active) index.value = active
 }
 
 function step(dir: number) {
@@ -123,10 +134,10 @@ function measure() {
   })
 }
 
-// Geseran tali tetap di foto yang sama saat ukurannya berubah.
-watch(spacing, (next) => {
-  sim.target = active * next
-  sim.off = active * next
+// Tali tetap di foto yang sama saat ukuran atau jumlah fotonya berubah.
+watch(range, () => {
+  sim.target = offsetFor(active, spacing.value, range.value)
+  if (!drag) sim.off = sim.target
 })
 
 watch(count, (n, before) => {
@@ -163,10 +174,10 @@ function onMove(event: PointerEvent) {
   d.lx = event.clientX
   d.lt = event.timeStamp
   // Di ujung tali geserannya makin berat, seperti ditahan.
-  const max = (count.value - 1) * spacing.value
+  const [lo, hi] = range.value
   let off = d.off - dx
-  if (off < 0) off *= 0.35
-  if (off > max) off = max + (off - max) * 0.35
+  if (off < lo) off = lo + (off - lo) * 0.35
+  if (off > hi) off = hi + (off - hi) * 0.35
   sim.off = off
 }
 
@@ -177,10 +188,10 @@ function onUp(event: PointerEvent) {
   if (d.moved) {
     dragging.value = false
     sim.vel = -d.v * 1000
-    goTo(flingTarget(sim.off, d.v, spacing.value, count.value))
+    goTo(releaseIndex(active, d.off, sim.off, d.v, spacing.value, count.value))
     return
   }
-  // Ketukan (bukan geseran yang dibatalkan browser) di foto tetangga membawanya ke tengah.
+  // Ketukan (bukan geseran yang dibatalkan browser) di foto tetangga membawanya ke depan.
   if (event.type !== 'pointerup') return
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-i]')
   if (card) goTo(Number(card.dataset.i))
@@ -231,9 +242,12 @@ function tick(now: number) {
     lineVel = -(sim.off - before) / Math.max(dt, 1e-3)
   }
   const gain = reduce ? 0 : props.swing
-  const near = nearestAt(sim.off, gap, n)
+  // Selama diseret, sorotan ikut pindah sejauh tali digeser.
+  const shown = d?.moved
+    ? clamp(active + Math.round((sim.off - d.off) / gap), 0, Math.max(0, n - 1))
+    : active
   let flying = false
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < (pending ? 0 : n); i++) {
     const el = cards[i]
     if (!el) continue
     const x = w / 2 + i * gap - sim.off
@@ -245,29 +259,33 @@ function tick(now: number) {
     let top = stringY(x, w, Y0, sag) - 4
     let scale = 1
     let opacity = 1
-    let behind = false
+    let clip = ''
     const start = entrance?.start[i]
     if (entrance && start !== undefined) {
       const t = (now - start) / FLIGHT_MS
       if (t < 1) {
         flying = true
-        // Naik dulu dari dalam kantong (di balik foilnya), lalu terbang dan dijepit di tali.
-        const peek = entrance.y - 34
+        // Naik dari mulut kantong sampai seluruhnya keluar (bagian yang masih di dalam kantong
+        // dipotong), lalu terbang dan dijepit di tempatnya di tali.
+        const small = 0.55
+        const height = (entrance.heights[i] ?? 0) * small
+        const out = entrance.y - height - 6
         if (t < RISE) {
           const u = Math.max(0, t) / RISE
-          behind = true
           left = entrance.x - cw / 2
-          top = entrance.y + 30 - (entrance.y + 30 - peek) * (1 - (1 - u) * (1 - u))
-          scale = 0.55
+          top = entrance.y + (out - entrance.y) * (1 - (1 - u) * (1 - u))
+          scale = small
           opacity = t <= 0 ? 0 : 1
-          angle = (i % 2 ? 0.08 : -0.08) * u
+          angle = (i % 2 ? 0.05 : -0.05) * u
+          const inside = Math.max(0, top + height - entrance.y)
+          clip = `inset(0 0 ${(inside / small).toFixed(1)}px 0)`
         } else {
           const v = (t - RISE) / (1 - RISE)
           const e = easeOutBack(v)
-          const lift = Math.sin(Math.PI * v) * 46
+          const lift = Math.sin(Math.PI * v) * 40
           left = entrance.x - cw / 2 + (left - (entrance.x - cw / 2)) * e
-          top = peek + (top - peek) * e - lift
-          scale = 0.55 + 0.45 * Math.min(1, e)
+          top = out + (top - out) * e - lift
+          scale = small + (1 - small) * Math.min(1, e)
           angle = (1 - Math.min(1, e)) * (i % 2 ? 0.4 : -0.4)
         }
         spin = (i % 2 ? -1 : 1) * 2.4
@@ -281,32 +299,36 @@ function tick(now: number) {
     sim.angle[i] = angle
     sim.spin[i] = spin
     el.style.opacity = opacity === 1 ? '' : opacity.toFixed(2)
+    el.style.clipPath = clip
     el.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) rotate(${angle.toFixed(4)}rad)${scale === 1 ? '' : ` scale(${scale.toFixed(3)})`}`
-    // Selama masih di dalam kantong, foto ada di belakang kantong (z-20); setelah keluar, di
-    // depannya. Tetap di bawah modal dan lembar (z-40 ke atas).
-    el.style.zIndex = behind
-      ? '1'
-      : String(21 + (i === near ? 15 : Math.max(0, 14 - Math.abs(i - near))))
+    el.dataset.on = String(i === shown)
+    // Di atas kantong (z-20), tetap di bawah modal dan lembar (z-40 ke atas).
+    el.style.zIndex = String(21 + (i === shown ? 15 : Math.max(0, 14 - Math.abs(i - shown))))
   }
-  if (entrance && !flying && now > Math.max(...entrance.start) + FLIGHT_MS) entrance = null
+  if (entrance) {
+    if (arriving.value && now > entrance.start[0]! + FLIGHT_MS * 0.7) arriving.value = false
+    if (!flying && now > Math.max(...entrance.start) + FLIGHT_MS) entrance = null
+  }
   path.value?.setAttribute('d', `M0 ${Y0} Q${w / 2} ${Y0 + 2 * sag} ${w} ${Y0}`)
-  if (near !== active) {
-    active = near
-    index.value = near
-  }
   raf = requestAnimationFrame(tick)
 }
 
 function startEntrance() {
+  pending = false
   const origin = props.from?.getBoundingClientRect()
   const box = stage.value?.getBoundingClientRect()
-  if (!origin || !box || reduce) return
+  if (!origin || !box || reduce) {
+    arriving.value = false
+    return
+  }
   const now = performance.now()
   entrance = {
     x: origin.left + origin.width / 2 - box.left,
     y: origin.top + origin.height * props.fromY - box.top,
-    start: props.photos.map((_, i) => now + 160 + i * 150),
+    start: props.photos.map((_, i) => now + 160 + i * 170),
+    heights: props.photos.map((_, i) => cards[i]?.offsetHeight ?? 0),
   }
+  arriving.value = true
 }
 
 /** Putar otomatis ke foto berikutnya sampai user menyentuh layar atau menekan tombol. */
@@ -321,8 +343,8 @@ function takeOver() {
 
 onMounted(() => {
   reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
-  sim.off = sim.target = active * spacing.value
   measure()
+  sim.off = sim.target = offsetFor(active, spacing.value, range.value)
   resize = new ResizeObserver(measure)
   if (stage.value) resize.observe(stage.value)
   observer = new IntersectionObserver(([entry]) => {
@@ -333,6 +355,9 @@ onMounted(() => {
     }
   })
   if (stage.value) observer.observe(stage.value)
+  // Setelah lebar foto yang terukur terpasang, supaya tinggi tiap foto sudah benar.
+  pending = !!props.from && !reduce
+  arriving.value = pending
   nextTick(startEntrance)
   prev = performance.now()
   raf = requestAnimationFrame(tick)
@@ -350,6 +375,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', takeOver, { capture: true })
 })
 
+// Fokus pindah ke tali setelah kantong dibuka, supaya pengguna keyboard langsung bisa menggeser.
+function focus() {
+  stage.value?.parentElement?.focus({ preventScroll: true })
+}
+defineExpose({ focus })
+
 const live = computed(() =>
   current.value ? `Foto ${index.value + 1} dari ${count.value}: ${current.value.title}` : '',
 )
@@ -358,7 +389,7 @@ const live = computed(() =>
 <template>
   <div
     class="line"
-    :class="{ 'is-drag': dragging }"
+    :class="{ 'is-drag': dragging, 'is-arriving': arriving }"
     role="region"
     aria-roledescription="carousel"
     aria-label="Foto di kantong"
@@ -386,7 +417,6 @@ const live = computed(() =>
         :ref="(el) => (cards[i] = el as HTMLElement | null)"
         class="line__card"
         :data-i="i"
-        :data-on="i === index"
         :aria-hidden="i === index ? undefined : true"
         data-testid="line-photo"
       >
@@ -445,6 +475,17 @@ const live = computed(() =>
   cursor: grabbing;
 }
 
+/* Tali dan keterangannya menyusul foto yang keluar dari kantong; hanya munculnya yang dianimasikan. */
+.line:not(.is-arriving) .line__string,
+.line:not(.is-arriving) .line__bar {
+  transition: opacity 360ms ease;
+}
+
+.line.is-arriving .line__string,
+.line.is-arriving .line__bar {
+  opacity: 0;
+}
+
 .line__string {
   position: absolute;
   inset: 0;
@@ -472,7 +513,7 @@ const live = computed(() =>
     filter 500ms ease;
 }
 
-.line__card[data-on='false'] .line__print {
+.line__card:not([data-on='true']) .line__print {
   transform: scale(0.9);
   filter: saturate(0.75) brightness(0.97);
 }

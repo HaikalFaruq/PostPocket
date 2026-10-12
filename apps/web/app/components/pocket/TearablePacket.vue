@@ -3,33 +3,49 @@ import type { Sticker } from '@postpocket/presets'
 import {
   PACKET_W,
   TEAR_DONE,
+  TEAR_MAX,
   TEAR_Y,
+  autoTear,
   beginTear,
   extendTear,
   startEdge,
   tearProgress,
+  tearTip,
   type Tear,
   type TearDir,
 } from '~/utils/packet-tear'
 
 /**
  * Kantong yang bisa dibuka dua cara: ketuk (atau Enter/Spasi) untuk menyobek otomatis dari kiri ke
- * kanan, atau gores garis putus-putusnya ke samping dan sobekan mengikuti jari, termasuk tinggi
- * dan arahnya. Sobekan yang dilepas sudah hampir di ujung dituntaskan sendiri; yang masih pendek
- * tetap terbuka sebagian dan bisa dilanjutkan dengan goresan atau ketukan berikutnya.
+ * kanan, atau geser jari di garis putus-putusnya (digores) dan sobekan memanjang mengikuti gerakan
+ * jari, termasuk tinggi dan arahnya. Sobekan yang dilepas sudah hampir di ujung dituntaskan sendiri;
+ * yang masih pendek tetap terbuka sebagian dan bisa dilanjutkan dengan goresan atau ketukan.
+ * `restored` menampilkan kantong yang sudah terbuka tanpa animasi (kembali lewat Back).
  */
-const props = withDefaults(defineProps<{ color: string; sticker?: Sticker; opened?: boolean }>(), {
-  sticker: undefined,
-  opened: false,
-})
+const props = withDefaults(
+  defineProps<{ color: string; sticker?: Sticker; opened?: boolean; restored?: boolean }>(),
+  { sticker: undefined, opened: false, restored: false },
+)
 const emit = defineEmits<{ open: [] }>()
 
 const button = ref<HTMLButtonElement | null>(null)
-const tear = shallowRef<Tear | null>(null)
+const tear = shallowRef<Tear | null>(props.restored ? autoTear(1, 1) : null)
 const pulling = ref(false)
 /** Sobekan sedang dituntaskan otomatis (setelah ketuk atau goresan yang hampir sampai). */
 const finishing = ref(false)
-let gesture: null | { id: number; x: number; y: number; dir: TearDir | 0 } = null
+let gesture: null | {
+  id: number
+  x: number
+  y: number
+  /** Posisi jari terakhir dalam satuan gambar; sobekan memanjang sejauh jari bergerak. */
+  last: number
+  dir: TearDir | 0
+  moved: boolean
+  /** Hanya geseran yang dimulai di pita atas kantong yang menyobek. */
+  band: boolean
+} = null
+// Klik yang menyusul seretan mouse diabaikan. Jari tidak mengirim klik itu, jadi tandanya dihapus
+// lagi di sentuhan berikutnya, dan klik dari keyboard tidak pernah diabaikan.
 let swallowClick = false
 let anim = 0
 
@@ -47,16 +63,28 @@ function finish() {
 
 function onDown(event: PointerEvent) {
   if (props.opened || anim || (event.pointerType === 'mouse' && event.button !== 0)) return
-  gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, dir: 0 }
+  const point = toArt(event)
+  swallowClick = false
+  gesture = {
+    id: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    last: point.x,
+    dir: 0,
+    moved: false,
+    band: point.y <= TEAR_MAX + 22,
+  }
 }
 
 function onMove(event: PointerEvent) {
   const g = gesture
   if (!g || g.id !== event.pointerId || props.opened) return
   const dx = event.clientX - g.x
+  const dy = event.clientY - g.y
+  if (Math.hypot(dx, dy) > 8) g.moved = true
   if (!g.dir) {
-    // Geser tegak dibiarkan untuk menggulir halaman; geser ke samping mulai menyobek.
-    if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(event.clientY - g.y)) return
+    // Geser tegak dibiarkan untuk menggulir halaman; geser ke samping di pita atas mulai menyobek.
+    if (!g.band || Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return
     // Sobekan yang sudah ada dilanjutkan searah; yang baru mulai dari tepi yang berlawanan.
     g.dir = tear.value?.dir ?? (dx > 0 ? 1 : -1)
     tear.value ??= beginTear(g.dir, toArt(event).y)
@@ -64,7 +92,11 @@ function onMove(event: PointerEvent) {
     button.value?.setPointerCapture(event.pointerId)
   }
   const point = toArt(event)
-  tear.value = extendTear(tear.value!, point.x, point.y)
+  const step = (point.x - g.last) * g.dir
+  g.last = point.x
+  if (step <= 0) return
+  const tip = tearTip(tear.value!)
+  tear.value = extendTear(tear.value!, tip.x + g.dir * step, point.y)
   if (tearProgress(tear.value) >= 1) {
     gesture = null
     pulling.value = false
@@ -77,14 +109,14 @@ function onUp(event: PointerEvent) {
   const g = gesture
   if (!g || g.id !== event.pointerId) return
   gesture = null
+  if (g.moved) swallowClick = true
   if (!g.dir) return
   pulling.value = false
-  swallowClick = true
   if (tear.value && tearProgress(tear.value) >= TEAR_DONE) tearOpen()
 }
 
-function onClick() {
-  if (swallowClick) {
+function onClick(event: MouseEvent) {
+  if (swallowClick && event.detail !== 0) {
     swallowClick = false
     return
   }
@@ -150,7 +182,14 @@ const started = computed(
       @pointercancel="onUp"
       @click="onClick"
     >
-      <SnackPacket :color="color" :sticker="sticker" :tear="tear" :opened="opened" guide />
+      <SnackPacket
+        :color="color"
+        :sticker="sticker"
+        :tear="tear"
+        :opened="opened"
+        :instant="restored"
+        guide
+      />
     </button>
     <p
       v-if="!opened"
@@ -158,11 +197,11 @@ const started = computed(
       :class="{ invisible: finishing }"
       aria-hidden="true"
     >
-      {{
-        started
-          ? 'Terus gores sampai ujung, atau ketuk untuk menuntaskan'
-          : 'Ketuk kantong, atau gores garis putus-putusnya ke samping'
-      }}
+      <template v-if="started">Geser terus sampai ujung, atau ketuk untuk membuka</template>
+      <template v-else>
+        Ketuk kantong, atau geser jari di
+        <span class="whitespace-nowrap">garis putus-putus</span>
+      </template>
     </p>
   </div>
 </template>

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   easeOutBack,
-  flingTarget,
-  nearestAt,
+  lineSpring,
+  offsetFor,
+  offsetRange,
   pad2,
   printWidth,
-  lineSpring,
+  releaseIndex,
   stringY,
   swingStep,
 } from '../app/utils/photo-line'
@@ -50,20 +51,40 @@ describe('swingStep', () => {
   })
 })
 
-describe('nearestAt dan flingTarget', () => {
-  it('foto terdekat ke tengah, tidak pernah di luar daftar', () => {
-    expect(nearestAt(0, 200, 5)).toBe(0)
-    expect(nearestAt(290, 200, 5)).toBe(1)
-    expect(nearestAt(310, 200, 5)).toBe(2)
-    expect(nearestAt(-400, 200, 5)).toBe(0)
-    expect(nearestAt(5000, 200, 5)).toBe(4)
-    expect(nearestAt(100, 200, 0)).toBe(0)
+describe('offsetRange dan offsetFor', () => {
+  it('di HP foto yang dilihat selalu di tengah tali', () => {
+    const range = offsetRange(4, 180, 390, 164)
+    expect(range).toEqual([0, 540])
+    expect(offsetFor(0, 180, range)).toBe(0)
+    expect(offsetFor(3, 180, range)).toBe(540)
   })
 
-  it('lemparan ke kiri meluncur ke foto berikutnya, lemparan pelan tetap di tempat', () => {
-    expect(flingTarget(200, -2, 200, 5)).toBe(3)
-    expect(flingTarget(200, 0.1, 200, 5)).toBe(1)
-    expect(flingTarget(200, 3, 200, 5)).toBe(0)
+  it('kalau semua foto muat, kelompoknya di tengah dan tali tidak bergeser', () => {
+    const range = offsetRange(3, 237, 1440, 220)
+    expect(range).toEqual([237, 237])
+    expect(offsetFor(0, 237, range)).toBe(237)
+    expect(offsetFor(2, 237, range)).toBe(237)
+  })
+
+  it('di layar lebar dengan banyak foto, ujung tali tidak pernah kosong separuh', () => {
+    const range = offsetRange(9, 237, 1440, 220)
+    // Foto pertama menempel di tepi kiri, foto terakhir di tepi kanan.
+    expect(1440 / 2 - offsetFor(0, 237, range)).toBe(220 / 2 + 16)
+    expect(1440 / 2 + 8 * 237 - offsetFor(8, 237, range)).toBe(1440 - 220 / 2 - 16)
+    expect(offsetFor(4, 237, range)).toBe(4 * 237)
+  })
+})
+
+describe('releaseIndex', () => {
+  it('seretan sejauh satu foto pindah satu foto, lemparan meluncur lebih jauh', () => {
+    expect(releaseIndex(1, 200, 390, 0, 200, 5)).toBe(2)
+    expect(releaseIndex(1, 200, 250, 0, 200, 5)).toBe(1)
+    expect(releaseIndex(1, 200, 210, -3, 200, 5)).toBe(4)
+    expect(releaseIndex(1, 200, 190, 5, 200, 5)).toBe(0)
+  })
+
+  it('bekerja sama saat tali tidak bergeser karena semua foto muat', () => {
+    expect(releaseIndex(0, 237, 237 + 260, 0, 237, 3)).toBe(1)
   })
 })
 

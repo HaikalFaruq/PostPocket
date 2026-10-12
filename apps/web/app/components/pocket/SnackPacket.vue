@@ -37,6 +37,8 @@ const props = withDefaults(
     guide?: boolean
     tear?: Tear | null
     opened?: boolean
+    /** Langsung di keadaan akhir tanpa animasi, misalnya saat kembali ke kantong yang sudah dibuka. */
+    instant?: boolean
   }>(),
   {
     sticker: undefined,
@@ -47,6 +49,7 @@ const props = withDefaults(
     guide: false,
     tear: null,
     opened: false,
+    instant: false,
   },
 )
 
@@ -81,7 +84,7 @@ const backEdge = computed(() =>
 <template>
   <div
     class="packet"
-    :class="{ 'packet--mini': mini, 'is-split': split, 'is-opened': opened }"
+    :class="{ 'packet--mini': mini, 'is-split': split, 'is-opened': opened, 'is-instant': instant }"
     :style="{ '--packet': color }"
   >
     <svg
@@ -244,8 +247,9 @@ const backEdge = computed(() =>
           v-if="guide && !mini"
           class="packet__guide"
           :d="`M9 ${TEAR_Y} H191`"
-          stroke="#fff"
-          stroke-opacity="0.7"
+          :stroke="tones.deeper"
+          stroke-opacity="0.55"
+          stroke-width="1.1"
           stroke-dasharray="3.2 3.2"
           fill="none"
         />
@@ -379,6 +383,12 @@ const backEdge = computed(() =>
   left: 43%;
   width: 14%;
   height: 22%;
+}
+
+.is-instant .packet__body,
+.is-instant .packet__top {
+  transition: none;
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

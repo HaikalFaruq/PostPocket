@@ -186,7 +186,7 @@ test('buka kantong: disobek, foto dijepit di tali, foto yang di tengah dikirim s
 
   const day = page.getByTestId('pocket-day')
   await expect(day).toHaveAttribute('data-torn', 'false')
-  await expect(page.getByText('Ketuk kantong, atau gores garis putus-putusnya')).toBeVisible()
+  await expect(page.getByText('Ketuk kantong, atau geser jari di')).toBeVisible()
   await page.getByRole('button', { name: 'Buka kantong' }).click()
   await expect(day).toHaveAttribute('data-torn', 'true')
 
@@ -200,8 +200,12 @@ test('buka kantong: disobek, foto dijepit di tali, foto yang di tengah dikirim s
   // Di HP pendek, tombol-tombolnya digulir sampai kelihatan setelah fotonya keluar.
   await expect(page.getByRole('button', { name: 'Kirim sebagai surat' })).toBeInViewport()
 
-  // Tombol, keyboard, dan ketuk foto tetangga menggeser tali.
-  await line.getByRole('button', { name: 'Foto berikutnya' }).click()
+  // Tombol, keyboard, dan ketuk foto tetangga menggeser tali. Dua ketukan cepat pindah dua foto.
+  const next = line.getByRole('button', { name: 'Foto berikutnya' })
+  await next.click()
+  await next.click()
+  await expect(line).toHaveAttribute('data-index', '2')
+  await line.getByRole('button', { name: 'Foto sebelumnya' }).click()
   await expect(line).toHaveAttribute('data-index', '1')
   await line.focus()
   await page.keyboard.press('End')
@@ -240,7 +244,7 @@ test('kantong bisa digores: sobekan mengikuti jari, berhenti di tengah, lalu dit
   expect(progress).toBeGreaterThan(0.4)
   expect(progress).toBeLessThan(0.7)
   await expect(page.getByTestId('pocket-day')).toHaveAttribute('data-torn', 'false')
-  await expect(page.getByText('Terus gores sampai ujung')).toBeVisible()
+  await expect(page.getByText('Geser terus sampai ujung')).toBeVisible()
 
   // Goresan berikutnya melanjutkan sobekan yang sama sampai ujung.
   await page.mouse.move(...at(95, 40))
@@ -282,15 +286,82 @@ test('ganti desain: foto lama bisa dikeluarkan, kantong bisa dihapus, latarnya k
   await expect(dialog).toContainText('2 foto terselip')
   await dialog.getByRole('button', { name: 'Keluarkan foto 1 dari kantong' }).click()
   await expect(dialog).toContainText('1 foto terselip')
+  // Yang dikeluarkan masih bisa dikembalikan sebelum disimpan.
+  await dialog.getByRole('button', { name: 'Kembalikan foto 1 ke kantong' }).click()
+  await expect(dialog).toContainText('2 foto terselip')
+  await dialog.getByRole('button', { name: 'Keluarkan foto 1 dari kantong' }).click()
   await dialog.getByRole('button', { name: 'Simpan perubahan' }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByTestId('line-photo')).toHaveCount(1)
 
+  // Hapus kantong ditanyakan di dalam modal, bukan dialog bawaan browser.
   await page.getByRole('button', { name: 'Ganti desain kantong' }).click()
-  page.once('dialog', (confirm) => confirm.accept())
   await dialog.getByRole('button', { name: 'Hapus kantong' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('Hapus kantong ini beserta 1 fotonya?')
+  await dialog.getByRole('button', { name: 'Hapus', exact: true }).click()
   await expect(page).toHaveURL(/\/pocket$/)
   await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
+})
+
+test('goresan jari yang berhenti di tengah dituntaskan dengan satu ketukan', async ({
+  page,
+  browserName,
+  hasTouch,
+}) => {
+  test.skip(browserName !== 'chromium' || !hasTouch, 'Sentuhan lewat CDP, khusus HP Chromium')
+  await page.goto('/pocket')
+  await saveDay(page, TODAY, [20])
+  await page.goto(`/pocket/${TODAY}`)
+  const packet = page.getByTestId('tearable-packet')
+  const art = (await packet.locator('svg').boundingBox())!
+  const unit = art.width / 200
+  const y = art.y + 38 * unit
+  // Jari sungguhan: setelah seretan, browser tidak mengirim klik.
+  const cdp = await page.context().newCDPSession(page)
+  const touch = (type: string, x?: number) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: x === undefined ? [] : [{ x, y }],
+    })
+  await touch('touchStart', art.x + 8 * unit)
+  for (let x = 18; x <= 90; x += 8) await touch('touchMove', art.x + x * unit)
+  await touch('touchEnd')
+  await expect(page.getByText('Geser terus sampai ujung')).toBeVisible()
+  await page.touchscreen.tap(art.x + art.width / 2, art.y + art.height / 2)
+  await expect(page.getByTestId('pocket-day')).toHaveAttribute('data-torn', 'true')
+})
+
+test('Back dari TV kembali ke kantong yang sudah terbuka, di foto yang sama', async ({ page }) => {
+  await page.goto('/pocket')
+  await saveDay(page, TODAY, [20, 200])
+  await openPocket(page)
+  const line = page.getByTestId('photo-line')
+  await line.getByRole('button', { name: 'Foto berikutnya' }).click()
+  await expect(line).toHaveAttribute('data-index', '1')
+  await page.getByRole('link', { name: 'Putar di TV' }).click()
+  await expect(page).toHaveURL(/\/tv\?hari=/)
+  await page.goBack()
+  await expect(page.getByTestId('pocket-day')).toHaveAttribute('data-torn', 'true')
+  await expect(line).toHaveAttribute('data-index', '1')
+  // Kunjungan baru dari kalender mulai tersegel lagi.
+  await page.getByRole('link', { name: 'Kalender' }).click()
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  await expect(page).toHaveURL(new RegExp(`/pocket/${TODAY}$`))
+  await expect(page.getByTestId('pocket-day')).toHaveAttribute('data-torn', 'false')
+})
+
+test('di layar lebar, foto yang muat semua tergantung di tengah tali', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) < 1000, 'Khusus layar lebar')
+  await page.goto('/pocket')
+  await saveDay(page, TODAY, [20, 200, 300])
+  await openPocket(page)
+  const prints = page.getByTestId('line-photo')
+  await expect(prints).toHaveCount(3)
+  await page.waitForTimeout(2500)
+  const first = (await prints.first().boundingBox())!
+  const last = (await prints.last().boundingBox())!
+  const middle = (first.x + last.x + last.width) / 2
+  expect(Math.abs(middle - page.viewportSize()!.width / 2)).toBeLessThan(40)
 })
 
 test('putar di TV: isi kantong langsung diputar, foto baru masuk ke kantong yang sama', async ({

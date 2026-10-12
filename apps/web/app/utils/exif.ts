@@ -197,3 +197,13 @@ async function heifExifDate(file: Blob, head: DataView): Promise<string | null> 
   if (data.byteLength < 8) return null
   return exifDateFromTiff(data, 4 + data.getUint32(0))
 }
+
+/**
+ * Waktu foto untuk kenangan: tanggal EXIF kalau ada, kalau tidak waktu berkasnya terakhir diubah
+ * (tangkapan layar dan foto dari WhatsApp tidak punya EXIF), jadi bukan waktu fotonya dipilih.
+ */
+export async function photoTime(file: File): Promise<string | undefined> {
+  const exif = await readExifDate(file)
+  if (exif) return exif
+  return file.lastModified ? new Date(file.lastModified).toISOString() : undefined
+}

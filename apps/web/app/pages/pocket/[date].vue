@@ -2,7 +2,7 @@
 import { byId, letter, pocket } from '@postpocket/presets'
 import type { LinePhoto } from '~/components/pocket/PhotoLine.vue'
 import { isPocketDay, longDate, shortDate } from '~/utils/calendar'
-import { readExifDate } from '~/utils/exif'
+import { photoTime } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { dayKey } from '~/utils/memories'
 import { sendPhotoToLetter } from '~/utils/pending-photo'
@@ -53,9 +53,18 @@ watch(
 
 const clock = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' })
 
+/** Urutan foto di tali: menurut waktu diambil, lalu urutan masuknya. */
+const ordered = computed(() => {
+  const time = (id: string) => Date.parse(memories.data.moments[id]?.takenAt ?? '') || 0
+  return (saved.value?.moments ?? [])
+    .map((id, i) => ({ id, i }))
+    .sort((a, b) => time(a.id) - time(b.id) || a.i - b.i)
+    .map(({ id }) => id)
+})
+
 /** Foto di tali: jamnya ditulis di bingkai, asalnya di keterangan bawah tali. */
 const linePhotos = computed<LinePhoto[]>(() =>
-  (saved.value?.moments ?? []).map((id) => {
+  ordered.value.map((id) => {
     const moment = memories.data.moments[id]
     const taken = moment ? new Date(moment.takenAt) : null
     const time = taken && !Number.isNaN(taken.getTime()) ? clock.format(taken) : null
@@ -77,21 +86,51 @@ const linePhotos = computed<LinePhoto[]>(() =>
 )
 
 const torn = ref(false)
-/** Foto yang sedang di tengah tali; dipakai "Kirim sebagai surat". */
+/** Kantong yang sudah dibuka lalu ditinggal lewat link (editor surat, TV) dan didatangi lagi lewat Back. */
+const restored = ref(false)
+/** Foto yang sedang dilihat di tali; dipakai "Kirim sebagai surat". */
 const active = ref(0)
-const selected = computed(() => saved.value?.moments[active.value] ?? null)
+const selected = computed(() => ordered.value[active.value] ?? null)
 const packet = ref<{ el: HTMLElement | null } | null>(null)
 const packetEl = computed(() => packet.value?.el ?? null)
+const line = ref<{ focus: () => void } | null>(null)
 const actions = ref<HTMLElement | null>(null)
+
+// Keadaan terbuka disimpan di entri riwayat halaman ini: Back dari editor surat atau TV kembali ke
+// kantong yang terbuka di foto yang sama, sedangkan kunjungan baru dari kalender mulai tersegel.
+const OPEN_STATE = 'pocketOpen'
+function remember() {
+  if (!torn.value) return
+  try {
+    const state = { ...history.state, [OPEN_STATE]: { day: day.value, index: active.value } }
+    history.replaceState(state, '')
+  } catch {
+    // Riwayat tidak bisa ditulis (jarang); kantong saja yang tersegel lagi.
+  }
+}
+watch(active, remember)
+onMounted(() => {
+  const state = history.state?.[OPEN_STATE] as { day?: string; index?: number } | undefined
+  if (state?.day !== day.value) return
+  restored.value = true
+  torn.value = true
+  active.value = Math.max(0, Number(state.index) || 0)
+})
+
 function tear() {
   torn.value = true
+  remember()
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  // Pengguna keyboard langsung bisa menggeser tali (atau menambah foto ke kantong kosong).
+  nextTick(() =>
+    line.value ? line.value.focus() : actions.value?.querySelector('button')?.focus(),
+  )
   // Di HP yang pendek, foto dan tombolnya muncul di bawah kantong; gulir sampai kelihatan setelah
   // fotonya selesai keluar dari kantong.
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
   window.setTimeout(
     () =>
       actions.value?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' }),
-    reduced ? 0 : 900,
+    reduced ? 0 : 1400,
   )
 }
 
@@ -109,15 +148,13 @@ async function onFiles(event: Event) {
   try {
     const photos = []
     for (const file of files) {
-      const takenAt = (await readExifDate(file)) ?? undefined
-      photos.push({ photo: await preparePhoto(file), takenAt })
+      photos.push({ photo: await preparePhoto(file), takenAt: await photoTime(file) })
     }
-    const before = saved.value.moments.length
     const ids = await memories.addMoments(photos, { day: day.value, source: 'upload' })
     await memories.saveDay({ ...saved.value, moments: [...saved.value.moments, ...ids] })
     // Tali bergeser ke foto pertama yang baru, jadi kelihatan fotonya sudah masuk dan langsung
     // bisa dikirim sebagai surat.
-    if (ids.length) active.value = before
+    if (ids[0]) active.value = Math.max(0, ordered.value.indexOf(ids[0]))
   } catch (problem) {
     error.value = problem instanceof PhotoError ? problem.message : 'Foto gagal disimpan.'
   } finally {
@@ -160,6 +197,7 @@ const editOpen = ref(false)
             :color="color"
             :sticker="sticker"
             :opened="torn"
+            :restored="restored"
             @open="tear"
           />
         </div>
@@ -181,12 +219,13 @@ const editOpen = ref(false)
       <!-- Tali selebar layar: foto tetangga mengintip dari tepi. -->
       <PhotoLine
         v-if="linePhotos.length"
+        ref="line"
         v-model:index="active"
         class="mt-4"
         :photos="linePhotos"
         :frame="frame"
         :frame-color="frameColor"
-        :from="packetEl"
+        :from="restored ? null : packetEl"
         :from-y="0.2"
       />
       <p

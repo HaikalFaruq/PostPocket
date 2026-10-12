@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { byId, letter, pocket } from '@postpocket/presets'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
-import { longDate, shortDate } from '~/utils/calendar'
-import { readExifDate } from '~/utils/exif'
+import { longDate } from '~/utils/calendar'
+import { photoTime } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import type { DraftPhoto } from '~/utils/letter-draft'
 import type { PocketDay } from '~/utils/memories'
@@ -31,6 +31,8 @@ const keptUrls = ref<Record<string, string | null>>({})
 const busy = ref(false)
 const preparing = ref(false)
 const error = ref('')
+/** "Hapus kantong" sedang ditanyakan di footer. */
+const confirmDelete = ref(false)
 
 const kept = computed(() => (existing.value?.moments ?? []).filter((id) => !removed.value.has(id)))
 const photoCount = computed(() => kept.value.length + added.value.length)
@@ -53,6 +55,7 @@ watch(open, async (isOpen) => {
   } else frameColor.value = day?.frameColor ?? pocket.frameColors[0]!.id
   clearAdded()
   removed.value = new Set()
+  confirmDelete.value = false
   error.value = ''
   const urls: Record<string, string | null> = {}
   for (const id of day?.moments ?? []) urls[id] = await memories.photoUrl(id)
@@ -105,7 +108,7 @@ async function onFiles(event: Event) {
   const next = [...added.value]
   for (const file of files) {
     try {
-      const takenAt = (await readExifDate(file)) ?? undefined
+      const takenAt = await photoTime(file)
       const photo = await preparePhoto(file)
       next.push({ photo, url: URL.createObjectURL(photo.blob), takenAt })
     } catch (problem) {
@@ -125,6 +128,10 @@ function removeAdded(index: number) {
 
 function removeKept(id: string) {
   removed.value = new Set([...removed.value, id])
+}
+
+function restoreKept(id: string) {
+  removed.value = new Set([...removed.value].filter((item) => item !== id))
 }
 
 function clearAdded() {
@@ -163,19 +170,19 @@ async function save() {
   }
 }
 
-/** Hapus kantong beserta fotonya, setelah bertanya. */
-async function removePocket() {
+/** Hapus kantong beserta fotonya. Ditanyakan dulu di footer modal. */
+const deleteQuestion = computed(() => {
   const count = existing.value?.moments.length ?? 0
-  const photos = count ? ` beserta ${count} fotonya` : ''
-  const ok = window.confirm(
-    `Hapus kantong ${shortDate(props.day)}${photos}? Foto yang sudah masuk CD di Memori TV juga ikut terhapus.`,
-  )
-  if (!ok) return
+  return count ? `Hapus kantong ini beserta ${count} fotonya?` : 'Hapus kantong ini?'
+})
+
+async function removePocket() {
   busy.value = true
   try {
     await memories.deleteDay(props.day)
     clearAdded()
     removed.value = new Set()
+    confirmDelete.value = false
     open.value = false
     emit('deleted')
   } catch {
@@ -233,6 +240,16 @@ onBeforeUnmount(clearAdded)
         >
           {{ comboName }}
         </p>
+        <!-- Di HP langkah foto ada jauh di bawah; tombol ini menghemat gulirnya. -->
+        <button
+          type="button"
+          class="-mt-2 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-4 text-body font-semibold shadow-[inset_0_0_0_1px_var(--color-line)] md:hidden"
+          :disabled="busy"
+          @click="fileInput?.click()"
+        >
+          <Icon name="plus" :size="15" />
+          {{ photoCount ? `Tambah foto (${photoCount})` : 'Tambah foto' }}
+        </button>
       </div>
     </template>
 
@@ -334,7 +351,9 @@ onBeforeUnmount(clearAdded)
             :color="item.color"
             check
           />
-          <Swatch value="custom" label="Warna sendiri" :color="customColor" check />
+          <Swatch value="custom" label="Warna sendiri" check>
+            <span class="custom-swatch" :style="{ '--custom': customColor }" aria-hidden="true" />
+          </Swatch>
         </SwatchGroup>
         <label
           v-if="frameColor === 'custom'"
@@ -370,14 +389,29 @@ onBeforeUnmount(clearAdded)
         <Icon name="plus" :size="18" />
       </button>
 
-      <ul v-if="photoCount" class="mt-3 flex flex-wrap gap-2" aria-label="Foto di kantong">
+      <ul
+        v-if="existing?.moments.length || added.length"
+        class="mt-3 flex flex-wrap gap-2"
+        aria-label="Foto di kantong"
+      >
         <li
-          v-for="(id, index) in kept"
+          v-for="(id, index) in existing?.moments ?? []"
           :key="id"
           class="relative size-16 overflow-hidden rounded-[10px] bg-fill"
+          :class="{ 'is-removed': removed.has(id) }"
         >
           <img v-if="keptUrls[id]" :src="keptUrls[id]!" alt="" class="size-full object-cover" />
           <button
+            v-if="removed.has(id)"
+            type="button"
+            class="thumb-remove"
+            :aria-label="`Kembalikan foto ${index + 1} ke kantong`"
+            @click="restoreKept(id)"
+          >
+            <Icon name="undo" :size="12" />
+          </button>
+          <button
+            v-else
             type="button"
             class="thumb-remove"
             :aria-label="`Keluarkan foto ${index + 1} dari kantong`"
@@ -406,7 +440,7 @@ onBeforeUnmount(clearAdded)
         Foto HEIC butuh beberapa detik.
       </p>
       <p v-if="removed.size" class="mt-2 text-caption text-ink-muted">
-        {{ removed.size }} foto akan dikeluarkan dari kantong saat disimpan.
+        {{ removed.size }} foto dikeluarkan saat disimpan. Ketuk panahnya untuk mengembalikan.
       </p>
       <p v-if="error" role="alert" class="mt-2 text-caption text-ink-muted">{{ error }}</p>
       <input
@@ -423,31 +457,56 @@ onBeforeUnmount(clearAdded)
     </StepCard>
 
     <template #footer>
-      <!-- Di HP cukup ikonnya, supaya tombol simpan tidak terjepit. -->
-      <button
-        v-if="existing"
-        type="button"
-        class="mr-auto inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 text-body whitespace-nowrap text-ink-muted hover:text-ink"
-        :disabled="busy"
-        @click="removePocket"
-      >
-        <Icon name="trash" :size="16" /> <span class="max-sm:sr-only">Hapus kantong</span>
-      </button>
-      <button
-        type="button"
-        class="min-h-10 px-1 text-body whitespace-nowrap text-ink-muted hover:text-ink"
-        @click="setOpen(false)"
-      >
-        Batal
-      </button>
-      <button
-        type="button"
-        class="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-body font-semibold whitespace-nowrap text-white disabled:opacity-50"
-        :disabled="busy"
-        @click="save"
-      >
-        <Icon name="check" :size="15" /> {{ saveLabel }}
-      </button>
+      <template v-if="confirmDelete">
+        <p class="mr-auto text-body font-semibold" role="alert">
+          {{ deleteQuestion }}
+          <span class="block text-caption font-normal text-ink-muted">
+            Foto yang sudah masuk CD di Memori TV ikut terhapus.
+          </span>
+        </p>
+        <button
+          type="button"
+          class="min-h-10 px-1 text-body whitespace-nowrap text-ink-muted hover:text-ink"
+          @click="confirmDelete = false"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-body font-semibold whitespace-nowrap text-white disabled:opacity-50"
+          :disabled="busy"
+          @click="removePocket"
+        >
+          <Icon name="trash" :size="15" /> Hapus
+        </button>
+      </template>
+      <template v-else>
+        <!-- Di HP cukup ikonnya, supaya tombol simpan tidak terjepit. -->
+        <button
+          v-if="existing"
+          type="button"
+          class="mr-auto inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 text-body whitespace-nowrap text-ink-muted hover:text-ink"
+          :disabled="busy"
+          @click="confirmDelete = true"
+        >
+          <Icon name="trash" :size="16" /> <span class="max-sm:sr-only">Hapus kantong</span>
+        </button>
+        <button
+          type="button"
+          class="min-h-10 px-1 text-body whitespace-nowrap text-ink-muted hover:text-ink"
+          @click="setOpen(false)"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-body font-semibold whitespace-nowrap text-white disabled:opacity-50"
+          :disabled="busy"
+          @click="save"
+        >
+          <Icon name="check" :size="15" /> {{ saveLabel }}
+        </button>
+      </template>
     </template>
   </Modal>
 </template>
@@ -494,6 +553,28 @@ onBeforeUnmount(clearAdded)
 
 .add-photos:hover {
   background-color: var(--color-fill);
+}
+
+.is-removed img {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.custom-swatch {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--spectrum);
+}
+
+/* Titik warna pilihan di tengah cincin pelangi. */
+.custom-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  background-color: var(--custom);
+  box-shadow: 0 0 0 1.5px var(--color-surface);
 }
 
 .thumb-remove {
