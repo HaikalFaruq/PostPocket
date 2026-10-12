@@ -167,7 +167,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: JPEG 1200×630 maksimal 300.000 byte, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
 - [x] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
 - [x] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`, atau gambar OG bawaan kalau sudah dihapus
-- [x] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore ([Deploy](#deploy))
+- [x] Region fungsi Vercel `sin1` (Singapura), bukan US. Supabase-nya di Sydney (`ap-southeast-2`), bukan Singapura ([Deploy](#deploy))
 - [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp ([cara cek](#gerbang-sprint-2))
 
 **Sprint 3 (minggu 6–7)**
@@ -225,7 +225,7 @@ Proyek Vercel `postpocket` (Hobby, akun Kall) tersambung ke repo ini lewat GitHu
 | --- | --- |
 | Root directory | `apps/web`, file di luar root ikut di-build (misalnya `packages/presets`) |
 | Framework dan Node | Nuxt, 24.x |
-| Region fungsi | `sin1`, dekat dengan Supabase di Singapore |
+| Region fungsi | `sin1` (Singapura), dekat dengan pengguna di Indonesia. Supabase ada di Sydney (`ap-southeast-2`) |
 | Env production, preview, development | `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, nilainya sama dengan `apps/web/.env` |
 
 - Preview dilindungi Vercel Authentication, jadi hanya bisa dibuka akun pemilik proyek. Domain produksi terbuka untuk siapa saja.
