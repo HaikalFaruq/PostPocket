@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 const cardPage = (page: Page) => page.getByTestId('letter-page')
@@ -95,6 +96,21 @@ test('editor: blok teks baru bisa diketik dan diatur', async ({ page }) => {
   await expect(cardPage(page).getByText('P.S. kangen')).toBeAttached()
 })
 
+test('foto HEIC tanpa tipe (seperti di Windows) tetap masuk ke isi surat', async ({ page }) => {
+  const heic = readFileSync(new URL('./fixtures/foto.heic', import.meta.url))
+  await chooseTemplate(page, '1 foto + teks')
+  await openEditor(page)
+  await page
+    .getByTestId('content-photo-upload')
+    .setInputFiles({ name: 'IMG_0002.HEIC', mimeType: 'application/octet-stream', buffer: heic })
+  await expect(editorPage(page).locator('[data-kind="photo"] img')).toHaveAttribute(
+    'src',
+    /^blob:/,
+    { timeout: 20_000 },
+  )
+  await expect(editor(page).getByRole('alert')).toHaveCount(0)
+})
+
 test('foto isi surat mengisi slot template dan tetap ada setelah dimuat ulang', async ({
   page,
 }) => {
@@ -113,4 +129,49 @@ test('foto isi surat mengisi slot template dan tetap ada setelah dimuat ulang', 
   await page.reload()
   await expect(cardPage(page).locator('[data-kind="photo"] img')).toHaveAttribute('src', /^blob:/)
   await expect(page.getByText('1 foto', { exact: true })).toBeVisible()
+})
+
+test('cubit dua jari memperbesar dan memutar elemen yang dipilih', async ({ page }) => {
+  test.skip(
+    test.info().project.name !== 'android',
+    'Sentuhan dua jari lewat CDP, butuh layar sentuh',
+  )
+  await page.getByRole('textbox', { name: 'Isi surat' }).fill('Halo dicubit')
+  await openEditor(page)
+  // Di layar sentuh petunjuknya menyebut cubit dua jari, bukan pegangan.
+  await expect(editor(page).getByText(/cubit dua jari/)).toBeVisible()
+  await expect(editor(page).getByText(/tarik titik atas/)).toBeHidden()
+  const item = editorPage(page).locator('[data-kind="text"]').first()
+  await item.click()
+  await expect(item).toHaveAttribute('aria-pressed', 'true')
+  const width = async () => Number(/width: ([\d.]+)%/.exec((await item.getAttribute('style'))!)![1])
+  const before = await width()
+  const box = (await item.boundingBox())!
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+
+  // Dua jari di sekitar teks, lalu direntangkan sambil diputar 45°.
+  const cdp = await page.context().newCDPSession(page)
+  const fingers = (radius: number, degrees: number) => {
+    const a = (degrees * Math.PI) / 180
+    return [
+      { x: cx - radius * Math.cos(a), y: cy - radius * Math.sin(a), id: 1 },
+      { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a), id: 2 },
+    ]
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: fingers(40, 0) })
+  for (let step = 1; step <= 6; step++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: fingers(40 + step * 8, step * 7.5),
+    })
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+
+  await expect(item).toHaveAttribute('style', /rotate\(45deg\)/)
+  // Lebar teks bawaan sudah besar, jadi cubitan ini mentok di lebar halaman.
+  expect(before).toBeLessThan(100)
+  expect(await width()).toBe(100)
+  // Pilihannya tetap; jari kedua tidak melepas elemen.
+  await expect(item).toHaveAttribute('aria-pressed', 'true')
 })

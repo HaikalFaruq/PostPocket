@@ -1,6 +1,7 @@
 name: Backend
 
-# Migrasi, test database, dan kontrak API. Hanya jalan kalau supabase/ atau kontraknya berubah.
+# Migrasi, test database, Edge Functions, dan kontrak API. Hanya jalan kalau supabase/, kontrak, atau
+# preset (dipakai validasi Edge Functions) berubah.
 
 on:
   push:
@@ -8,11 +9,15 @@ on:
     paths:
       - 'supabase/**'
       - 'docs/api/**'
+      - 'packages/presets/**'
+      - 'scripts/bundle-contract.sh'
       - '.github/workflows/backend.yml'
   pull_request:
     paths:
       - 'supabase/**'
       - 'docs/api/**'
+      - 'packages/presets/**'
+      - 'scripts/bundle-contract.sh'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
 
@@ -56,3 +61,46 @@ jobs:
 
       - name: Lint openapi.yaml
         run: npx --yes @redocly/cli@1 lint docs/api/openapi.yaml
+
+      - name: Bundel kontrak untuk Edge Functions sudah diperbarui
+        run: |
+          scripts/bundle-contract.sh
+          git diff --exit-code -- supabase/functions/_shared/openapi.json || {
+            echo "::error::Jalankan scripts/bundle-contract.sh lalu commit openapi.json"
+            exit 1
+          }
+
+  functions:
+    name: functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: supabase/functions
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.6
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Format, lint, dan cek tipe
+        run: |
+          deno fmt --check
+          deno lint
+          deno check letters/index.ts l/index.ts tests/
+
+      - name: Unit test
+        run: deno test tests/unit.test.ts
+
+      - name: Jalankan stack Supabase lokal
+        run: supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta
+
+      - name: Test integrasi lima endpoint
+        run: |
+          eval "$(supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY)=')"
+          API_URL="$API_URL" PUBLISHABLE_KEY="$PUBLISHABLE_KEY" deno test -A tests/api.test.ts

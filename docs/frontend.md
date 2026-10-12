@@ -41,6 +41,7 @@ apps/web/
   app/components/tv/        TvSet, CdShelf, TvSlideshow, BoothCamera, BoothResult
   app/components/pocket/    SnackPacket (kantong snack), SaveDayModal (modal simpan hari), MonthPicker
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
+  app/workers/              heic.worker.ts: HEIC ke JPEG dengan libheif, dimuat hanya saat ada foto HEIC
   app/stores/               useLetterDraft (draf surat) dan useMemories (momen, hari Pocket, album CD) di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
                             color, foil, icons) dan util browser (front-image, photo-filter), diuji di test/
@@ -167,7 +168,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
 - [x] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`, atau gambar OG bawaan kalau sudah dihapus
 - [x] Region fungsi Vercel `sin1`, dekat dengan Supabase di Singapore ([Deploy](#deploy))
-- [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
+- [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp ([cara cek](#gerbang-sprint-2))
 
 **Sprint 3 (minggu 6–7)**
 
@@ -205,6 +206,16 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 - `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: buka di domain produksi, atau `pnpm dev --host` lalu tunnel HTTPS.
 
 Domain produksi: [postpocket.vercel.app/lab/foil?bench=1](https://postpocket.vercel.app/lab/foil?bench=1) dan [postpocket.vercel.app/lab/safari](https://postpocket.vercel.app/lab/safari).
+
+## Gerbang Sprint 2
+
+Begitu Edge Function `letters` dan `l` ter-deploy, gerbangnya dicek dalam tiga langkah:
+
+1. `LIVE_BASE_URL=https://postpocket.vercel.app pnpm --filter @postpocket/web exec playwright test --project=android` menjalankan `e2e/live.spec.ts` ke backend asli: kirim surat berfoto, buka dari konteks browser baru tanpa login (seperti HP lain), cek aturan preview WhatsApp, lalu hapus suratnya lagi. Tes lain dilewati dan server lokal tidak dinyalakan. Uji ini membuat satu surat sungguhan, jadi ikut dihitung rate limit (10 surat per jam per IP).
+2. `pnpm --filter @postpocket/web check:preview <link surat>` memeriksa satu link seperti crawler WhatsApp. Syarat preview: halaman 200 tanpa login, meta OG ada di HTML dari server, gambar OG https, JPEG atau PNG, 1200×630, dan maksimal 300.000 byte. Cek privasinya: halaman surat wajib `noindex`. Aturannya di `apps/web/scripts/link-preview.mjs`, dan E2E `kirim-terima.spec.ts` ikut memakainya dengan mock.
+3. Terakhir, cek manual: kirim linknya lewat WhatsApp ke HP lain, pastikan preview (judul dan sampul) muncul dan suratnya terbuka tanpa login.
+
+Langkah 1 bisa dicoba ke server lokal dengan mock: jalankan build dengan `NUXT_MOCK_API=1 NUXT_PUBLIC_API_BASE=/mock-api`, lalu pakai `LIVE_BASE_URL=http://127.0.0.1:4320`.
 
 ## Deploy
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 
 // Hari ini dibuat tetap supaya kalender dan judul bulan bisa dicek pasti.
@@ -87,6 +88,15 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   await dialog.getByRole('radio', { name: 'Bunga sakura' }).click()
   await expect(combo).toHaveText('STROBERI / BUNGA SAKURA')
   await expect(preview.locator('.packet__sticker')).toHaveAttribute('alt', 'Bunga sakura')
+  // Nama kombinasi tidak tertimpa kantong, termasuk di layar HP yang sempit.
+  const packetBox = (await packet.boundingBox())!
+  const comboBox = (await combo.boundingBox())!
+  const overlaps =
+    comboBox.x < packetBox.x + packetBox.width &&
+    packetBox.x < comboBox.x + comboBox.width &&
+    comboBox.y < packetBox.y + packetBox.height &&
+    packetBox.y < comboBox.y + comboBox.height
+  expect(overlaps).toBe(false)
 
   // Foto pertama langsung menyelip di depan kantong, dengan bingkai pilihan.
   await page.getByTestId('moment-upload').setInputFiles(await photos(page, [20, 200]))
@@ -107,6 +117,49 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   await expect(savedCount(page)).toHaveText('1 hari tersimpan')
 })
 
+test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ page }) => {
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await page.getByTestId('moment-upload').setInputFiles(await photos(page, [20]))
+  await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
+
+  page.once('dialog', (confirm) => confirm.dismiss())
+  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(dialog).toBeVisible()
+
+  // Back di HP juga bertanya dulu, dan tidak meninggalkan Pocket.
+  page.once('dialog', (confirm) => confirm.dismiss())
+  await page.goBack()
+  await expect(dialog).toBeVisible()
+  await expect(page).toHaveURL(/\/pocket$/)
+
+  page.once('dialog', (confirm) => confirm.accept())
+  await page.goBack()
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/\/pocket$/)
+  await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
+})
+
+test('foto yang ditambah ke kantong kosong langsung bisa dikirim sebagai surat', async ({
+  page,
+}) => {
+  // Kantong disimpan tanpa foto, lalu fotonya ditambah setelah kantong disobek.
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: /^Simpan/ }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.goto(`/pocket/${TODAY}`)
+  await page.getByRole('button', { name: 'Buka kantong' }).click()
+  const send = page.getByRole('button', { name: 'Kirim sebagai surat' })
+  await expect(send).toBeDisabled()
+  await page.getByLabel('Tambah foto ke kantong').setInputFiles(await photos(page, [20]))
+  await expect(page.getByTestId('moment')).toHaveCount(1)
+  await expect(send).toBeEnabled()
+})
+
 test('buka kantong: disobek, foto keluar, lalu dikirim sebagai surat', async ({ page }) => {
   await page.goto('/pocket')
   await saveDay(page, TODAY, [20, 200])
@@ -119,6 +172,8 @@ test('buka kantong: disobek, foto keluar, lalu dikirim sebagai surat', async ({ 
   await expect(day).toHaveAttribute('data-torn', 'true')
   const moments = page.getByTestId('moment')
   await expect(moments).toHaveCount(2)
+  // Di HP pendek, tombol-tombolnya digulir sampai kelihatan setelah kantong disobek.
+  await expect(page.getByRole('button', { name: 'Kirim sebagai surat' })).toBeInViewport()
   await expect(moments.first()).toHaveAttribute('aria-selected', 'true')
   await expect(moments.nth(1).locator('img')).toHaveAttribute('src', /^blob:/)
 
@@ -188,6 +243,21 @@ test('foto kenangan pertama meminta penyimpanan permanen, sekali saja', async ({
   expect(await calls()).toBe(1)
 })
 
+test('latar Pocket sampai ke tepi layar dan kembali normal setelah pindah halaman', async ({
+  page,
+}) => {
+  const themeColor = page.locator('meta[name="theme-color"]')
+  await page.goto('/pocket')
+  await expect(page.locator('[data-day]').first()).toBeVisible()
+  await expect(page.locator('html')).toHaveClass(/bg-pocket-page/)
+  await expect(themeColor).toHaveAttribute('content', '#efefef')
+
+  await page.getByRole('link', { name: /PostPocket/ }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('html')).not.toHaveClass(/bg-pocket-page/)
+  await expect(themeColor).toHaveAttribute('content', '#f5f5f3')
+})
+
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({
   page,
 }) => {
@@ -199,4 +269,29 @@ test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum data
   await page.goto('/pocket/2026-10-11')
   await expect(page).toHaveURL(/\/pocket$/)
   await expect(page.getByTestId('month-label')).toHaveText('Oktober 2026')
+})
+
+test('foto HEIC bisa dipilih dan tampil, juga di browser yang tidak membuka HEIC sendiri', async ({
+  page,
+}) => {
+  // Foto HEIC asli 480×360. Chrome dan Firefox mengubahnya ke JPEG di Web Worker.
+  const heic = readFileSync(new URL('./fixtures/foto.heic', import.meta.url))
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await page
+    .getByTestId('moment-upload')
+    .setInputFiles({ name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: heic })
+  const thumb = dialog.locator('img[src^="blob:"]').first()
+  await expect
+    .poll(() => thumb.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight]), {
+      timeout: 20_000,
+    })
+    .toEqual([480, 360])
+  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.goto(`/pocket/${TODAY}`)
+  await page.getByRole('button', { name: 'Buka kantong' }).click()
+  await expect(page.getByTestId('moment')).toHaveCount(1)
 })

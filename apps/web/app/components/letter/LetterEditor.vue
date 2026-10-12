@@ -2,7 +2,14 @@
 import { byId, contentLimits, letter, type LetterElement } from '@postpocket/presets'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { MESSAGE_LIMIT } from '~/utils/letter-draft'
-import { moved, pointerAngle, scaled, snappedRotation, textSized } from '~/utils/letter-gesture'
+import {
+  moved,
+  pinched,
+  pointerAngle,
+  scaled,
+  snappedRotation,
+  textSized,
+} from '~/utils/letter-gesture'
 import { describeElement, elementStyle } from '~/utils/letter-page'
 
 /**
@@ -128,7 +135,58 @@ function begin(event: PointerEvent, element: LetterElement, kind: Gesture['kind'
   }
 }
 
+// Cubit dua jari (HP): semua penunjuk di panggung dicatat. Begitu ada dua dan ada elemen terpilih,
+// jarak, sudut, dan titik tengah keduanya mengubah ukuran, putaran, dan posisi elemen itu. Jari
+// kedua boleh mendarat di luar elemen tanpa melepas pilihan.
+interface Pinch {
+  start: LetterElement
+  distance: number
+  angle: number
+  x: number
+  y: number
+}
+const pointers = new Map<number, { x: number; y: number }>()
+let pinch: Pinch | null = null
+
+function pinchNow() {
+  const [a, b] = [...pointers.values()] as [{ x: number; y: number }, { x: number; y: number }]
+  return {
+    distance: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+    angle: pointerAngle(a.x, a.y, b.x, b.y),
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  }
+}
+
+function onStagePointerDown(event: PointerEvent) {
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  const element = draft.content.elements.find((e) => e.id === selectedId.value)
+  if (pointers.size !== 2 || !element) return
+  event.stopPropagation()
+  event.preventDefault()
+  gesture = null
+  pinch = { start: { ...element }, ...pinchNow() }
+}
+
 function onPointerMove(event: PointerEvent) {
+  if (pointers.has(event.pointerId)) {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  }
+  if (pinch) {
+    if (pointers.size < 2 || !page.value) return
+    const now = pinchNow()
+    const rect = page.value.getBoundingClientRect()
+    draft.updateElement(
+      pinch.start.id,
+      pinched(pinch.start, {
+        factor: now.distance / pinch.distance,
+        turn: now.angle - pinch.angle,
+        dx: (now.x - pinch.x) / rect.width,
+        dy: (now.y - pinch.y) / rect.height,
+      }),
+    )
+    return
+  }
   if (!gesture || !page.value) return
   const dx = event.clientX - gesture.x
   const dy = event.clientY - gesture.y
@@ -149,7 +207,13 @@ function onPointerMove(event: PointerEvent) {
   }
 }
 
-function onPointerEnd() {
+function onPointerEnd(event: PointerEvent) {
+  pointers.delete(event.pointerId)
+  if (pinch) {
+    // Cubitan selesai begitu satu jari diangkat; jari yang tersisa tidak lanjut menggeser.
+    pinch = null
+    return
+  }
   const done = gesture
   gesture = null
   if (!done || done.moved || done.kind !== 'move') return
@@ -284,7 +348,12 @@ onMounted(() => dialog.value?.focus())
       <div class="min-w-0 flex-1">
         <h2 id="content-editor-title" class="text-[15px] font-semibold">Isi surat</h2>
         <p class="text-caption text-ink-muted">
-          Geser untuk memindah, tarik pojok untuk ukuran, tarik titik atas untuk memutar.
+          <span class="pointer-coarse:hidden">
+            Geser untuk memindah, tarik pojok untuk ukuran, tarik titik atas untuk memutar.
+          </span>
+          <span class="hidden pointer-coarse:inline">
+            Geser untuk memindah, cubit dua jari untuk ukuran dan putaran.
+          </span>
         </p>
       </div>
       <button
@@ -298,7 +367,8 @@ onMounted(() => dialog.value?.focus())
 
     <div
       ref="stage"
-      class="grid min-h-0 flex-1 place-items-center overflow-hidden p-4"
+      class="grid min-h-0 flex-1 touch-none place-items-center overflow-hidden p-4"
+      @pointerdown.capture="onStagePointerDown"
       @pointerdown.self="select(null)"
     >
       <div
@@ -450,9 +520,11 @@ onMounted(() => dialog.value?.focus())
               <Icon name="plus" :size="15" /> Stiker
             </button>
           </div>
+          <!-- Di HP dua baris yang digeser ke samping (setengah kolom berikutnya mengintip), supaya
+               halaman surat di atasnya tidak tertutup; di layar lebar semua stiker kelihatan. -->
           <div
             v-if="stickersOpen"
-            class="grid grid-cols-6 gap-1 sm:grid-cols-9"
+            class="grid auto-cols-[calc((100%-1.25rem)/5.5)] grid-flow-col grid-rows-2 gap-1 overflow-x-auto overscroll-x-contain pb-1 sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-9 sm:grid-rows-none sm:overflow-visible"
             role="group"
             aria-label="Pilih stiker"
           >

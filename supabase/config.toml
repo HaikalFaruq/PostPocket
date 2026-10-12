@@ -383,8 +383,10 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+# Hanya untuk stack lokal. SUPABASE_URL di dalam container adalah alamat internal Docker, jadi
+# URL yang dikirim ke browser (signed upload, berkas publik) memakai alamat ini.
+[edge_runtime.secrets]
+PUBLIC_API_URL = "http://127.0.0.1:54321"
 
 [analytics]
 enabled = true
@@ -413,3 +415,15 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# Fungsi API surat. verify_jwt mati karena publishable key bukan JWT; apikey dicek di
+# supabase/functions/_shared/http.ts.
+[functions.letters]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/letters/index.ts"
+
+[functions.l]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/l/index.ts"

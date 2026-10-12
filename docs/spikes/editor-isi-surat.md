@@ -15,6 +15,7 @@
   - geser untuk memindah;
   - pegangan pojok untuk ukuran;
   - pegangan atas untuk memutar, menempel ke kelipatan 90° kalau dekat.
+- Cubit dua jari di HP untuk ukuran, putaran, dan posisi sekaligus. Jari kedua boleh mendarat di luar elemen yang dipilih, dan seluruh panggung editor memakai `touch-action: none` supaya browser tidak ikut memperbesar halaman. Petunjuk di header menyebut cubitan di layar sentuh dan pegangan di layar dengan mouse.
 
   Hitungannya ada di `apps/web/app/utils/letter-gesture.ts` beserta unit test-nya.
 - Keyboard:
@@ -25,5 +26,4 @@
 
 ## Belum
 
-- Cubit dua jari untuk ukuran dan putaran. Untuk sekarang lewat pegangan.
 - Ekspor halaman surat jadi gambar. Kalau dibutuhkan, gambarnya bisa disusun dari `content` di canvas biasa tanpa Konva.

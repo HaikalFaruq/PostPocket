@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { byId, letter, pocket } from '@postpocket/presets'
-import { isPocketDay, longDate } from '~/utils/calendar'
+import { isPocketDay, longDate, shortDate } from '~/utils/calendar'
 import { readExifDate } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
+import { sendPhotoToLetter } from '~/utils/pending-photo'
 
 useSeoMeta({ title: 'Kantong · PostPocket', robots: 'noindex' })
+// Sama dengan --color-pocket-page di main.css.
+usePageTint('bg-pocket-page', '#efefef')
 
 // Tanggal yang tidak ada atau belum datang kembali ke kalender.
 definePageMeta({
@@ -20,7 +23,6 @@ definePageMeta({
 const route = useRoute()
 const day = computed(() => String(route.params.date))
 const memories = useMemories()
-const draft = useLetterDraft()
 onMounted(() => memories.load())
 
 const saved = computed(() => memories.data.days[day.value])
@@ -48,9 +50,15 @@ watch(
 
 const torn = ref(false)
 const selected = ref<string | null>(null)
+const actions = ref<HTMLElement | null>(null)
 function tear() {
   torn.value = true
   selected.value ??= saved.value?.moments[0] ?? null
+  // Di HP yang pendek, foto dan tombolnya muncul di bawah kantong; gulir sampai kelihatan.
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  nextTick(() =>
+    actions.value?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' }),
+  )
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -72,6 +80,9 @@ async function onFiles(event: Event) {
     }
     const ids = await memories.addMoments(photos, { day: day.value, source: 'upload' })
     await memories.saveDay({ ...saved.value, moments: [...saved.value.moments, ...ids] })
+    // Kantong yang tadinya kosong: foto pertama langsung terpilih, supaya "Kirim sebagai surat"
+    // tidak tetap nonaktif tanpa penjelasan.
+    selected.value ??= ids[0] ?? null
   } catch (problem) {
     error.value = problem instanceof PhotoError ? problem.message : 'Foto gagal disimpan.'
   } finally {
@@ -84,14 +95,7 @@ async function sendAsLetter() {
   const id = selected.value
   if (!id) return
   const photo = await memories.photo(id)
-  if (!photo) return
-  await draft.load()
-  if (!draft.addPhoto(photo)) {
-    error.value = 'Surat sudah berisi 4 foto. Hapus satu dulu di editor isi surat.'
-    return
-  }
-  await draft.save()
-  await navigateTo('/letter/new')
+  if (photo) await sendPhotoToLetter(photo, `Pocket ${shortDate(day.value)}`)
 }
 
 const editOpen = ref(false)
@@ -162,14 +166,14 @@ const editOpen = ref(false)
             Kantong ini masih kosong. Tambahkan foto pertamamu.
           </p>
 
-          <div class="mt-2 flex flex-wrap justify-center gap-2">
+          <div ref="actions" class="mt-2 flex scroll-mb-6 flex-wrap justify-center gap-2">
             <button
               type="button"
               class="pocket-action"
               :disabled="busy"
               @click="fileInput?.click()"
             >
-              <Icon name="plus" :size="15" /> Tambah foto
+              <Icon name="plus" :size="15" /> {{ busy ? 'Menyiapkan foto…' : 'Tambah foto' }}
             </button>
             <button type="button" class="pocket-action" @click="editOpen = true">
               Ganti desain kantong

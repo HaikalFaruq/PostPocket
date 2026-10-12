@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { previewProblems } from './preview'
 
 // Alur kirim dan buka surat lewat mock API (server/routes/mock-api).
 
@@ -16,7 +17,7 @@ async function sendFromEditor(page: Page, message: string): Promise<string> {
 
 const slugOf = (url: string) => url.split('/l/')[1]!
 
-test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, request }) => {
+test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, browser, request }) => {
   const url = await sendFromEditor(page, 'Halo dari E2E')
   const slug = slugOf(url)
 
@@ -25,23 +26,70 @@ test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, request }) =
   expect(response?.headers()['x-robots-tag']).toBe('noindex')
   const ogImage = await page.locator('meta[property="og:image"]').getAttribute('content')
   expect(ogImage).toMatch(/^http.*\/mock-api\/assets\/.+\.jpg$/)
+  // Gambar OG hasil render browser memenuhi aturan preview WhatsApp.
+  expect(await previewProblems(request, url)).toEqual([])
 
-  // Membaca halaman belum menandai surat dibuka; ketukan pertama yang menandai.
-  expect((await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt).toBeNull()
-  const card = page.getByRole('button', { name: /Surat untukmu/ })
+  // Pengirim melihat pratinjau di browsernya sendiri: tidak menandai surat dibuka.
+  const openedAt = async () => (await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt
+  await expect(page.getByTestId('own-letter-note')).toContainText('pratinjau suratmu')
+  const ownCard = page.getByRole('button', { name: /Surat untukmu/ })
+  await ownCard.click()
+  await expect(ownCard).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Baca lebih besar' })).toBeVisible()
+  await expect(page.getByTestId('reply')).toHaveCount(0)
+  await page.waitForTimeout(500)
+  expect(await openedAt()).toBeNull()
+
+  // Penerima di HP lain, tanpa data pengirim. Membaca halaman belum menandai surat dibuka;
+  // ketukan pertama yang menandai.
+  const recipient = await (await browser.newContext()).newPage()
+  expect((await recipient.goto(url))?.status()).toBe(200)
+  await expect(recipient.getByTestId('own-letter-note')).toHaveCount(0)
+  expect(await openedAt()).toBeNull()
+  const card = recipient.getByRole('button', { name: /Surat untukmu/ })
   await card.click()
   await expect(card).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('letter-page')).toContainText('Halo dari E2E')
-  await expect
-    .poll(async () => (await (await request.get(`/mock-api/l/${slug}`)).json()).openedAt)
-    .not.toBeNull()
+  await expect(recipient.getByTestId('letter-page')).toContainText('Halo dari E2E')
+  // Halaman surat juga bisa dibaca selebar layar, karena di dalam kartu tulisannya kecil di HP.
+  await recipient.getByRole('button', { name: 'Baca lebih besar' }).click()
+  const reader = recipient.getByTestId('letter-reader')
+  await expect(reader).toContainText('Halo dari E2E')
+  await reader.getByRole('button', { name: 'Tutup' }).click()
+  await expect(reader).toBeHidden()
+  await expect.poll(openedAt).not.toBeNull()
 
-  await page.getByTestId('reply').click()
-  await expect(page.getByTestId('reply-banner')).toBeVisible()
-  await expect(page).toHaveURL(/\/letter\/new$/)
-  const replyUrl = await sendFromEditorFromHere(page)
+  await recipient.getByTestId('reply').click()
+  await expect(recipient.getByTestId('reply-banner')).toBeVisible()
+  await expect(recipient).toHaveURL(/\/letter\/new$/)
+  const replyUrl = await sendFromEditorFromHere(recipient)
   const reply = await (await request.get(`/mock-api/l/${slugOf(replyUrl)}`)).json()
   expect(reply.replyTo).toBe(slug)
+  await recipient.context().close()
+})
+
+test('tombol Back menutup tampilan baca, bukan meninggalkan surat', async ({ page, browser }) => {
+  const url = await sendFromEditor(page, 'Surat untuk dibaca')
+  const home = new URL('/', url).href
+  const recipient = await (await browser.newContext()).newPage()
+  await recipient.goto(home)
+  await recipient.goto(url)
+  await recipient.getByRole('button', { name: /Surat untukmu/ }).click()
+  const open = recipient.getByRole('button', { name: 'Baca lebih besar' })
+  const reader = recipient.getByTestId('letter-reader')
+
+  await open.click()
+  await expect(reader).toBeVisible()
+  await recipient.goBack()
+  await expect(reader).toBeHidden()
+  await expect(recipient).toHaveURL(url)
+
+  // Ditutup lewat tombol Tutup: Back berikutnya langsung kembali ke halaman sebelumnya.
+  await open.click()
+  await reader.getByRole('button', { name: 'Tutup' }).click()
+  await expect(reader).toBeHidden()
+  await recipient.goBack()
+  await expect(recipient).toHaveURL(home)
+  await recipient.context().close()
 })
 
 /** Kirim draf yang sedang terbuka tanpa memuat ulang halaman. */
@@ -143,4 +191,15 @@ test('slug yang tidak ada mendapat 404 dengan pesan yang jelas', async ({ page }
     'href',
     '/letter/new',
   )
+})
+
+test('link surat yang ikut tanda baca di belakangnya tetap membuka suratnya', async ({ page }) => {
+  const url = await sendFromEditor(page, 'Surat dari obrolan')
+  for (const tail of ['.', ')', '!,']) {
+    await page.goto(url + tail)
+    await expect(page).toHaveURL(url)
+    await expect(page.getByTestId('received-page')).toBeVisible()
+  }
+  // Ajakan mengetuk tampil begitu kartunya siap diketuk.
+  await expect(page.getByTestId('open-hint')).toBeVisible()
 })

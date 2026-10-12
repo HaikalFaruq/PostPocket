@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { byId, isFilledElement, letter } from '@postpocket/presets'
+import { byId, isFilledElement, letter, templateForPhotos } from '@postpocket/presets'
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
+import { looksLikeImage } from '~/utils/heic'
 import { MESSAGE_LIMIT } from '~/utils/letter-draft'
+import { takePendingPhoto, type PendingPhoto } from '~/utils/pending-photo'
+import { listSent } from '~/utils/sent-letters'
 
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
 
@@ -14,13 +17,109 @@ onMounted(async () => {
   await draft.load()
   const reply = route.query.balas
   if (typeof reply === 'string') {
-    draft.setReplyTo(reply)
     router.replace({ query: {} })
+    await startReply(reply)
+  }
+  // Foto dari "Kirim sebagai surat" (Pocket) atau "Pakai di surat" (Booth): /letter/new?foto=1.
+  // Pilihan untuk draf yang belum dikirim sudah ditanyakan di sana; kalau belum, ditanya di sini.
+  if (route.query.foto !== undefined) {
+    router.replace({ query: {} })
+    const pending = await takePendingPhoto()
+    if (!pending) return
+    const mode =
+      pending.mode ??
+      (draft.blank || draft.sent
+        ? 'new'
+        : await askDraftChoice({
+            kind: 'photo',
+            from: pending.from,
+            draft: draft.summary,
+            full: draft.photosFull,
+          }))
+    if (mode === 'new') await startWithPhoto(pending)
+    else if (mode === 'add') await addToDraft(pending)
   }
 })
 
+/**
+ * Mulai membalas surat `slug`. Draf yang belum dikirim tidak diam-diam jadi balasan, supaya
+ * isinya tidak terkirim ke orang yang salah; kalau dibatalkan, kembali ke surat tadi.
+ */
+async function startReply(slug: string) {
+  if (draft.replyTo === slug) return
+  if (draft.blank || draft.sent) {
+    if (draft.sent) await draft.reset()
+    draft.setReplyTo(slug)
+    return
+  }
+  const choice = await askDraftChoice({
+    kind: 'reply',
+    draft: draft.summary,
+    replyingElsewhere: !!draft.replyTo,
+  })
+  if (choice === 'new') await draft.reset()
+  if (choice) {
+    draft.setReplyTo(slug)
+    return
+  }
+  // router, bukan navigateTo(): kalau dibatalkan lewat Back, popstate-nya masih berjalan dan
+  // navigateTo() akan diam-diam tidak memindahkan halaman.
+  const letterPath = `/l/${encodeURIComponent(slug)}`
+  if (window.history.state?.back === letterPath) router.back()
+  else await router.replace(letterPath)
+}
+
+const notice = ref('')
+
+/**
+ * Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. Bingkainya
+ * mengikuti bentuk foto, jadi strip Booth dan foto tegak tampil utuh.
+ */
+async function startWithPhoto(pending: PendingPhoto) {
+  await draft.reset()
+  draft.setTemplate('photo-1')
+  draft.addPhoto(pending.photo)
+  draft.fitPhotos({ grow: 1.4 })
+  await draft.save()
+  notice.value = `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu buat link.`
+  open.value = true
+}
+
+/**
+ * Tambahkan foto ke draf. Kalau slot template-nya tidak cukup, tata letaknya diganti ke template
+ * dengan slot sebanyak fotonya, supaya foto baru tidak menumpuk di atas foto lama.
+ */
+async function addToDraft(pending: PendingPhoto) {
+  const id = draft.addPhoto(pending.photo)
+  if (!id) {
+    notice.value =
+      'Isi surat ini sudah berisi 4 foto. Hapus satu dulu lewat "Atur foto dan stiker".'
+    return
+  }
+  const count = draft.content.elements.filter((e) => e.kind === 'photo' && e.photo).length
+  const current = byId(letter.templates, draft.design.template)
+  const next =
+    current && current.photos >= count ? null : templateForPhotos(letter.templates, count)
+  if (next) {
+    draft.setTemplate(next.id)
+    draft.fitPhotos({ grow: count === 1 ? 1.4 : 1 })
+    // Tata letak baru bisa membuat stiker lama menutupi tulisan atau foto.
+    draft.tidyStickers()
+  } else {
+    draft.fitPhotos({ ids: [id] })
+  }
+  await draft.save()
+  notice.value = next
+    ? `Foto dari ${pending.from} ditambahkan. Tata letaknya diganti ke "${next.label}" supaya fotonya tidak bertumpuk.`
+    : `Foto dari ${pending.from} ditambahkan ke isi surat.`
+  open.value = true
+}
+
 const isDesktop = useMediaQuery('(min-width: 1024px)')
 const open = ref(false)
+const cardHint = computed(() =>
+  open.value ? 'Ketuk kartu untuk menutup' : 'Ketuk kartu untuk membuka',
+)
 const expanded = ref(true)
 const card = ref<{ turnBy: (degrees: number) => void } | null>(null)
 const busy = ref(false)
@@ -78,7 +177,7 @@ async function takeFile(file: File) {
 }
 
 function imageFile(list: FileList | null | undefined): File | undefined {
-  return [...(list ?? [])].find((file) => file.type.startsWith('image/'))
+  return [...(list ?? [])].find(looksLikeImage)
 }
 
 // Drop di mana saja di halaman.
@@ -121,8 +220,55 @@ const contentSummary = computed(() => {
   return parts.length ? parts.join(' · ') : 'Belum ada foto atau stiker.'
 })
 
-// "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG.
+// "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG. Draf yang sudah jadi link
+// cukup menampilkan link-nya lagi, dan surat kosong tidak bisa dikirim.
 const sending = ref(false)
+const emptyWarning = ref(false)
+const messageField = ref<HTMLTextAreaElement | null>(null)
+watch(
+  () => filled.value.length,
+  (count) => {
+    if (count) emptyWarning.value = false
+  },
+)
+
+function startSending() {
+  if (draft.sent) {
+    sending.value = true
+    return
+  }
+  if (!filled.value.length) {
+    emptyWarning.value = true
+    expanded.value = true
+    nextTick(() => messageField.value?.focus())
+    return
+  }
+  sending.value = true
+}
+
+// Surat yang pernah dibuat linknya di sini, supaya link lama tetap bisa disalin atau dihapus.
+const sentCount = ref(0)
+const showSent = ref(false)
+async function refreshSent() {
+  sentCount.value = (await listSent()).filter(
+    (item) => Date.parse(item.expiresAt) > Date.now(),
+  ).length
+}
+onMounted(refreshSent)
+watch(() => draft.sent, refreshSent)
+
+const sentUntil = computed(() =>
+  draft.sent
+    ? new Date(draft.sent.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' })
+    : '',
+)
+
+async function newLetter() {
+  open.value = false
+  await draft.reset()
+  notice.value = 'Surat tadi tetap bisa dibuka. Link-nya ada di "Surat terkirim".'
+  void refreshSent()
+}
 const ogCard = computed(() => ({
   art: art.value,
   foilMask: mask.value,
@@ -140,6 +286,8 @@ function closeEditor() {
   open.value = true
   nextTick(() => editorButton.value?.focus())
 }
+// Back di HP menutup editor isi surat, bukan meninggalkan halaman.
+useBackToClose(editing, closeEditor)
 
 function surpriseMe() {
   open.value = false
@@ -193,9 +341,9 @@ async function startOver() {
       </FoilCard>
       <p
         v-if="isDesktop"
-        class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-subtle"
+        class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-muted"
       >
-        Tap kartu untuk membuka · geser untuk memutar
+        {{ cardHint }} · geser untuk memutar
       </p>
       <div
         v-if="dragging"
@@ -207,7 +355,7 @@ async function startOver() {
 
     <component :is="isDesktop ? SidePanel : BottomSheet" v-bind="panelProps">
       <template #peek>
-        <p class="text-caption text-ink-subtle">Tap kartu untuk membuka</p>
+        <p class="text-caption text-ink-muted" data-testid="card-hint">{{ cardHint }}</p>
       </template>
 
       <div class="px-6 pt-6 pb-1">
@@ -215,6 +363,15 @@ async function startOver() {
         <p class="mt-1 text-ink-muted">
           Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu kirim lewat link.
         </p>
+        <button
+          v-if="sentCount"
+          type="button"
+          class="mt-2 text-caption font-semibold underline underline-offset-2"
+          data-testid="open-sent-letters"
+          @click="showSent = true"
+        >
+          Surat terkirim ({{ sentCount }})
+        </button>
         <div
           v-if="draft.replyTo"
           class="mt-3 flex items-center justify-between gap-3 rounded-control bg-fill px-3 py-2 text-caption"
@@ -228,6 +385,47 @@ async function startOver() {
           >
             Batal membalas
           </button>
+        </div>
+        <p
+          v-if="notice"
+          role="status"
+          class="mt-3 flex items-start justify-between gap-3 rounded-control bg-fill px-3 py-2 text-caption"
+          data-testid="letter-notice"
+        >
+          <span>{{ notice }}</span>
+          <button
+            type="button"
+            class="shrink-0 font-medium underline underline-offset-2"
+            @click="notice = ''"
+          >
+            Oke
+          </button>
+        </p>
+        <div
+          v-if="draft.sent"
+          class="mt-3 rounded-control bg-fill px-3 py-2.5 text-caption"
+          data-testid="sent-banner"
+        >
+          <p class="font-semibold text-ink">Surat ini sudah jadi link.</p>
+          <p class="mt-0.5 text-ink-muted">
+            Bisa dibuka sampai {{ sentUntil }}. Kalau kamu mengubahnya, nanti dibuat link baru.
+          </p>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            <button
+              type="button"
+              class="font-semibold underline underline-offset-2"
+              @click="sending = true"
+            >
+              Lihat link
+            </button>
+            <button
+              type="button"
+              class="font-semibold underline underline-offset-2"
+              @click="newLetter"
+            >
+              Bikin surat baru
+            </button>
+          </div>
         </div>
         <p
           v-if="draft.saveFailed"
@@ -303,7 +501,15 @@ async function startOver() {
 
       <StepCard :step="5" title="Isi surat">
         <PillGroup v-model="template" label="Template isi surat" :options="templateOptions" />
+        <p
+          v-if="emptyWarning"
+          role="alert"
+          class="mt-3 rounded-control bg-[#fbefd2] px-3 py-2 text-caption text-[#7a5a14]"
+        >
+          Isi suratnya masih kosong. Tulis sesuatu dulu, yuk.
+        </p>
         <textarea
+          ref="messageField"
           v-model="draft.message"
           :maxlength="MESSAGE_LIMIT"
           rows="5"
@@ -311,7 +517,7 @@ async function startOver() {
           placeholder="Tulis sesuatu untuk dia…"
           class="mt-4 block w-full resize-y rounded-control bg-surface px-3.5 py-3 font-letter text-[19px] leading-snug inset-ring inset-ring-line placeholder:text-ink-subtle focus:outline-2 focus:outline-ink"
         />
-        <p class="mt-1 text-right text-caption text-ink-subtle">
+        <p class="mt-1 text-right text-caption text-ink-muted">
           {{ draft.message.length }}/{{ MESSAGE_LIMIT }}
         </p>
         <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -339,15 +545,16 @@ async function startOver() {
       </div>
 
       <template #footer>
-        <StickyCTA :disabled="!draft.ready || maskBusy" @click="sending = true"
-          >Buat link untuk dikirim</StickyCTA
-        >
+        <StickyCTA :disabled="!draft.ready || maskBusy" @click="startSending">{{
+          draft.sent ? 'Lihat link surat' : 'Buat link untuk dikirim'
+        }}</StickyCTA>
       </template>
     </component>
 
     <Teleport to="body">
       <LetterEditor v-if="editing" @close="closeEditor" />
-      <SendLetter v-if="sending" :card="ogCard" @close="sending = false" />
+      <SendLetter v-if="sending" :card="ogCard" :existing="draft.sent" @close="sending = false" />
+      <SentLetters v-model:open="showSent" @changed="refreshSent" />
     </Teleport>
   </div>
 </template>

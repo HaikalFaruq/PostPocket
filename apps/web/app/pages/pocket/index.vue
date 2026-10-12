@@ -4,6 +4,8 @@ import { WEEKDAYS, longDate, monthGrid, shiftMonth } from '~/utils/calendar'
 import { dayKey, monthTitle } from '~/utils/memories'
 
 useSeoMeta({ title: 'Pocket · PostPocket', robots: 'noindex' })
+// Sama dengan --color-pocket-page di main.css.
+usePageTint('bg-pocket-page', '#efefef')
 
 /**
  * Kalender Pocket (PRD modul 2, referensi Day Pocket): setiap hari bisa diisi foto lalu dibungkus

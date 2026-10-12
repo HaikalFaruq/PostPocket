@@ -24,6 +24,7 @@ const frameColor = ref(pocket.frameColors[0]!.id)
 const customColor = ref('#c8a2c8')
 const added = shallowRef<{ photo: DraftPhoto; url: string; takenAt?: string }[]>([])
 const busy = ref(false)
+const preparing = ref(false)
 const error = ref('')
 const existingUrl = ref<string | null>(null)
 
@@ -79,6 +80,7 @@ async function onFiles(event: Event) {
   input.value = ''
   if (!files.length) return
   busy.value = true
+  preparing.value = true
   error.value = ''
   const next = [...added.value]
   for (const file of files) {
@@ -92,6 +94,7 @@ async function onFiles(event: Event) {
   }
   added.value = next
   busy.value = false
+  preparing.value = false
 }
 
 function removeAdded(index: number) {
@@ -134,20 +137,40 @@ async function save() {
   }
 }
 
+/** Foto yang sudah dipilih tapi belum disimpan tidak dibuang tanpa bertanya. */
+function setOpen(next: boolean) {
+  if (!next && added.value.length && !busy.value) {
+    if (!window.confirm('Foto yang kamu pilih belum disimpan. Tetap tutup?')) return
+    clearAdded()
+  }
+  open.value = next
+}
+
+// Back di HP menutup modal dengan pertanyaan yang sama, bukan meninggalkan Pocket.
+useBackToClose(open, () => {
+  setOpen(false)
+  return !open.value
+})
+
 onBeforeUnmount(clearAdded)
 </script>
 
 <template>
   <Modal
-    v-model:open="open"
+    :open="open"
     tone="pocket"
     eyebrow="Kapsul waktu kecilmu"
     :title="existing ? 'Ganti desain kantong' : 'Simpan satu hari kecil'"
     :description="longDate(day)"
+    @update:open="setOpen"
   >
     <template #preview>
-      <div class="grid h-full place-items-center" data-testid="packet-preview">
-        <div class="w-[min(62%,300px)] pt-6">
+      <!-- Di HP nama kombinasi ada di bawah kantong; di layar lebar di pojok kiri bawah. -->
+      <div
+        class="flex h-full flex-col items-center justify-center gap-4"
+        data-testid="packet-preview"
+      >
+        <div class="w-[min(56%,300px)] pt-6">
           <SnackPacket
             :color="packetColor.color"
             :sticker="stickerItem"
@@ -156,13 +179,13 @@ onBeforeUnmount(clearAdded)
             :photo-url="previewPhoto"
           />
         </div>
+        <p
+          class="font-mono text-[11px] tracking-[0.18em] text-pocket-muted md:absolute md:bottom-5 md:left-6"
+          data-testid="combo-name"
+        >
+          {{ comboName }}
+        </p>
       </div>
-      <p
-        class="absolute bottom-5 left-6 font-mono text-[11px] tracking-[0.18em] text-pocket-muted"
-        data-testid="combo-name"
-      >
-        {{ comboName }}
-      </p>
     </template>
 
     <StepCard :step="1" title="Warna kantong" :hint="packetColor.label" variant="card">
@@ -252,6 +275,9 @@ onBeforeUnmount(clearAdded)
           <Icon name="plus" :size="18" />
         </button>
       </div>
+      <p v-if="preparing" class="mt-2 text-caption text-ink-muted" aria-live="polite">
+        Menyiapkan foto… Foto HEIC butuh beberapa detik.
+      </p>
       <p v-if="existing?.moments.length" class="mt-2 text-caption text-ink-muted">
         Sudah ada {{ existing.moments.length }} foto di kantong ini.
       </p>
@@ -270,7 +296,7 @@ onBeforeUnmount(clearAdded)
     </StepCard>
 
     <template #footer>
-      <button type="button" class="text-body text-ink-muted hover:text-ink" @click="open = false">
+      <button type="button" class="text-body text-ink-muted hover:text-ink" @click="setOpen(false)">
         Nanti saja
       </button>
       <button

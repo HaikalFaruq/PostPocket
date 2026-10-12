@@ -3,4 +3,5 @@
   <NuxtRouteAnnouncer />
   <NuxtPage />
   <PwaUpdateToast />
+  <DraftChoiceDialog />
 </template>
