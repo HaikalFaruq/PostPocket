@@ -12,7 +12,12 @@ import { sendPhotoToLetter } from '~/utils/pending-photo'
  * bersama oleh Pocket dan CD.
  */
 const props = defineProps<{ shots: HTMLCanvasElement[]; layout: BoothLayout }>()
-const emit = defineEmits<{ close: []; retake: [] }>()
+const emit = defineEmits<{
+  close: []
+  retake: []
+  /** Hasilnya masuk CD: rak TV memilih CD itu dan menandai foto barunya. */
+  cd: [albumId: string, moments: string[]]
+}>()
 const memories = useMemories()
 
 const frameColor = ref(pocket.frameColors[0]!.id)
@@ -101,6 +106,7 @@ const putInCd = () =>
     await memories.addToAlbum(album.id, ids)
     saved.cd = true
     message.value = 'Masuk ke CD Photo Booth.'
+    emit('cd', album.id, ids)
   })
 
 const useInLetter = () =>
@@ -154,7 +160,7 @@ function focusPrimary(event: Event) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="booth-result-title"
-        class="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-[24px] bg-surface p-5"
+        class="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-[24px] bg-surface p-5 *:shrink-0"
       >
         <div class="flex items-center justify-between">
           <h2 id="booth-result-title" class="text-title">Hasil Booth</h2>
