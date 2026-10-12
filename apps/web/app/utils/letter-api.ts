@@ -245,6 +245,10 @@ async function failure(response: Response): Promise<LetterApiError> {
   )
 }
 
+/** Gangguan yang biasanya hilang sendiri: koneksi yang diputus atau error server (5xx). */
+const transient = (problem: unknown) =>
+  problem instanceof LetterApiError && (problem.code === 'network' || (problem.status ?? 0) >= 500)
+
 /**
  * Klien lima endpoint surat. `base` adalah URL absolut fungsi Supabase (atau mock), dan setiap
  * request membawa publishable key di header `apikey`. Unggahan memakai `signedUrl` apa adanya.
@@ -253,6 +257,8 @@ export function createLetterApi(options: {
   base: string
   apiKey: string
   fetch?: typeof globalThis.fetch
+  /** Jeda sebelum GET surat dicoba sekali lagi, dalam milidetik. */
+  retryDelay?: number
 }): LetterApi {
   const base = options.base.replace(/\/$/, '')
   const run = options.fetch ?? globalThis.fetch.bind(globalThis)
@@ -286,7 +292,19 @@ export function createLetterApi(options: {
     // diulang (misalnya setelah koneksi putus) tetap berhasil. Endpoint lain tidak punya 409.
     publish: (id, editToken) =>
       call('POST', `/letters/${encodeURIComponent(id)}/publish`, { editToken, alsoOk: 409 }),
-    get: (slug) => call('GET', `/l/${encodeURIComponent(slug)}`),
+    // Penerima jangan sampai melihat "Surat belum bisa dimuat" (atau WhatsApp gagal membaca
+    // preview) karena satu gangguan sesaat, misalnya koneksi lama yang sudah diputus server saat
+    // halaman di-SSR. Membaca surat aman diulang, jadi GET dicoba sekali lagi.
+    async get(slug) {
+      const path = `/l/${encodeURIComponent(slug)}`
+      try {
+        return await call<Letter>('GET', path)
+      } catch (problem) {
+        if (!transient(problem)) throw problem
+        await new Promise((resolve) => setTimeout(resolve, options.retryDelay ?? 400))
+        return call<Letter>('GET', path)
+      }
+    },
     open: (slug) => call('POST', `/l/${encodeURIComponent(slug)}/open`),
     remove: (id, editToken) => call('DELETE', `/letters/${encodeURIComponent(id)}`, { editToken }),
     async upload(target, file) {
