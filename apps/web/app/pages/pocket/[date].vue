@@ -78,6 +78,9 @@ async function onFiles(event: Event) {
     }
     const ids = await memories.addMoments(photos, { day: day.value, source: 'upload' })
     await memories.saveDay({ ...saved.value, moments: [...saved.value.moments, ...ids] })
+    // Kantong yang tadinya kosong: foto pertama langsung terpilih, supaya "Kirim sebagai surat"
+    // tidak tetap nonaktif tanpa penjelasan.
+    selected.value ??= ids[0] ?? null
   } catch (problem) {
     error.value = problem instanceof PhotoError ? problem.message : 'Foto gagal disimpan.'
   } finally {
