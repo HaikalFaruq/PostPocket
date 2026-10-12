@@ -52,12 +52,30 @@ export default defineNuxtConfig({
   },
 
   fonts: {
-    // Huruf Latin saja (Indonesia dan nama berhuruf aksen). Tanpa ini setiap ketebalan Inter ikut
+    // Huruf Latin saja (Indonesia dan nama berhuruf aksen). Tanpa ini setiap ketebalan ikut
     // membawa @font-face Cyrillic, Yunani, dan Vietnam, dan CSS awal yang memblokir render jadi
     // sepertiganya deklarasi font.
-    defaults: { subsets: ['latin', 'latin-ext'] },
+    // Font cadangan diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), supaya teks
+    // tidak melompat saat font aslinya selesai dimuat.
+    defaults: {
+      subsets: ['latin', 'latin-ext'],
+      fallbacks: {
+        'sans-serif': ['Arial', 'Roboto'],
+        'ui-sans-serif': ['Arial', 'Roboto'],
+        cursive: ['Arial', 'Roboto'],
+      },
+    },
+    priority: ['google'],
     families: [
-      { name: 'Bricolage Grotesque', provider: 'google', weights: [400, 500, 600, 700, 800] },
+      // Huruf antarmuka (docs/desain.md). Variabel, jadi satu berkas latin untuk semua ketebalan,
+      // dan di-preload karena dipakai di layar pertama. Sengaja tanpa `provider`: dengan provider,
+      // font cadangan di atas diganti kategori Google-nya (`sans-serif`) yang tidak punya ukuran.
+      {
+        name: 'Bricolage Grotesque',
+        weights: [400, 500, 600, 700, 800],
+        subsets: ['latin'],
+        preload: true,
+      },
       { name: 'Caveat', provider: 'google', weights: [400, 500, 600] },
       { name: 'VT323', provider: 'google', weights: [400] },
     ],
