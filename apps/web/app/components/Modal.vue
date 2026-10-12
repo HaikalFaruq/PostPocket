@@ -44,7 +44,7 @@ const open = defineModel<boolean>('open', { default: false })
             <p
               v-if="eyebrow"
               class="font-mono text-[11px] tracking-[0.2em] uppercase"
-              :class="tone === 'pocket' ? 'text-pocket-muted' : 'text-ink-subtle'"
+              :class="tone === 'pocket' ? 'text-pocket-muted' : 'text-ink-muted'"
             >
               {{ eyebrow }}
             </p>

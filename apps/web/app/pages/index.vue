@@ -56,7 +56,7 @@ const open = ref(false)
 
     <main class="grid flex-1 items-center gap-10 py-6 lg:grid-cols-[1fr_1.05fr] lg:py-10">
       <div>
-        <p class="font-mono text-[11px] tracking-[0.2em] text-ink-subtle uppercase">
+        <p class="font-mono text-[11px] tracking-[0.2em] text-ink-muted uppercase">
           Booth · Pocket · Letter
         </p>
         <h1
@@ -120,21 +120,16 @@ const open = ref(false)
             </template>
           </ClientOnly>
         </div>
-        <figcaption class="mt-2 text-caption text-ink-subtle">
-          Contoh surat · tap untuk membuka, geser untuk memutar
+        <figcaption class="mt-2 text-caption text-ink-muted">
+          Contoh surat · ketuk untuk membuka, geser untuk memutar
         </figcaption>
       </figure>
     </main>
 
     <InstallCard class="mb-6 max-w-md" />
 
-    <footer
-      class="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft py-5 text-caption text-ink-subtle"
-    >
-      <p>Masih Sprint 0 · beta tertutup sekitar minggu ke-10</p>
-      <NuxtLink to="/lab" class="underline underline-offset-2 hover:text-ink"
-        >Lab komponen</NuxtLink
-      >
+    <footer class="border-t border-line-soft py-5 text-caption text-ink-muted">
+      <p>Versi beta · foto, kantong, dan draf suratmu tersimpan di perangkat ini.</p>
     </footer>
   </div>
 </template>
