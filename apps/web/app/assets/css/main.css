@@ -133,6 +133,32 @@
   background: var(--airmail);
 }
 
+/* Jepitan kayu Pocket: dipakai kantong dan sel kalender yang masih menunggu kantong. */
+@utility clothespin {
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--color-pocket-wood),
+    #f3e0bb 45%,
+    var(--color-pocket-wood)
+  );
+  box-shadow:
+    0 2px 4px rgb(24 32 74 / 0.22),
+    inset 0 -2px 0 rgb(74 59 48 / 0.15);
+
+  /* Per besi di tengah jepitan. */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 38%;
+    left: -18%;
+    right: -18%;
+    height: max(1px, 9%);
+    border-radius: 2px;
+    background: #b9bcc4;
+  }
+}
+
 @layer base {
   html {
     background-color: var(--color-canvas);

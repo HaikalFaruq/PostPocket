@@ -70,7 +70,7 @@ const strip = polygon(teeth(0, 2.4), ragged)
         <div class="packet__band packet__band--top" />
         <div class="packet__gloss" />
       </div>
-      <span class="packet__clip" />
+      <span class="packet__clip clothespin" />
     </div>
     <div v-if="!mini && photoUrl" class="packet__photo">
       <PhotoFrame :variant="frame" :color="frameColor" :src="photoUrl" />
@@ -176,27 +176,6 @@ const strip = polygon(teeth(0, 2.4), ragged)
   left: 45%;
   width: 10%;
   height: 20%;
-  border-radius: 3px;
-  background: linear-gradient(
-    to right,
-    var(--color-pocket-wood),
-    #f3e0bb 45%,
-    var(--color-pocket-wood)
-  );
-  box-shadow:
-    0 2px 4px rgb(74 59 48 / 0.3),
-    inset 0 -2px 0 rgb(74 59 48 / 0.15);
-}
-
-.packet__clip::after {
-  content: '';
-  position: absolute;
-  top: 38%;
-  left: -18%;
-  right: -18%;
-  height: 9%;
-  border-radius: 2px;
-  background: #b9bcc4;
 }
 
 .packet__photo {
