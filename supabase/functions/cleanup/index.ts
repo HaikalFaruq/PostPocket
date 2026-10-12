@@ -11,6 +11,7 @@ import { type AssetRow, check, db, type LetterRow, ok, secretKey } from '../_sha
 import { deleteLetters, frontIsPhoto, removeAssets } from '../_shared/files.ts'
 import { bytea, sameHash, sha256 } from '../_shared/token.ts'
 
+// Satu batch dipakai langsung di filter `.in()`, jadi jangan lebih dari IN_LIMIT di _shared/files.ts.
 const BATCH = 100
 const ROUNDS = 10
 /** Draf yang sedang di-publish tepat saat kedaluwarsa tidak dihapus di tengah jalan. */

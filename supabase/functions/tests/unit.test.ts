@@ -1,6 +1,7 @@
 // Unit test tanpa database. Jalankan dari supabase/functions: deno test tests/unit.test.ts
 
 import { assert, assertEquals, assertNotEquals, assertThrows } from '@std/assert'
+import { chunks } from '../_shared/files.ts'
 import { ApiError } from '../_shared/http.ts'
 import { imageInfo, stripMetadata } from '../_shared/image.ts'
 import { ipPrefix, newSlug, sameHash, sha256 } from '../_shared/token.ts'
@@ -163,4 +164,14 @@ Deno.test('ipPrefix memotong IPv6 ke /64 dan membiarkan IPv4', () => {
   assertEquals(ipPrefix('2001:db8:abcd:12:1:2:3:4'), '2001:db8:abcd:12::/64')
   assertEquals(ipPrefix('2001:db8::1'), '2001:db8:0:0::/64')
   assertEquals(ipPrefix('2001:DB8:0:0:ffff::1'), '2001:db8:0:0::/64')
+})
+
+Deno.test('chunks memotong daftar untuk filter .in() yang panjang', () => {
+  assertEquals(chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])
+  assertEquals(chunks([], 200), [])
+  assertEquals(chunks(Array.from({ length: 450 }, (_, i) => i), 200).map((part) => part.length), [
+    200,
+    200,
+    50,
+  ])
 })
