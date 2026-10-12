@@ -294,7 +294,13 @@ export function createLetterApi(options: {
       try {
         response = await run(target.signedUrl, {
           method: 'PUT',
-          headers: { 'content-type': file.type, 'x-upsert': 'false' },
+          // Tanpa cache-control, Storage menyajikan berkasnya dengan `no-cache`, jadi gambar surat
+          // diunduh ulang setiap dibuka (kontrak 0.2.1). Berkas surat tidak berubah setelah terbit.
+          headers: {
+            'content-type': file.type,
+            'x-upsert': 'false',
+            'cache-control': 'max-age=3600',
+          },
           body: file,
         })
       } catch {

@@ -130,7 +130,7 @@ describe('createLetterApi', () => {
     await expect(api.get('x')).rejects.toMatchObject({ code: 'network' })
   })
 
-  it('unggah memakai PUT ke signedUrl dengan tipe berkas', async () => {
+  it('unggah memakai PUT ke signedUrl dengan tipe berkas dan cache satu jam', async () => {
     const fetch = vi.fn(async () => respond(200, {}))
     const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch })
     const file = new Blob(['x'], { type: 'image/jpeg' })
@@ -138,7 +138,11 @@ describe('createLetterApi', () => {
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://s.test/up?token=t')
     expect(init).toMatchObject({ method: 'PUT', body: file })
-    expect(init.headers).toMatchObject({ 'content-type': 'image/jpeg' })
+    expect(init.headers).toMatchObject({
+      'content-type': 'image/jpeg',
+      'x-upsert': 'false',
+      'cache-control': 'max-age=3600',
+    })
   })
 })
 
