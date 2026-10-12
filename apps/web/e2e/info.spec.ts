@@ -23,7 +23,7 @@ test('alamat yang tidak ada mendapat halaman 404 berbahasa Indonesia', async ({ 
   expect(response?.status()).toBe(404)
   const error = page.getByTestId('error-page')
   await expect(error.getByRole('heading', { level: 1 })).toHaveText('Halaman ini tidak ada')
-  await error.getByRole('button', { name: 'Ke Beranda' }).click()
+  await error.getByRole('link', { name: 'Ke Beranda' }).click()
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 })

@@ -140,9 +140,10 @@ const formatDate = (value: string | null | undefined) =>
     </header>
 
     <main v-if="letter" class="flex flex-1 flex-col items-center">
+      <h1 class="sr-only">{{ ownLetter ? 'Pratinjau suratmu' : 'Surat untukmu' }}</h1>
       <!-- Suratnya datang dalam amplop par avion, sama dengan gambar pratinjau di chat. -->
       <div class="airmail w-full">
-        <div class="relative h-[min(60dvh,540px)] w-full rounded-[14px] bg-canvas">
+        <div class="relative h-[min(60dvh,540px)] w-full rounded-[3px] bg-canvas">
           <ClientOnly>
             <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
             <template #fallback>
@@ -209,7 +210,7 @@ const formatDate = (value: string | null | undefined) =>
       class="flex flex-1 flex-col items-center justify-center pb-16 text-center"
       data-testid="letter-missing"
     >
-      <h1 class="text-title font-semibold">
+      <h1 class="text-title">
         {{ missing ? 'Surat ini sudah tidak tersedia' : 'Surat belum bisa dimuat' }}
       </h1>
       <p class="mt-2 max-w-sm text-ink-muted">

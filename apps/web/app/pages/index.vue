@@ -26,12 +26,8 @@ const version = useRuntimeConfig().public.appVersion
 // Modul lain ditampilkan sebagai bendanya: kantong jajan Pocket dan strip foto Booth.
 const packet = pocket.packetColors[0]!
 const heart = byId(letter.stickers, 'heart')
-const shots = [
-  'linear-gradient(160deg, #f6b48f, #c9698a)',
-  'linear-gradient(160deg, #9ec5f0, #4f6fb8)',
-  'linear-gradient(160deg, #f4d35e, #e0864a)',
-  'linear-gradient(160deg, #a6d08f, #4f8f6a)',
-]
+// Satu foto contoh dengan empat filter Booth, seperti strip sungguhan.
+const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(-18deg)']
 </script>
 
 <template>
@@ -45,7 +41,9 @@ const shots = [
       <!-- Pembuka: surat contoh dalam amplop par avion, yang bisa langsung dibuka. -->
       <figure class="lg:order-2">
         <div class="airmail">
-          <div class="relative h-[min(50dvh,480px)] rounded-[14px] bg-canvas">
+          <div
+            class="relative h-[clamp(240px,40dvh,440px)] rounded-[3px] bg-canvas lg:h-[min(58dvh,520px)]"
+          >
             <ClientOnly>
               <FoilCard
                 v-model:open="open"
@@ -80,54 +78,62 @@ const shots = [
 
       <div class="lg:order-1">
         <h1
-          class="text-[42px] leading-[0.95] font-extrabold tracking-[-0.045em] text-balance sm:text-[60px]"
+          class="text-[38px] leading-[0.95] font-extrabold tracking-[-0.045em] text-balance sm:text-[60px]"
         >
           Kenangan kecil, dikirim jadi surat.
         </h1>
-        <p class="mt-5 max-w-md text-[16px] leading-relaxed text-pretty text-ink-muted">
+        <p class="mt-4 max-w-md text-[16px] leading-relaxed text-pretty text-ink-muted">
           Tulis kartu foil 3D, lalu kirim lewat satu link. Penerimanya tinggal mengetuk kartunya,
           tanpa daftar dan tanpa aplikasi.
         </p>
         <NuxtLink
           to="/letter/new"
-          class="mt-7 inline-flex h-12 items-center rounded-control bg-ink px-7 text-[15px] font-semibold text-white transition-colors hover:bg-ink/90"
+          class="mt-6 inline-flex h-12 items-center rounded-control bg-ink px-7 text-[15px] font-semibold text-white transition-colors hover:bg-ink/90"
         >
           Tulis surat
         </NuxtLink>
 
         <ul class="mt-12 max-w-md divide-y divide-line-soft border-y border-line-soft">
           <li>
-            <NuxtLink to="/pocket" class="group flex items-center gap-5 py-4">
-              <span class="w-12 shrink-0 -rotate-6 transition-transform group-hover:-rotate-2">
-                <SnackPacket :color="packet.color" :sticker="heart" mini />
+            <NuxtLink to="/pocket" class="group flex items-center gap-4 py-4">
+              <span class="grid w-14 shrink-0 place-items-center">
+                <span class="w-12 -rotate-6 transition-transform group-hover:-rotate-2">
+                  <SnackPacket :color="packet.color" :sticker="heart" mini />
+                </span>
               </span>
-              <span>
+              <span class="min-w-0 flex-1">
                 <span class="block text-[17px] font-bold tracking-[-0.02em]">Pocket</span>
                 <span class="mt-0.5 block text-ink-muted">
                   Simpan satu hal kecil setiap hari di kantong berstiker.
                 </span>
               </span>
+              <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
             </NuxtLink>
           </li>
           <li>
-            <NuxtLink to="/tv?booth=1" class="group flex items-center gap-5 py-4">
-              <span
-                class="booth-mini w-9 shrink-0 rotate-6 transition-transform group-hover:rotate-2"
-                aria-hidden="true"
-              >
+            <NuxtLink to="/tv?booth=1" class="group flex items-center gap-4 py-4">
+              <span class="grid w-14 shrink-0 place-items-center">
                 <span
-                  v-for="shot in shots"
-                  :key="shot"
-                  class="booth-mini__shot"
-                  :style="{ background: shot }"
-                />
+                  class="booth-mini w-8 rotate-6 transition-transform group-hover:rotate-2"
+                  aria-hidden="true"
+                >
+                  <img
+                    v-for="filter in shots"
+                    :key="filter"
+                    src="/samples/contoh-foto.svg"
+                    alt=""
+                    class="booth-mini__shot"
+                    :style="{ filter }"
+                  />
+                </span>
               </span>
-              <span>
+              <span class="min-w-0 flex-1">
                 <span class="block text-[17px] font-bold tracking-[-0.02em]">Booth</span>
                 <span class="mt-0.5 block text-ink-muted">
                   Empat jepretan berfilter retro, langsung jadi strip foto.
                 </span>
               </span>
+              <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
             </NuxtLink>
           </li>
         </ul>
@@ -161,11 +167,14 @@ const shots = [
   padding: 4px 4px 9px;
   background-color: var(--color-white);
   border-radius: 2px;
-  box-shadow: 0 6px 12px -6px rgb(17 17 20 / 0.45);
+  box-shadow: 0 6px 12px -6px rgb(24 32 74 / 0.45);
 }
 
 .booth-mini__shot {
+  display: block;
+  width: 100%;
   aspect-ratio: 4 / 3;
+  object-fit: cover;
   border-radius: 1px;
 }
 </style>
