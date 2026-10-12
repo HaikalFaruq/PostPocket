@@ -10,6 +10,9 @@ test('Beranda menautkan halaman privasi dan lisensi', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Privasi')
   await expect(page.getByRole('main')).toContainText('30 hari')
   await expect(page.getByRole('main')).toContainText('bukan alamat IP-nya')
+  // Klaim yang dicek backend: lokasi server dan log IP di penyedia hosting.
+  await expect(page.getByRole('main')).toContainText('Supabase (Sydney, Australia)')
+  await expect(page.getByRole('main')).toContainText('log teknis mereka')
 
   await page.goto('/')
   await page.getByRole('contentinfo').getByRole('link', { name: 'Lisensi' }).click()
