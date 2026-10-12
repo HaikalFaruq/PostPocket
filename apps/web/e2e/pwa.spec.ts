@@ -121,9 +121,17 @@ test('Pocket dan TV tetap terbuka offline, lengkap dengan stiker dan kenangan di
   await context.setOffline(true)
   await page.reload()
   await expect(today).toHaveAttribute('data-saved', 'true')
+  // Stiker di kantong mini (gambar di dalam SVG kantong) tetap terbaca dari cache.
+  const sticker = await today.locator('image.packet__sticker').first().getAttribute('href')
+  expect(sticker).toMatch(/^\/stickers\//)
   await expect
-    .poll(() => today.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
-    .toBeGreaterThan(0)
+    .poll(() =>
+      page.evaluate(async (href) => {
+        const response = await fetch(href!).catch(() => null)
+        return !!response?.ok && (await response.blob()).size > 0
+      }, sticker),
+    )
+    .toBe(true)
   await page.goto('/tv')
   await expect(page.getByTestId('tv-idle')).toContainText('NO SIGNAL')
   await context.setOffline(false)

@@ -1,12 +1,31 @@
 <script setup lang="ts">
 import type { Sticker } from '@postpocket/presets'
+import { packetTones } from '~/utils/color'
+import { FOLDS, GROOVES, PACKET_SHAPE, wedge } from '~/utils/packet-art'
+import {
+  PACKET_H,
+  PACKET_W,
+  SEAL,
+  TEAR_Y,
+  liftAt,
+  regionPath,
+  tearBoundary,
+  tearProgress,
+  tornPath,
+  type Tear,
+} from '~/utils/packet-tear'
 
 /**
- * Kantong snack mengilap ala Day Pocket: tepi bergerigi, kilau plastik, stiker di depan, digantung
- * jepitan kayu, dan foto berbingkai yang menyelip di depannya. Versi `mini` untuk sel kalender.
- * `torn` menyobek pita atasnya: pita dan jepitan terlepas, kantong tersisa dengan tepi sobek.
+ * Kantong snack foil (pillow pack) yang digambar sendiri dalam SVG: segel bergerigi beralur di atas
+ * dan bawah, badan menggembung dengan sisi tertarik ke dalam, kerutan di empat sudut, dan kilau
+ * plastik. Warnanya hanya `color`; bayangan dan kilaunya putih/hitam transparan, jadi cocok untuk
+ * warna apa pun. Digantung jepitan kayu. Versi `mini` untuk sel kalender.
+ *
+ * `tear` membelah kantong di garis sobekan yang sedang dibuat (celahnya memperlihatkan lapisan
+ * dalam foil), dan `opened` memisahkan kedua potongan: potongan atas tetap dijepit dan berayun,
+ * badan kantong turun sedikit.
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     color: string
     sticker?: Sticker
@@ -14,7 +33,10 @@ withDefaults(
     frameColor?: string
     photoUrl?: string | null
     mini?: boolean
-    torn?: boolean
+    /** Garis putus-putus dan takik: tanda tempat menggores, hanya di kantong yang bisa disobek. */
+    guide?: boolean
+    tear?: Tear | null
+    opened?: boolean
   }>(),
   {
     sticker: undefined,
@@ -22,56 +44,256 @@ withDefaults(
     frameColor: '#fbf6ec',
     photoUrl: null,
     mini: false,
-    torn: false,
+    guide: false,
+    tear: null,
+    opened: false,
   },
 )
 
-// Bentuk kantong sebagai clip-path, dalam persen kotak kantong.
-const TEETH = 14
-const xs = Array.from({ length: TEETH * 2 + 1 }, (_, i) => (i / (TEETH * 2)) * 100)
-const teeth = (y: number, depth: number) => xs.map((_, i) => (i % 2 ? y + depth : y))
-// Garis sobek tepat di bawah pita atas. Acak tapi tetap, supaya bentuknya sama setiap kali.
-const JITTER = [
-  0.6, 1.8, 0.2, 1.2, 0.9, 2, 0.4, 1.5, 0.1, 1.1, 1.9, 0.5, 1.4, 0.3, 1.7, 0.8, 1.3, 0, 1.6, 0.7,
-  1.9, 0.2, 1.2, 0.6, 1.8, 0.4, 1, 0.1, 1.5,
-]
-const ragged = xs.map((_, i) => 11 + (JITTER[i] ?? 0))
-const polygon = (top: number[], bottom: number[]) => {
-  const points = [...xs.map((x, i) => [x, top[i]!]), ...xs.map((x, i) => [x, bottom[i]!]).reverse()]
-  return `polygon(${points.map(([x, y]) => `${x!.toFixed(2)}% ${y!.toFixed(2)}%`).join(', ')})`
-}
-const crimp = polygon(teeth(0, 2.4), teeth(100, -2.4))
-const opened = polygon(ragged, teeth(100, -2.4))
-const strip = polygon(teeth(0, 2.4), ragged)
+const uid = useId()
+const ref$ = (name: string) => `${uid}-${name}`
+const url = (name: string) => `url(#${ref$(name)})`
+
+const B = PACKET_H - SEAL
+const tones = computed(() => packetTones(props.color))
+// Lipatan dari tepi ke tengah: bayangan lebar, kilau di punggung lipatan, dan kilap kecil di
+// dekat tepi tempat foil paling melengkung.
+const foldShadows = FOLDS.map((fold) => wedge(fold, 1.25))
+const foldLights = FOLDS.map((fold) => wedge(fold, 0.8, 0.92))
+const foldGlints = FOLDS.map((fold) => wedge(fold, 0.32, 0.5))
+
+const split = computed(() => !props.mini && !!props.tear && tearProgress(props.tear) > 0.01)
+const boundary = computed(() => (props.tear ? tearBoundary(props.tear) : []))
+// Celah di bagian yang sudah sobek; setelah terbuka tidak dipakai lagi karena potongannya berpisah.
+const lift = computed(() =>
+  props.tear && !props.opened ? liftAt(props.tear, 3 + 5 * tearProgress(props.tear)) : () => 0,
+)
+const topClip = computed(() => (split.value ? regionPath(boundary.value, 'above', lift.value) : ''))
+const bodyClip = computed(() => (split.value ? regionPath(boundary.value, 'below') : ''))
+const frontEdge = computed(() => (props.tear ? tornPath(props.tear, () => 0, 0.7) : ''))
+const topEdge = computed(() => (props.tear ? tornPath(props.tear, lift.value, -0.6) : ''))
+// Lapisan belakang kantong robek sedikit lebih tinggi; terlihat di mulut kantong yang terbuka.
+const backEdge = computed(() =>
+  props.tear ? regionPath(boundary.value, 'below', (x) => 5 + Math.sin(x / 9) * 1.2) : '',
+)
 </script>
 
 <template>
   <div
     class="packet"
-    :class="{ 'packet--mini': mini, 'is-torn': torn }"
+    :class="{ 'packet--mini': mini, 'is-split': split, 'is-opened': opened }"
     :style="{ '--packet': color }"
   >
-    <div class="packet__body">
-      <div class="packet__bag" :style="{ clipPath: torn ? opened : crimp }">
-        <div class="packet__band packet__band--top" />
-        <div class="packet__gloss" />
-        <img
-          v-if="sticker"
-          class="packet__sticker"
-          :src="sticker.src"
-          :alt="mini ? '' : sticker.label"
-          draggable="false"
+    <svg
+      class="packet__art"
+      :viewBox="`0 0 ${PACKET_W} ${PACKET_H}`"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <clipPath :id="ref$('shape')">
+          <path :d="PACKET_SHAPE" />
+        </clipPath>
+        <!-- Badan menggembung seperti tabung: tepi pekat, kilau tipis di dekat tepi, tengah terang. -->
+        <linearGradient :id="ref$('round')" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" :stop-color="tones.deeper" />
+          <stop offset="0.035" :stop-color="tones.deep" />
+          <stop offset="0.08" :stop-color="tones.light" />
+          <stop offset="0.13" :stop-color="tones.base" />
+          <stop offset="0.27" :stop-color="tones.soft" />
+          <stop offset="0.4" :stop-color="tones.base" />
+          <stop offset="0.64" :stop-color="tones.base" />
+          <stop offset="0.78" :stop-color="tones.soft" />
+          <stop offset="0.87" :stop-color="tones.light" />
+          <stop offset="0.93" :stop-color="tones.deep" />
+          <stop offset="1" :stop-color="tones.deeper" />
+        </linearGradient>
+        <!-- Bayangan di bawah segel atas dan di atas segel bawah, tempat foil tertarik. -->
+        <linearGradient :id="ref$('pinch')" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0.083" :stop-color="tones.deep" stop-opacity="0.8" />
+          <stop offset="0.13" :stop-color="tones.deep" stop-opacity="0.3" />
+          <stop offset="0.22" :stop-color="tones.deep" stop-opacity="0" />
+          <stop offset="0.76" :stop-color="tones.deep" stop-opacity="0" />
+          <stop offset="0.87" :stop-color="tones.deep" stop-opacity="0.32" />
+          <stop offset="0.917" :stop-color="tones.deep" stop-opacity="0.75" />
+        </linearGradient>
+        <radialGradient :id="ref$('dome')" cx="0.46" cy="0.36" r="0.44">
+          <stop offset="0" :stop-color="tones.light" stop-opacity="0.75" />
+          <stop offset="0.5" :stop-color="tones.light" stop-opacity="0.25" />
+          <stop offset="1" :stop-color="tones.light" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient :id="ref$('seal-top')" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" :stop-color="tones.soft" />
+          <stop offset="1" :stop-color="tones.deep" />
+        </linearGradient>
+        <linearGradient :id="ref$('seal-bottom')" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" :stop-color="tones.deep" />
+          <stop offset="1" :stop-color="tones.base" />
+        </linearGradient>
+        <linearGradient :id="ref$('inside')" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#cfd7de" />
+          <stop offset="0.4" stop-color="#f4f7f9" />
+          <stop offset="0.7" stop-color="#dfe6eb" />
+          <stop offset="1" stop-color="#c3ccd4" />
+        </linearGradient>
+        <filter :id="ref$('blur-s')" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="1.1" />
+        </filter>
+        <filter :id="ref$('blur-m')" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2.4" />
+        </filter>
+        <filter :id="ref$('lift')" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.24" />
+        </filter>
+
+        <g :id="ref$('art')">
+          <g :clip-path="url('shape')">
+            <rect :width="PACKET_W" :height="PACKET_H" :fill="url('round')" />
+            <rect :width="PACKET_W" :height="PACKET_H" :fill="url('pinch')" />
+            <template v-if="!mini">
+              <g :filter="url('blur-m')" :fill="tones.deep" fill-opacity="0.55">
+                <path v-for="d in foldShadows" :key="d" :d="d" transform="translate(0.8 2.6)" />
+              </g>
+              <g :filter="url('blur-s')">
+                <path
+                  v-for="d in foldLights"
+                  :key="d"
+                  :d="d"
+                  :fill="tones.light"
+                  fill-opacity="0.9"
+                />
+                <path v-for="d in foldGlints" :key="d" :d="d" fill="#fff" fill-opacity="0.42" />
+              </g>
+            </template>
+            <rect :width="PACKET_W" :height="PACKET_H" :fill="url('dome')" />
+            <!-- Segel atas dan bawah: rata, beralur, dengan lipatan ke badan kantong. -->
+            <rect :width="PACKET_W" :height="SEAL" :fill="url('seal-top')" />
+            <rect :y="B" :width="PACKET_W" :height="SEAL" :fill="url('seal-bottom')" />
+            <g v-if="!mini" fill="none">
+              <path
+                v-for="y in GROOVES"
+                :key="`d${y}`"
+                :d="`M0 ${y} H200 M0 ${PACKET_H - y} H200`"
+                :stroke="tones.deeper"
+                stroke-opacity="0.35"
+                stroke-width="0.9"
+              />
+              <path
+                v-for="y in GROOVES"
+                :key="`l${y}`"
+                :d="`M0 ${y + 1.2} H200 M0 ${PACKET_H - y + 1.2} H200`"
+                :stroke="tones.light"
+                stroke-opacity="0.7"
+                stroke-width="0.7"
+              />
+            </g>
+            <path
+              :d="`M0 ${SEAL} H200 M0 ${B} H200`"
+              :stroke="tones.deeper"
+              stroke-opacity="0.45"
+              fill="none"
+            />
+            <path
+              :d="`M0 ${SEAL + 1.5} H200 M0 ${B - 1.5} H200`"
+              :stroke="tones.light"
+              stroke-opacity="0.55"
+              fill="none"
+            />
+            <image
+              v-if="sticker"
+              class="packet__sticker"
+              :href="sticker.src"
+              x="54"
+              y="102"
+              width="92"
+              height="92"
+              preserveAspectRatio="xMidYMid meet"
+              transform="rotate(-6 100 148)"
+              :filter="mini ? undefined : url('lift')"
+            />
+            <!-- Kilau plastik juga lewat di atas stiker, seperti dicetak di foil. -->
+            <ellipse
+              v-if="!mini"
+              cx="88"
+              cy="122"
+              rx="16"
+              ry="46"
+              transform="rotate(32 88 122)"
+              fill="#fff"
+              fill-opacity="0.16"
+              :filter="url('blur-m')"
+            />
+          </g>
+        </g>
+
+        <clipPath :id="ref$('top')">
+          <path :d="topClip" />
+        </clipPath>
+        <clipPath :id="ref$('body')">
+          <path :d="bodyClip" />
+        </clipPath>
+        <clipPath :id="ref$('back')">
+          <path :d="backEdge" />
+        </clipPath>
+      </defs>
+
+      <template v-if="!split">
+        <use :href="`#${ref$('art')}`" />
+        <!-- Garis putus-putus dan takik: tempat jari menggores untuk menyobek. -->
+        <path
+          v-if="guide && !mini"
+          class="packet__guide"
+          :d="`M9 ${TEAR_Y} H191`"
+          stroke="#fff"
+          stroke-opacity="0.7"
+          stroke-dasharray="3.2 3.2"
+          fill="none"
         />
-        <div class="packet__band packet__band--bottom" />
-      </div>
-    </div>
-    <div class="packet__lid" aria-hidden="true">
-      <div v-if="!mini" class="packet__bag packet__strip" :style="{ clipPath: strip }">
-        <div class="packet__band packet__band--top" />
-        <div class="packet__gloss" />
-      </div>
-      <span class="packet__clip clothespin" />
-    </div>
+      </template>
+      <template v-else>
+        <!-- Celah sobekan memperlihatkan lapisan dalam foil yang keperakan. -->
+        <rect
+          v-if="!opened"
+          :y="TEAR_Y - 30"
+          :width="PACKET_W"
+          height="60"
+          :fill="url('inside')"
+          :clip-path="url('shape')"
+        />
+        <g class="packet__body">
+          <g :clip-path="url('shape')">
+            <rect
+              v-if="opened"
+              :width="PACKET_W"
+              :height="PACKET_H"
+              :fill="url('inside')"
+              :clip-path="url('back')"
+            />
+          </g>
+          <use :href="`#${ref$('art')}`" :clip-path="url('body')" />
+          <path
+            :d="frontEdge"
+            fill="none"
+            stroke="#fff"
+            stroke-opacity="0.95"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+          />
+        </g>
+        <g class="packet__top">
+          <use :href="`#${ref$('art')}`" :clip-path="url('top')" />
+          <path
+            :d="topEdge"
+            fill="none"
+            stroke="#fff"
+            stroke-opacity="0.9"
+            stroke-width="1.3"
+            stroke-linejoin="round"
+          />
+        </g>
+      </template>
+    </svg>
+    <span class="packet__clip clothespin" aria-hidden="true" />
     <div v-if="!mini && photoUrl" class="packet__photo">
       <PhotoFrame :variant="frame" :color="frameColor" :src="photoUrl" />
     </div>
@@ -82,160 +304,88 @@ const strip = polygon(teeth(0, 2.4), ragged)
 .packet {
   position: relative;
   width: 100%;
-  aspect-ratio: 0.74;
+  aspect-ratio: 200 / 290;
 }
 
-/* Bayangan di pembungkus: clip-path dijalankan setelah filter, jadi tidak bisa di elemen yang sama. */
-.packet__body {
+.packet__art {
   position: absolute;
   inset: 0;
-  filter: drop-shadow(0 12px 16px rgb(17 17 20 / 0.22));
-}
-
-.packet__bag {
-  position: absolute;
-  inset: 4% 6% 0;
-  overflow: hidden;
-  background:
-    linear-gradient(
-      100deg,
-      transparent 16%,
-      rgb(255 255 255 / 0.5) 25%,
-      transparent 34%,
-      transparent 62%,
-      rgb(255 255 255 / 0.28) 69%,
-      transparent 76%
-    ),
-    linear-gradient(
-      to right,
-      rgb(0 0 0 / 0.14),
-      transparent 14%,
-      transparent 86%,
-      rgb(0 0 0 / 0.16)
-    ),
-    var(--packet);
-}
-
-.packet__band {
-  position: absolute;
-  inset-inline: 0;
-  height: 11%;
-  background:
-    repeating-linear-gradient(to right, rgb(0 0 0 / 0.08) 0 2px, transparent 2px 6px),
-    rgb(255 255 255 / 0.12);
-}
-
-.packet__band--top {
-  top: 0;
-  border-bottom: 1.5px dashed rgb(255 255 255 / 0.65);
-}
-
-.packet__band--bottom {
-  bottom: 0;
-}
-
-.packet__gloss {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgb(255 255 255 / 0.3),
-    transparent 24%,
-    transparent 76%,
-    rgb(0 0 0 / 0.12)
-  );
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 14px 14px rgb(24 32 74 / 0.2)) drop-shadow(0 2px 2px rgb(24 32 74 / 0.12));
 }
 
 .packet__sticker {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 46%;
-  transform: translate(-50%, -46%) rotate(-6deg);
-  filter: drop-shadow(0 4px 6px rgb(17 17 20 / 0.25));
   user-select: none;
-}
-
-/* Pita atas dan jepitan: satu potongan yang terlepas saat kantong disobek. */
-.packet__lid {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  transform-origin: 20% 6%;
-}
-
-.packet__strip {
-  opacity: 0;
 }
 
 .packet__clip {
   position: absolute;
-  top: -5%;
-  left: 45%;
-  width: 10%;
-  height: 20%;
+  top: -6%;
+  left: 46%;
+  z-index: 2;
+  width: 8%;
+  height: 15%;
 }
 
 .packet__photo {
   position: absolute;
-  right: -6%;
-  bottom: 5%;
+  right: -10%;
+  bottom: 4%;
   z-index: 2;
   width: 46%;
   transform: rotate(8deg);
 }
 
-/* Disobek: kantong tersentak, pita atas beserta jepitan terlepas miring lalu hilang. */
-.is-torn .packet__body {
-  animation: packet-jolt 420ms var(--ease-card);
+.packet__body,
+.packet__top {
+  transform-box: view-box;
 }
 
-.is-torn .packet__strip {
-  opacity: 1;
+/* Terbuka: badan kantong turun dan sedikit miring, potongan atas berayun di jepitannya. */
+.is-opened .packet__body {
+  transform: translateY(16px) rotate(-1.4deg);
+  transform-origin: 50% 100%;
+  transition: transform 700ms cubic-bezier(0.3, 1.45, 0.5, 1);
 }
 
-.is-torn .packet__lid {
-  animation: lid-off 760ms var(--ease-card) forwards;
+.is-opened .packet__top {
+  transform-origin: 50% 0%;
+  animation: lid-swing 1600ms ease-out;
 }
 
-@keyframes packet-jolt {
-  35% {
-    transform: translateY(2.5%) rotate(-1.2deg);
+@keyframes lid-swing {
+  15% {
+    transform: rotate(5deg);
+  }
+  40% {
+    transform: rotate(-3deg);
+  }
+  65% {
+    transform: rotate(1.4deg);
+  }
+  85% {
+    transform: rotate(-0.5deg);
   }
 }
 
-@keyframes lid-off {
-  25% {
-    opacity: 1;
-    transform: translate(-2%, -3%) rotate(-5deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-18%, -36%) rotate(-18deg);
-  }
-}
-
-.packet--mini .packet__body {
-  filter: drop-shadow(0 3px 4px rgb(17 17 20 / 0.2));
+.packet--mini .packet__art {
+  filter: drop-shadow(0 3px 3px rgb(24 32 74 / 0.2));
 }
 
 .packet--mini .packet__clip {
-  top: -8%;
+  top: -9%;
   left: 43%;
   width: 14%;
   height: 22%;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .is-torn .packet__body {
+  .is-opened .packet__body,
+  .is-opened .packet__top {
+    transition: none;
     animation: none;
-  }
-
-  .is-torn .packet__lid {
-    animation: none;
-    opacity: 0;
   }
 }
 </style>
