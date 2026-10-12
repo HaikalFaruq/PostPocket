@@ -23,6 +23,8 @@ const frame = ref(pocket.frames[0]!.id)
 const frameColor = ref(pocket.frameColors[0]!.id)
 const customColor = ref('#c8a2c8')
 const added = shallowRef<{ photo: DraftPhoto; url: string; takenAt?: string }[]>([])
+/** Kantong ini akan berisi foto: yang baru dipilih atau yang sudah ada. */
+const hasPhotos = computed(() => added.value.length > 0 || !!existing.value?.moments.length)
 const busy = ref(false)
 const preparing = ref(false)
 const error = ref('')
@@ -189,112 +191,121 @@ onBeforeUnmount(clearAdded)
       </div>
     </template>
 
-    <StepCard :step="1" title="Warna kantong" :hint="packetColor.label" variant="card">
-      <SwatchGroup
-        v-model="packet"
-        label="Warna kantong"
-        :options="packetOptions"
-        size="md"
-        check
-      />
-    </StepCard>
-
-    <StepCard :step="2" title="Stiker" :hint="stickerItem?.label" variant="card">
-      <RadioGroupRoot
-        v-model="sticker"
-        aria-label="Stiker"
-        orientation="horizontal"
-        loop
-        class="grid grid-cols-6 gap-1.5 sm:grid-cols-7"
+    <!-- Foto dulu, karena itu isi kantongnya; tampilan kantong menyusul. Satu lembar dengan
+         garis pemisah, bukan kartu bernomor yang seragam. -->
+    <div class="divide-y divide-line-soft rounded-[20px] bg-surface">
+      <StepCard
+        :step="1"
+        title="Foto hari ini"
+        variant="card"
+        description="Pilih beberapa foto sekaligus: JPG, PNG, atau HEIC. Tanggalnya diambil dari foto bila ada."
       >
-        <RadioGroupItem
-          v-for="item in letter.stickers"
-          :key="item.id"
-          :value="item.id"
-          :aria-label="item.label"
-          :title="item.label"
-          class="sticker-option aspect-square rounded-[12px] p-1.5"
-        >
-          <img :src="item.src" alt="" class="size-full" draggable="false" />
-        </RadioGroupItem>
-      </RadioGroupRoot>
-    </StepCard>
-
-    <StepCard :step="3" title="Bingkai foto" variant="card">
-      <PillGroup v-model="frame" label="Bingkai foto" :options="frameOptions" />
-      <div class="mt-3 flex flex-wrap items-center gap-2.5">
-        <SwatchGroup v-model="frameColor" label="Warna bingkai" :options="frameColorOptions" check>
-          <Swatch
-            v-for="item in frameColorOptions"
-            :key="item.value"
-            :value="item.value"
-            :label="item.label"
-            :color="item.color"
-            check
-          />
-          <Swatch value="custom" label="Warna sendiri" :color="customColor" check />
-        </SwatchGroup>
-        <label
-          v-if="frameColor === 'custom'"
-          class="inline-flex items-center gap-2 text-caption text-ink-muted"
-        >
-          Pilih warna
-          <input v-model="customColor" type="color" class="h-8 w-10 rounded" />
-        </label>
-      </div>
-    </StepCard>
-
-    <StepCard
-      :step="4"
-      title="Tambah momen"
-      variant="card"
-      description="Pilih beberapa foto sekaligus: JPG, PNG, atau HEIC. Tanggalnya diambil dari foto bila ada."
-    >
-      <div class="flex flex-wrap gap-2">
-        <div
-          v-for="(item, index) in added"
-          :key="item.url"
-          class="relative size-16 overflow-hidden rounded-[10px]"
-        >
-          <img :src="item.url" alt="" class="size-full object-cover" />
+        <div class="flex flex-wrap gap-2">
+          <div
+            v-for="(item, index) in added"
+            :key="item.url"
+            class="relative size-16 overflow-hidden rounded-[10px]"
+          >
+            <img :src="item.url" alt="" class="size-full object-cover" />
+            <button
+              type="button"
+              class="absolute top-0.5 right-0.5 grid size-6 place-items-center rounded-full bg-ink/70 text-white"
+              :aria-label="`Hapus foto ${index + 1}`"
+              @click="removeAdded(index)"
+            >
+              <Icon name="close" :size="12" />
+            </button>
+          </div>
           <button
             type="button"
-            class="absolute top-0.5 right-0.5 grid size-6 place-items-center rounded-full bg-ink/70 text-white"
-            :aria-label="`Hapus foto ${index + 1}`"
-            @click="removeAdded(index)"
+            class="grid size-16 place-items-center rounded-[10px] border border-dashed border-line text-ink-muted hover:bg-fill"
+            :disabled="busy"
+            aria-label="Tambah foto"
+            @click="fileInput?.click()"
           >
-            <Icon name="close" :size="12" />
+            <Icon name="plus" :size="18" />
           </button>
         </div>
-        <button
-          type="button"
-          class="grid size-16 place-items-center rounded-[10px] border border-dashed border-line text-ink-muted hover:bg-fill"
-          :disabled="busy"
-          aria-label="Tambah foto"
-          @click="fileInput?.click()"
+        <p v-if="preparing" class="mt-2 text-caption text-ink-muted" aria-live="polite">
+          Menyiapkan foto… Foto HEIC butuh beberapa detik.
+        </p>
+        <p v-if="existing?.moments.length" class="mt-2 text-caption text-ink-muted">
+          Sudah ada {{ existing.moments.length }} foto di kantong ini.
+        </p>
+        <p v-if="error" role="alert" class="mt-2 text-caption text-ink-muted">{{ error }}</p>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          multiple
+          class="sr-only"
+          tabindex="-1"
+          aria-label="Pilih foto momen"
+          data-testid="moment-upload"
+          @change="onFiles"
+        />
+      </StepCard>
+
+      <StepCard :step="2" title="Warna kantong" :hint="packetColor.label" variant="card">
+        <SwatchGroup
+          v-model="packet"
+          label="Warna kantong"
+          :options="packetOptions"
+          size="md"
+          check
+        />
+      </StepCard>
+
+      <StepCard :step="3" title="Stiker" :hint="stickerItem?.label" variant="card">
+        <RadioGroupRoot
+          v-model="sticker"
+          aria-label="Stiker"
+          orientation="horizontal"
+          loop
+          class="grid grid-cols-6 gap-1.5 sm:grid-cols-7"
         >
-          <Icon name="plus" :size="18" />
-        </button>
-      </div>
-      <p v-if="preparing" class="mt-2 text-caption text-ink-muted" aria-live="polite">
-        Menyiapkan foto… Foto HEIC butuh beberapa detik.
-      </p>
-      <p v-if="existing?.moments.length" class="mt-2 text-caption text-ink-muted">
-        Sudah ada {{ existing.moments.length }} foto di kantong ini.
-      </p>
-      <p v-if="error" role="alert" class="mt-2 text-caption text-ink-muted">{{ error }}</p>
-      <input
-        ref="fileInput"
-        type="file"
-        accept="image/*"
-        multiple
-        class="sr-only"
-        tabindex="-1"
-        aria-label="Pilih foto momen"
-        data-testid="moment-upload"
-        @change="onFiles"
-      />
-    </StepCard>
+          <RadioGroupItem
+            v-for="item in letter.stickers"
+            :key="item.id"
+            :value="item.id"
+            :aria-label="item.label"
+            :title="item.label"
+            class="sticker-option aspect-square rounded-[12px] p-1.5"
+          >
+            <img :src="item.src" alt="" class="size-full" draggable="false" />
+          </RadioGroupItem>
+        </RadioGroupRoot>
+      </StepCard>
+
+      <StepCard :step="4" title="Bingkai foto" variant="card">
+        <PillGroup v-model="frame" label="Bingkai foto" :options="frameOptions" />
+        <div class="mt-3 flex flex-wrap items-center gap-2.5">
+          <SwatchGroup
+            v-model="frameColor"
+            label="Warna bingkai"
+            :options="frameColorOptions"
+            check
+          >
+            <Swatch
+              v-for="item in frameColorOptions"
+              :key="item.value"
+              :value="item.value"
+              :label="item.label"
+              :color="item.color"
+              check
+            />
+            <Swatch value="custom" label="Warna sendiri" :color="customColor" check />
+          </SwatchGroup>
+          <label
+            v-if="frameColor === 'custom'"
+            class="inline-flex items-center gap-2 text-caption text-ink-muted"
+          >
+            Pilih warna
+            <input v-model="customColor" type="color" class="h-8 w-10 rounded" />
+          </label>
+        </div>
+      </StepCard>
+    </div>
 
     <template #footer>
       <button type="button" class="text-body text-ink-muted hover:text-ink" @click="setOpen(false)">
@@ -306,7 +317,7 @@ onBeforeUnmount(clearAdded)
         :disabled="busy"
         @click="save"
       >
-        <Icon name="check" :size="15" /> Simpan
+        <Icon name="check" :size="15" /> {{ hasPhotos ? 'Simpan' : 'Simpan tanpa foto' }}
       </button>
     </template>
   </Modal>

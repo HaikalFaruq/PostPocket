@@ -113,7 +113,7 @@ test('Pocket dan TV tetap terbuka offline, lengkap dengan stiker dan kenangan di
   const today = page.locator('[data-day]').last()
   await today.click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan tanpa foto' }).click()
   // Modal baru tertutup setelah data tertulis di IndexedDB.
   await expect(dialog).toBeHidden()
   await expect(today).toHaveAttribute('data-saved', 'true')
