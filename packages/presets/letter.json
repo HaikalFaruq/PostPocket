@@ -24,9 +24,9 @@
   ],
   "shapes": [
     { "id": "original", "label": "Asli" },
-    { "id": "portrait", "label": "Portrait", "ratio": 0.75 },
-    { "id": "square", "label": "Square", "ratio": 1 },
-    { "id": "landscape", "label": "Landscape", "ratio": 1.3333 }
+    { "id": "portrait", "label": "Tegak", "ratio": 0.75 },
+    { "id": "square", "label": "Persegi", "ratio": 1 },
+    { "id": "landscape", "label": "Mendatar", "ratio": 1.3333 }
   ],
   "foilModes": [
     {

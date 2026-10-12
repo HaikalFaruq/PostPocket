@@ -36,7 +36,7 @@ test('langkah 1 sampai 4 langsung mengubah kartu', async ({ page }) => {
 
   await page
     .getByRole('radiogroup', { name: 'Bentuk kartu' })
-    .getByRole('radio', { name: 'Square' })
+    .getByRole('radio', { name: 'Persegi' })
     .click()
   await expect
     .poll(async () => {

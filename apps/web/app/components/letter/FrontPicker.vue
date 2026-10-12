@@ -77,7 +77,7 @@ function onChange(event: Event) {
       @click="input?.click()"
     >
       <Icon name="upload" :size="15" />
-      {{ busy ? 'Menyiapkan foto…' : 'Upload foto' }}
+      {{ busy ? 'Menyiapkan foto…' : 'Unggah foto' }}
     </button>
     <input
       ref="input"
@@ -85,13 +85,13 @@ function onChange(event: Event) {
       accept="image/*"
       class="sr-only"
       tabindex="-1"
-      aria-label="Upload foto untuk gambar depan"
+      aria-label="Unggah foto untuk gambar depan"
       data-testid="front-upload"
       @change="onChange"
     />
     <p class="min-w-0 flex-1 text-caption text-ink-muted">
-      <span class="pointer-coarse:hidden">atau drop / paste foto. </span>Foto tetap di perangkatmu
-      sampai kamu membuat link.
+      <span class="pointer-coarse:hidden">atau tarik ke halaman ini, atau tempel. </span>Foto tetap
+      di perangkatmu sampai kamu membuat link.
     </p>
   </div>
   <p
