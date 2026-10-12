@@ -83,6 +83,11 @@ test('gerbang Sprint 2: surat terbuka di HP lain tanpa login dan preview-nya sia
           .evaluate((img: HTMLImageElement) => img.naturalWidth),
       )
       .toBeGreaterThan(0)
+    // Foto disajikan dengan cache satu jam (kontrak 0.2.1), jadi tidak diunduh ulang setiap kali
+    // surat dibuka. Tanpa header cache-control saat upload, Storage menyajikannya `no-cache`.
+    const photoSrc = await letterPage.locator('[data-kind="photo"] img').getAttribute('src')
+    const photo = await request.get(photoSrc!)
+    expect(photo.headers()['cache-control']).toContain('max-age=3600')
     expect(errors).toEqual([])
     await other.close()
   } finally {

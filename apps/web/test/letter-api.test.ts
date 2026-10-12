@@ -126,11 +126,52 @@ describe('createLetterApi', () => {
 
   it('jaringan putus jadi kode network', async () => {
     const fetch = vi.fn(async () => Promise.reject(new TypeError('Failed to fetch')))
-    const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch })
+    const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch, retryDelay: 0 })
     await expect(api.get('x')).rejects.toMatchObject({ code: 'network' })
   })
 
-  it('unggah memakai PUT ke signedUrl dengan tipe berkas', async () => {
+  it('GET surat dicoba sekali lagi kalau koneksi putus atau server 5xx', async () => {
+    for (const first of [
+      () => Promise.reject(new TypeError('fetch failed')),
+      async () => respond(503, '<html>Service Unavailable</html>'),
+      async () => respond(500, { error: { code: 'internal', message: 'x' } }),
+    ]) {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockImplementationOnce(first)
+        .mockImplementationOnce(async () => respond(200, { slug: 'x7Kp2qLm9A' }))
+      const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch, retryDelay: 0 })
+      await expect(api.get('x7Kp2qLm9A')).resolves.toMatchObject({ slug: 'x7Kp2qLm9A' })
+      expect(fetch).toHaveBeenCalledTimes(2)
+    }
+  })
+
+  it('GET surat tidak diulang untuk 404, dan menyerah setelah dua kali gagal', async () => {
+    const missing = vi.fn(async () => respond(404, { error: { code: 'not_found', message: 'x' } }))
+    const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch: missing })
+    await expect(api.get('x')).rejects.toMatchObject({ code: 'not_found' })
+    expect(missing).toHaveBeenCalledTimes(1)
+
+    const down = vi.fn(async () => respond(502, 'Bad Gateway'))
+    const flaky = createLetterApi({
+      base: 'https://api.test',
+      apiKey: 'k',
+      fetch: down,
+      retryDelay: 0,
+    })
+    await expect(flaky.get('x')).rejects.toMatchObject({ status: 502 })
+    expect(down).toHaveBeenCalledTimes(2)
+  })
+
+  it('kirim dan hapus tidak diulang otomatis', async () => {
+    const fetch = vi.fn(async () => respond(503, 'Service Unavailable'))
+    const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch, retryDelay: 0 })
+    await expect(api.publish('id', 't')).rejects.toMatchObject({ status: 503 })
+    await expect(api.remove('id', 't')).rejects.toMatchObject({ status: 503 })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('unggah memakai PUT ke signedUrl dengan tipe berkas dan cache satu jam', async () => {
     const fetch = vi.fn(async () => respond(200, {}))
     const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch })
     const file = new Blob(['x'], { type: 'image/jpeg' })
@@ -138,7 +179,11 @@ describe('createLetterApi', () => {
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://s.test/up?token=t')
     expect(init).toMatchObject({ method: 'PUT', body: file })
-    expect(init.headers).toMatchObject({ 'content-type': 'image/jpeg' })
+    expect(init.headers).toMatchObject({
+      'content-type': 'image/jpeg',
+      'x-upsert': 'false',
+      'cache-control': 'max-age=3600',
+    })
   })
 })
 
