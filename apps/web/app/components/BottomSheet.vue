@@ -36,7 +36,10 @@ const bodyId = useId()
         :inert="!expanded"
         class="flex min-h-0 flex-col overflow-hidden rounded-t-card bg-panel shadow-sheet"
       >
-        <div class="max-h-[min(56dvh,560px)] overflow-y-auto overscroll-contain">
+        <!-- Di layar pendek, sheet menyisakan sekitar 220 px untuk kartu supaya tidak tertimpa. -->
+        <div
+          class="max-h-[max(160px,min(56dvh,560px,calc(100dvh_-_368px)))] overflow-y-auto overscroll-contain"
+        >
           <slot />
         </div>
         <slot name="footer" />

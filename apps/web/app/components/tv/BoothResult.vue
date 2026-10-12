@@ -3,6 +3,7 @@ import { byId, letter, pocket } from '@postpocket/presets'
 import { canvasBlob, composeStrip, SHOT_HEIGHT, SHOT_WIDTH, type BoothLayout } from '~/utils/booth'
 import { isDark } from '~/utils/color'
 import { dayKey } from '~/utils/memories'
+import { sendPhotoToLetter } from '~/utils/pending-photo'
 
 /**
  * Hasil Booth (PRD): strip berbingkai dengan tanggal. Simpan ke Pocket hari ini, masukkan ke CD,
@@ -12,8 +13,6 @@ import { dayKey } from '~/utils/memories'
 const props = defineProps<{ shots: HTMLCanvasElement[]; layout: BoothLayout }>()
 const emit = defineEmits<{ close: []; retake: [] }>()
 const memories = useMemories()
-const draft = useLetterDraft()
-const router = useRouter()
 
 const frameColor = ref(pocket.frameColors[0]!.id)
 const frameOptions = pocket.frameColors.map((item) => ({
@@ -107,13 +106,7 @@ const useInLetter = () =>
   run(async () => {
     if (!strip) return
     const blob = await canvasBlob(strip, 'image/jpeg', 0.9)
-    await draft.load()
-    if (!draft.addPhoto({ blob, width: strip.width, height: strip.height })) {
-      message.value = 'Surat sudah berisi 4 foto. Hapus satu dulu di editor isi surat.'
-      return
-    }
-    await draft.save()
-    await router.push('/letter/new')
+    await sendPhotoToLetter({ blob, width: strip.width, height: strip.height }, 'Booth')
   })
 
 const download = () =>
