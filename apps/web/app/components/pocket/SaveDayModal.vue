@@ -24,6 +24,7 @@ const frameColor = ref(pocket.frameColors[0]!.id)
 const customColor = ref('#c8a2c8')
 const added = shallowRef<{ photo: DraftPhoto; url: string; takenAt?: string }[]>([])
 const busy = ref(false)
+const preparing = ref(false)
 const error = ref('')
 const existingUrl = ref<string | null>(null)
 
@@ -79,6 +80,7 @@ async function onFiles(event: Event) {
   input.value = ''
   if (!files.length) return
   busy.value = true
+  preparing.value = true
   error.value = ''
   const next = [...added.value]
   for (const file of files) {
@@ -92,6 +94,7 @@ async function onFiles(event: Event) {
   }
   added.value = next
   busy.value = false
+  preparing.value = false
 }
 
 function removeAdded(index: number) {
@@ -256,6 +259,9 @@ onBeforeUnmount(clearAdded)
           <Icon name="plus" :size="18" />
         </button>
       </div>
+      <p v-if="preparing" class="mt-2 text-caption text-ink-muted" aria-live="polite">
+        Menyiapkan foto… Foto HEIC butuh beberapa detik.
+      </p>
       <p v-if="existing?.moments.length" class="mt-2 text-caption text-ink-muted">
         Sudah ada {{ existing.moments.length }} foto di kantong ini.
       </p>

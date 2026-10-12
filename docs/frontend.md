@@ -41,6 +41,7 @@ apps/web/
   app/components/tv/        TvSet, CdShelf, TvSlideshow, BoothCamera, BoothResult
   app/components/pocket/    SnackPacket (kantong snack), SaveDayModal (modal simpan hari), MonthPicker
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
+  app/workers/              heic.worker.ts: HEIC ke JPEG dengan libheif, dimuat hanya saat ada foto HEIC
   app/stores/               useLetterDraft (draf surat) dan useMemories (momen, hari Pocket, album CD) di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
                             color, foil, icons) dan util browser (front-image, photo-filter), diuji di test/
