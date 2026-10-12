@@ -37,7 +37,7 @@ useSeoMeta({
       <li>gambar pratinjau untuk WhatsApp;</li>
       <li>waktu surat diterbitkan dan pertama kali dibuka.</li>
     </ul>
-    <p>Server dan foto surat disimpan di Supabase (Singapura); halamannya dilayani Vercel.</p>
+    <p>Surat dan fotonya disimpan di Supabase (Sydney, Australia); halamannya dilayani Vercel.</p>
 
     <h2>Siapa yang bisa membuka suratmu</h2>
     <p>
@@ -51,8 +51,8 @@ useSeoMeta({
       <li>Surat bisa dibuka 30 hari sejak dikirim, lalu dihapus.</li>
       <li>Foto di dalamnya dihapus 7 hari setelah surat pertama kali dibuka.</li>
       <li>
-        Kalau pembuatan link gagal di tengah jalan, data yang sempat terunggah dihapus dari server
-        dalam 24 jam.
+        Kalau pembuatan link gagal di tengah jalan, data yang sempat terunggah dihapus otomatis
+        sekitar 24 jam kemudian.
       </li>
       <li>
         Kamu bisa menghapus surat kapan saja lewat "Surat terkirim" di halaman tulis surat, dari
@@ -60,11 +60,16 @@ useSeoMeta({
       </li>
     </ul>
 
-    <h2>Pembatasan spam</h2>
+    <h2>Alamat IP dan pembatasan spam</h2>
     <p>
       Satu jaringan bisa membuat paling banyak 10 surat per jam. Untuk menghitungnya, server
       menyimpan versi tersandi (hash berkunci) dari alamat IP pengirim, bukan alamat
-      <span class="whitespace-nowrap">IP-nya</span>.
+      <span class="whitespace-nowrap">IP-nya</span>, dan menghapusnya paling lambat 2 jam kemudian.
+      Fungsi server PostPocket tidak mencatat alamat IP.
+    </p>
+    <p>
+      Penyedia hosting (Supabase dan Vercel) tetap mencatat alamat IP di log teknis mereka untuk
+      sementara, untuk keamanan dan operasional.
     </p>
 
     <h2>Tanpa iklan dan pelacak</h2>
