@@ -37,10 +37,11 @@ const reload = () => window.location.reload()
       <h1 class="mt-8 text-title">
         {{ missing ? 'Halaman ini tidak ada' : 'Ada yang tidak beres' }}
       </h1>
-      <p class="mt-2 max-w-sm text-body text-ink-muted">
+      <p class="mt-2 max-w-sm text-body text-pretty text-ink-muted">
         <template v-if="missing">
-          Mungkin link-nya salah ketik. Kalau kamu mencari surat dari seseorang, minta dia mengirim
-          ulang link-nya.
+          Mungkin <span class="whitespace-nowrap">link-nya</span> salah ketik. Kalau kamu mencari
+          surat dari seseorang, minta dia mengirim ulang
+          <span class="whitespace-nowrap">link-nya.</span>
         </template>
         <template v-else>
           Coba muat ulang halaman ini. Draf, kantong, dan albummu tetap aman di perangkat ini.

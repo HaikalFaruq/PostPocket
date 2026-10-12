@@ -213,12 +213,12 @@ const formatDate = (value: string | null | undefined) =>
       <h1 class="text-title">
         {{ missing ? 'Surat ini sudah tidak tersedia' : 'Surat belum bisa dimuat' }}
       </h1>
-      <p class="mt-2 max-w-sm text-ink-muted">
-        {{
-          missing
-            ? 'Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau link-nya terpotong saat disalin.'
-            : 'Coba muat ulang halaman ini sebentar lagi.'
-        }}
+      <p class="mt-2 max-w-sm text-pretty text-ink-muted">
+        <template v-if="missing">
+          Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau
+          <span class="whitespace-nowrap">link-nya</span> terpotong saat disalin.
+        </template>
+        <template v-else>Coba muat ulang halaman ini sebentar lagi.</template>
       </p>
       <NuxtLink
         to="/letter/new"
