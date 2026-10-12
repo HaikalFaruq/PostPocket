@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   moved,
+  pinched,
   pointerAngle,
   scaled,
   snappedRotation,
@@ -46,6 +47,24 @@ describe('textSized', () => {
     if (text.kind !== 'text') throw new Error('bukan teks')
     expect(textSized(text, 2).size).toBeCloseTo(0.12)
     expect(textSized(text, 100).size).toBe(contentLimits.size.max)
+  })
+})
+
+describe('pinched', () => {
+  it('ukuran, putaran, dan posisi berubah sekaligus', () => {
+    const next = pinched(sticker, { factor: 1.5, turn: 30, dx: -0.1, dy: 0.2 })
+    expect(next.width).toBeCloseTo(0.3)
+    expect(next.rotation).toBe(22)
+    expect(next.x).toBeCloseTo(0.8)
+    expect(next.y).toBeCloseTo(0.3)
+  })
+
+  it('teks ikut membesarkan hurufnya, putaran tetap menempel, dan elemen tetap di halaman', () => {
+    const next = pinched(text, { factor: 2, turn: 88, dx: 1, dy: 0 })
+    expect(next.width).toBeCloseTo(1)
+    expect(next.size).toBeCloseTo(0.12)
+    expect(next.rotation).toBe(90)
+    expect(next.x).toBe(1)
   })
 })
 
