@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PostPocket API
-  version: 0.2.0
+  version: 0.2.1
   description: |
     Kontrak API rilis 1 antara frontend (`apps/web`) dan backend (Supabase Edge Functions).
     Rilis 1 hanya melayani surat yang dikirim; Pocket, TV, dan Booth tetap di browser.
@@ -12,7 +12,10 @@ info:
        draf dan mengembalikan `editToken` serta URL upload bertanda tangan per berkas.
     2. Browser mengunggah tiap berkas langsung ke Storage (tidak lewat Edge Function), misalnya
        `supabase.storage.from('letter-assets').uploadToSignedUrl(path, token, file)`.
-       URL upload berlaku 2 jam.
+       URL upload berlaku 2 jam. Kalau mengunggah dengan PUT sendiri, kirim header
+       `content-type`, `x-upsert: false`, dan `cache-control: max-age=3600`. Tanpa
+       `cache-control`, Storage menyajikan berkasnya dengan `no-cache` dan browser mengunduhnya
+       ulang setiap kali (`uploadToSignedUrl` sudah mengirimnya sendiri).
     3. `POST /letters/{id}/publish` dengan header `X-Edit-Token`. Server memeriksa semua berkas
        sudah ada dan sesuai metadata, membuat `slug`, lalu mengembalikan link surat.
 
@@ -30,6 +33,10 @@ info:
       Kalau gambar depannya foto user (`design.illustration = "upload"`), cover dan gambar OG
       ikut dihapus saat itu, karena gambar OG memuat foto yang sama. Setelah dihapus, field
       URL-nya bernilai `null` dan frontend menampilkan placeholder.
+    - Job pembersihan berjalan tiap jam, tapi `GET /l/{slug}` sudah menyembunyikan berkas tepat
+      saat masanya lewat: surat jadi `404` begitu `expiresAt` lewat, dan foto (serta cover dan
+      OG kalau gambar depannya foto user) tidak dikembalikan lagi begitu `photosExpireAt` lewat.
+      Klien tidak pernah menerima URL berkas yang sudah dihapus.
 
     **Header umum**
 
@@ -657,6 +664,7 @@ components:
         photosDeletedAt:
           type: [string, 'null']
           format: date-time
+          description: Terisi begitu foto tidak ditampilkan lagi (sama dengan `photosExpireAt`, atau waktu job menghapusnya). Selama terisi, `photos` kosong.
 
     OpenLetterResponse:
       type: object

@@ -8,11 +8,11 @@ import {
   clientIp,
   db,
   type LetterRow,
-  ok,
   secretKey,
   siteUrl,
   toPublic,
 } from '../_shared/db.ts'
+import { deleteLetters } from '../_shared/files.ts'
 import { ApiError, empty, json, notFound, readJson, serve } from '../_shared/http.ts'
 import { imageInfo, type ImageType, stripMetadata } from '../_shared/image.ts'
 import { bytea, newEditToken, newSlug, rateKey, sameHash, sha256 } from '../_shared/token.ts'
@@ -224,15 +224,7 @@ async function publishLetter(request: Request, id: string) {
 
 async function deleteLetter(request: Request, id: string) {
   await ownedLetter(request, id)
-  const assets = check(
-    await db().from('letter_assets').select('storage_path').eq('letter_id', id),
-  ) as Pick<AssetRow, 'storage_path'>[]
-  // Berkas dulu, baru baris: letter_assets memakai on delete restrict supaya tidak ada file yatim.
-  if (assets.length) {
-    check(await db().storage.from(BUCKET).remove(assets.map((asset) => asset.storage_path)))
-  }
-  ok(await db().from('letter_assets').delete().eq('letter_id', id))
-  ok(await db().from('letters').delete().eq('id', id))
+  await deleteLetters([id])
   return empty(request, 204)
 }
 

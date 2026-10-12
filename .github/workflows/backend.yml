@@ -92,7 +92,7 @@ jobs:
         run: |
           deno fmt --check
           deno lint
-          deno check letters/index.ts l/index.ts tests/
+          deno check letters/index.ts l/index.ts cleanup/index.ts tests/
 
       - name: Unit test
         run: deno test tests/unit.test.ts
@@ -100,7 +100,9 @@ jobs:
       - name: Jalankan stack Supabase lokal
         run: supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta
 
-      - name: Test integrasi lima endpoint
+      # SECRET_KEY di sini key bawaan stack lokal, bukan secret proyek.
+      - name: Test integrasi lima endpoint dan job pembersihan
         run: |
-          eval "$(supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY)=')"
-          API_URL="$API_URL" PUBLISHABLE_KEY="$PUBLISHABLE_KEY" deno test -A tests/api.test.ts
+          eval "$(supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY)=')"
+          export API_URL PUBLISHABLE_KEY SECRET_KEY
+          deno test -A tests/api.test.ts tests/cleanup.test.ts

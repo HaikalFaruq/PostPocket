@@ -2,6 +2,7 @@
 // Kontrak: docs/api/openapi.yaml.
 
 import { type AssetRow, assetUrl, check, db, type LetterRow } from '../_shared/db.ts'
+import { frontIsPhoto } from '../_shared/files.ts'
 import { json, notFound, serve } from '../_shared/http.ts'
 
 const SLUG = /^[A-Za-z0-9]{10}$/
@@ -32,7 +33,13 @@ async function getLetter(request: Request, slug: string) {
         .gt('expires_at', new Date().toISOString()).limit(1)
       : Promise.resolve({ data: [], error: null }),
   ])
-  const files = check(assets) as AssetRow[]
+  // Foto yang sudah lewat masanya tidak ditampilkan lagi meski job pembersihan (tiap jam) belum
+  // menghapusnya, supaya klien tidak pernah menerima URL yang sebentar lagi 404.
+  const photosGone = letter.photos_deleted_at !== null ||
+    (letter.photos_expire_at !== null && Date.parse(letter.photos_expire_at) <= Date.now())
+  const files = (check(assets) as AssetRow[]).filter((file) =>
+    !photosGone || (file.kind !== 'photo' && !frontIsPhoto(letter.design))
+  )
   const asset = (file?: AssetRow) =>
     file ? { url: assetUrl(file.storage_path), width: file.width, height: file.height } : null
   return json(request, 200, {
@@ -49,7 +56,7 @@ async function getLetter(request: Request, slug: string) {
     expiresAt: iso(letter.expires_at),
     openedAt: iso(letter.opened_at),
     photosExpireAt: iso(letter.photos_expire_at),
-    photosDeletedAt: iso(letter.photos_deleted_at),
+    photosDeletedAt: iso(letter.photos_deleted_at ?? (photosGone ? letter.photos_expire_at : null)),
   })
 }
 

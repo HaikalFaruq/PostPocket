@@ -72,12 +72,24 @@ Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karen
 
 ## Pembersihan file
 
-Satu job `pg_cron` per jam memanggil Edge Function pembersih lewat `pg_net`. Fungsi itu menghapus:
+Job `pg_cron` `pembersihan-surat` jalan tiap jam di menit ke-7 dan menjalankan `public.run_cleanup()`. Fungsi SQL itu menghapus baris `rate_limit_hits` yang lebih tua dari 1 jam, lalu memanggil Edge Function `cleanup` lewat `pg_net`. Edge Function itu menghapus:
 
-- draf yang tidak pernah di-publish setelah 24 jam, beserta filenya;
-- foto surat yang `opened_at`-nya sudah lewat 7 hari, beserta cover dan gambar OG kalau gambar depannya foto user;
-- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya;
-- baris `rate_limit_hits` yang lebih tua dari 1 jam (baris per IP hanya dibersihkan saat IP itu membuat surat lagi).
+- draf yang tidak pernah di-publish setelah 24 jam, beserta filenya (diberi tenggang 10 menit supaya publish yang sedang berjalan tidak terpotong);
+- foto surat yang `photos_expire_at`-nya sudah lewat (7 hari setelah dibuka), beserta cover dan gambar OG kalau gambar depannya foto user, lalu mengisi `photos_deleted_at`;
+- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya.
+
+Satu putaran memproses paling banyak 1.000 surat per jenis; sisanya diambil putaran berikutnya. `GET /l/:slug` tidak menunggu job: surat jadi 404 begitu `expires_at` lewat, dan foto tidak dikembalikan lagi begitu `photos_expire_at` lewat. Jadi jeda sampai job jalan hanya memengaruhi kuota, tidak pernah terlihat penerima.
+
+Fungsi `cleanup` menerima header `x-cleanup-token` (token acak di Vault, dibuat migrasi `cleanup_job`, tidak pernah ada di repo) atau `Authorization: Bearer <secret key>` untuk test dan pemanggilan manual. `run_cleanup()` membaca URL proyek dari secret Vault `project_url`. Secret ini diisi sekali per lingkungan, dan selama kosong job hanya membersihkan rate limit:
+
+```sh
+# Proyek Supabase (sudah diisi untuk produksi)
+supabase db query --linked "select vault.create_secret('https://<ref>.supabase.co', 'project_url')"
+# Stack lokal: Edge Functions dicapai dari container DB lewat Kong
+docker exec supabase_db_postpocket psql -U postgres -c "select vault.create_secret('http://kong:8000', 'project_url')"
+```
+
+Hasil panggilan terakhir ada di `net._http_response` (disimpan 6 jam) dan log Edge Function `cleanup`.
 
 File harus dihapus lewat Storage API (`storage.remove()`) di Edge Function. Menghapus baris `storage.objects` lewat SQL meninggalkan file yatim yang tetap memakan kuota ([Supabase: Delete Objects](https://supabase.com/docs/guides/storage/management/delete-objects)).
 
@@ -103,7 +115,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 2 (minggu 4–5)**
 
 - [x] `POST /letters/:id/publish`: validasi isi serta foto dan gambar OG yang sudah diunggah, slug, status `sent`
-- [ ] Job pembersihan file (`pg_cron` + `pg_net` + Edge Function), lihat bagian Pembersihan file
+- [x] Job pembersihan file (`pg_cron` + `pg_net` + Edge Function), lihat bagian Pembersihan file
 - [x] `GET /l/:slug` dan `POST /l/:slug/open`
 - [x] `DELETE /letters/:id`
 - [x] `noindex` untuk surat: halaman `/l/:slug` memakai `robots: noindex` (Kall), respons API memakai `Cache-Control: no-store`
@@ -139,7 +151,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
 - Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key.
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
-- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), dan `take_rate_limit()`. Semuanya hanya bisa dijalankan secret key.
+- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()` dan `run_cleanup()` untuk job pembersihan. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -161,18 +173,20 @@ Detail request, respons, dan kode error ada di [`docs/api/openapi.yaml`](api/ope
 
 ## Edge Functions
 
-Dua fungsi di `supabase/functions/`, keduanya dengan `verify_jwt = false`:
+Tiga fungsi di `supabase/functions/`, semuanya dengan `verify_jwt = false`:
 
 | Fungsi | Endpoint |
 | --- | --- |
 | `letters` | `POST /letters`, `POST /letters/{id}/publish`, `DELETE /letters/{id}` |
 | `l` | `GET /l/{slug}`, `POST /l/{slug}/open` |
+| `cleanup` | Job pembersihan, bukan bagian kontrak (lihat bagian Pembersihan file) |
 
 Kode bersama ada di `_shared/`:
 
 - `http.ts`: CORS sesuai kontrak, cek header `apikey` (harus publishable key proyek), dan bentuk error.
 - `validate.ts`: body `POST /letters` dicek dengan skema dari kontrak (`_shared/openapi.json`, hasil `scripts/bundle-contract.sh`), lalu aturan isi dicek dengan preset dan `contentLimits` dari `packages/presets`, sama seperti mock frontend.
 - `image.ts`: membaca tipe dan dimensi dari isi berkas, lalu membuang EXIF, XMP, IPTC, dan komentar tanpa kompres ulang.
+- `files.ts`: hapus berkas lewat Storage API dulu, baru barisnya. Dipakai `DELETE /letters/{id}` dan job pembersihan.
 - `db.ts`: klien secret key. Secret key diambil dari env yang disediakan Supabase (`SUPABASE_SECRET_KEYS`), jadi tidak perlu `secrets set`.
 
 Yang terjadi saat publish: setiap berkas diunduh dari Storage, ukurannya harus sama persis dengan metadata, tipe dan dimensinya dibaca dari isi berkas (bukan dari header). Kalau ada metadata yang tersisa atau content-type dari browser salah, berkasnya ditulis ulang tanpa metadata. Baru setelah itu `slug` dibuat dan status jadi `sent`.
@@ -186,12 +200,14 @@ supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,pos
 # Dari supabase/functions
 deno test tests/unit.test.ts
 API_URL=http://127.0.0.1:54321 PUBLISHABLE_KEY=<dari supabase status> deno test -A tests/api.test.ts
+# Job pembersihan, hanya stack lokal (memundurkan waktu di database)
+API_URL=… PUBLISHABLE_KEY=… SECRET_KEY=<dari supabase status> deno test -A tests/cleanup.test.ts
 
 # Setelah kontrak berubah
 scripts/bundle-contract.sh
 
 # Deploy (setelah migrasi baru di-push dengan supabase db push)
-supabase functions deploy letters l
+supabase functions deploy letters l cleanup
 ```
 
 Di stack lokal, Kong menimpa header CORS dengan `*`, jadi test CORS di `api.test.ts` hanya jalan kalau `API_URL` menunjuk proyek Supabase asli.
