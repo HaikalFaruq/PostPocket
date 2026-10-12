@@ -250,7 +250,7 @@ test('latar Pocket sampai ke tepi layar dan kembali normal setelah pindah halama
   await page.goto('/pocket')
   await expect(page.locator('[data-day]').first()).toBeVisible()
   await expect(page.locator('html')).toHaveClass(/bg-pocket-page/)
-  await expect(themeColor).toHaveAttribute('content', '#efefef')
+  await expect(themeColor).toHaveAttribute('content', '#f1f4f8')
 
   await page.getByRole('link', { name: /PostPocket/ }).click()
   await expect(page).toHaveURL(/\/$/)

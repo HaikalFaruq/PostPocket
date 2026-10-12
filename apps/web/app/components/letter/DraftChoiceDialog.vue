@@ -61,7 +61,7 @@ function focusSafeChoice(event: Event) {
         :data-kind="asking?.kind"
         @open-auto-focus="focusSafeChoice"
       >
-        <DialogTitle class="text-title font-semibold">Masih ada draf surat</DialogTitle>
+        <DialogTitle class="text-title">Masih ada draf surat</DialogTitle>
         <DialogDescription class="mt-1 text-ink-muted">
           Draf yang belum kamu kirim:
           <span class="font-letter text-[19px] text-ink" data-testid="draft-summary"

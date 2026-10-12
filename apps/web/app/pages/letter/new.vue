@@ -319,7 +319,7 @@ async function startOver() {
     <main class="relative min-h-0 flex-1">
       <NuxtLink
         to="/"
-        class="absolute top-4 left-4 z-10 inline-flex items-center gap-1 text-caption text-ink-muted hover:text-ink"
+        class="absolute top-2 left-3 z-10 inline-flex min-h-11 items-center gap-1 px-1 text-body text-ink-muted hover:text-ink"
       >
         <Icon name="chevron-left" :size="14" /> PostPocket
       </NuxtLink>
@@ -359,7 +359,7 @@ async function startOver() {
       </template>
 
       <div class="px-6 pt-6 pb-1">
-        <h1 class="text-title font-semibold">Surat foil</h1>
+        <h1 class="text-title">Surat foil</h1>
         <p class="mt-1 text-ink-muted">
           Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu kirim lewat link.
         </p>

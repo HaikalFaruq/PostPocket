@@ -89,7 +89,7 @@ async function remove(item: SentRecord) {
         data-testid="sent-letters"
       >
         <div class="flex items-start justify-between gap-3">
-          <DialogTitle class="text-title font-semibold">Surat terkirim</DialogTitle>
+          <DialogTitle class="text-title">Surat terkirim</DialogTitle>
           <DialogClose as-child>
             <IconButton label="Tutup" size="sm" variant="ghost">
               <Icon name="close" :size="15" />

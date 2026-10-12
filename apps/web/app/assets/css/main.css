@@ -18,7 +18,7 @@
   --color-surface: #ffffff;
   --color-panel: #f8fafc;
   --color-ink: #18204a;
-  /* Teks sekunder: minimal 4.5:1 di semua latar halaman, termasuk TV (#eaeaeb). */
+  /* Teks sekunder: minimal 4.5:1 di kertas (#f1f4f8), kartu putih, dan sel hari ini Pocket. */
   --color-ink-muted: rgb(24 32 74 / 0.66);
   --color-ink-subtle: rgb(24 32 74 / 0.48);
   --color-line: rgb(24 32 74 / 0.14);
@@ -26,18 +26,20 @@
   --color-fill: rgb(24 32 74 / 0.05);
   --color-post-red: #e23b3b;
 
-  /* Aksen Pocket: warna kantong ada di preset, di sini hanya teks dan kayu jepitan */
-  --color-pocket-page: #efefef;
+  /*
+   * Pocket dan TV memakai kertas dan tinta yang sama dengan beranda; ciri modulnya ada di bendanya
+   * (kantong, jepitan kayu, TV). Warna kantong ada di preset.
+   */
+  --color-pocket-page: #f1f4f8;
   --color-pocket-outside: #f9f9fb;
   --color-pocket-today: #f8f1e7;
-  --color-pocket-ink: #4a3b30;
-  /* Teks sekunder Pocket: kontras minimal 4.5:1 di halaman Pocket (#efefef) dan kantong hari ini. */
-  --color-pocket-muted: #7d6858;
+  --color-pocket-ink: #18204a;
+  --color-pocket-muted: rgb(24 32 74 / 0.66);
   --color-pocket-wood: #ead2a4;
   --color-pocket-ok: #a6d08f;
 
   /* Aksen TV: clay pink dan panel gelap */
-  --color-tv-page: #eaeaeb;
+  --color-tv-page: #f1f4f8;
   /* Aksen untuk latar (dengan teks putih, 4,8:1); glow untuk teks di panel gelap (minimal 4,7:1). */
   --color-tv-accent: #d81b80;
   --color-tv-glow: #ff4fa6;
@@ -51,15 +53,16 @@
   --font-letter: 'Caveat', cursive;
   --font-tv: 'VT323', ui-monospace, monospace;
 
-  --text-caption: 12px;
+  --text-caption: 13px;
   --text-caption--line-height: 1.45;
   --text-chip: 12.5px;
   --text-chip--line-height: 1;
-  --text-body: 13px;
+  --text-body: 14px;
   --text-body--line-height: 1.5;
-  --text-title: 22px;
-  --text-title--line-height: 1.2;
-  --text-title--letter-spacing: -0.025em;
+  --text-title: 24px;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.03em;
+  --text-title--font-weight: 800;
   --text-display: 42px;
   --text-display--line-height: 1.05;
   --text-display--letter-spacing: -0.03em;
@@ -126,7 +129,7 @@
 /* Bingkai amplop par avion (docs/desain.md): hanya untuk membingkai surat. */
 @utility airmail {
   padding: 10px;
-  border-radius: 22px;
+  border-radius: 6px;
   background: var(--airmail);
 }
 
@@ -147,8 +150,14 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--focus-ring, var(--color-ink));
     outline-offset: 2px;
+  }
+
+  /* Di permukaan gelap (panel TV, tampilan baca) cincin fokus tinta tidak kelihatan. */
+  .tv-panel,
+  [data-surface='dark'] {
+    --focus-ring: var(--color-white);
   }
 
   @media (prefers-reduced-motion: reduce) {

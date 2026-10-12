@@ -9,7 +9,7 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   await page.goto('/tv?booth=1')
   await expect(page.getByTestId('booth-camera')).toBeVisible()
   // Judul halaman mengikuti Booth, bukan TV.
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/PHOTO\s+BOOTH/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Booth')
   const record = page.getByTestId('booth-record')
   await expect(record).toBeEnabled({ timeout: 10_000 })
   await page.getByRole('radio', { name: 'Noir' }).click()
@@ -35,7 +35,7 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   await expect(result).toContainText('Masuk ke CD Photo Booth')
 
   const download = page.waitForEvent('download')
-  await result.getByRole('button', { name: 'Unduh PNG' }).click()
+  await result.getByRole('button', { name: 'Unduh gambar' }).click()
   expect((await download).suggestedFilename()).toMatch(/^postpocket-booth-\d{4}-\d{2}-\d{2}\.png$/)
 
   await result.getByRole('button', { name: 'Tutup' }).click()

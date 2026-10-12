@@ -7,7 +7,7 @@ import { sendPhotoToLetter } from '~/utils/pending-photo'
 
 useSeoMeta({ title: 'Kantong · PostPocket', robots: 'noindex' })
 // Sama dengan --color-pocket-page di main.css.
-usePageTint('bg-pocket-page', '#efefef')
+usePageTint('bg-pocket-page', '#f1f4f8')
 
 // Tanggal yang tidak ada atau belum datang kembali ke kalender.
 definePageMeta({
@@ -107,13 +107,13 @@ const editOpen = ref(false)
       <header class="py-4">
         <NuxtLink
           to="/pocket"
-          class="inline-flex items-center gap-1 text-caption text-pocket-muted hover:text-pocket-ink"
+          class="-ml-1 inline-flex min-h-11 items-center gap-1 px-1 text-body text-pocket-muted hover:text-pocket-ink"
         >
           <Icon name="chevron-left" :size="14" /> Kalender
         </NuxtLink>
       </header>
 
-      <h1 class="mt-1 text-[clamp(24px,6vw,32px)] font-semibold tracking-[-0.03em]">
+      <h1 class="mt-1 text-[clamp(26px,7vw,34px)] leading-tight font-extrabold tracking-[-0.04em]">
         {{ longDate(day) }}
       </h1>
 
