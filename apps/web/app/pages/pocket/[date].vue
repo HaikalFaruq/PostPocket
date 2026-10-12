@@ -113,7 +113,7 @@ const editOpen = ref(false)
         </NuxtLink>
       </header>
 
-      <h1 class="mt-1 text-[clamp(26px,7vw,34px)] leading-tight font-extrabold tracking-[-0.04em]">
+      <h1 class="mt-1 text-[clamp(26px,7vw,34px)] leading-tight font-bold tracking-[-0.03em]">
         {{ longDate(day) }}
       </h1>
 

@@ -47,8 +47,7 @@
   --color-tv-panel: #2a2a2a;
   --color-tv-panel-ink: rgb(255 255 255 / 0.92);
 
-  --font-sans:
-    'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Gantari', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-letter: 'Caveat', cursive;
   --font-tv: 'VT323', ui-monospace, monospace;
@@ -61,8 +60,8 @@
   --text-body--line-height: 1.5;
   --text-title: 24px;
   --text-title--line-height: 1.15;
-  --text-title--letter-spacing: -0.03em;
-  --text-title--font-weight: 800;
+  --text-title--letter-spacing: -0.025em;
+  --text-title--font-weight: 700;
   --text-display: 42px;
   --text-display--line-height: 1.05;
   --text-display--letter-spacing: -0.03em;

@@ -67,12 +67,13 @@ export default defineNuxtConfig({
     },
     priority: ['google'],
     families: [
-      // Huruf antarmuka (docs/desain.md). Variabel, jadi satu berkas latin untuk semua ketebalan,
-      // dan di-preload karena dipakai di layar pertama. Sengaja tanpa `provider`: dengan provider,
-      // font cadangan di atas diganti kategori Google-nya (`sans-serif`) yang tidak punya ukuran.
+      // Huruf antarmuka (docs/desain.md): Gantari dari Lafontype, foundry di Makassar. Variabel,
+      // jadi satu berkas latin untuk semua ketebalan, dan di-preload karena dipakai di layar
+      // pertama. Sengaja tanpa `provider`: dengan provider, font cadangan di atas diganti kategori
+      // Google-nya (`sans-serif`) yang tidak punya ukuran.
       {
-        name: 'Bricolage Grotesque',
-        weights: [400, 500, 600, 700, 800],
+        name: 'Gantari',
+        weights: [400, 500, 600, 700],
         subsets: ['latin'],
         preload: true,
       },

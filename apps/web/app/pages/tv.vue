@@ -711,7 +711,7 @@ const marqueeSeconds = computed(() => Math.max(8, marquee.value.length * 0.3))
 
       <div class="text-center">
         <!-- Halaman yang sama dipakai TV dan Booth; judulnya mengikuti yang sedang dibuka. -->
-        <h1 class="text-[clamp(36px,10vw,56px)] leading-none font-extrabold tracking-[-0.045em]">
+        <h1 class="text-[clamp(36px,10vw,56px)] leading-none font-bold tracking-[-0.035em]">
           {{ booth ? 'Booth' : 'Memori TV' }}
         </h1>
         <p class="mt-3 text-[14px] text-ink-muted" data-testid="tv-subtitle">

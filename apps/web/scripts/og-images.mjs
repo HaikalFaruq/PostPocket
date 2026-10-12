@@ -2,8 +2,8 @@
 // - og-surat.jpg: halaman penerima, kalau gambar OG suratnya sudah dihapus bersama cover;
 // - og-beranda.jpg: link Beranda.
 // Disusun dengan HTML dari ilustrasi dan warna foil emas milik sendiri, lalu dirender Chromium
-// milik Playwright, dengan bingkai par avion dan huruf Bricolage Grotesque (docs/desain.md). Fontnya
-// diambil dari Google Fonts saat skrip jalan.
+// milik Playwright, dengan bingkai par avion dan huruf Gantari (docs/desain.md). Fontnya diambil
+// dari Google Fonts saat skrip jalan.
 //
 //   node scripts/og-images.mjs
 
@@ -35,22 +35,22 @@ function page({ title, note }) {
   const metal = `linear-gradient(115deg, ${gold.shade} 0%, ${gold.base} 22%, ${gold.light} 40%, ${gold.base} 58%, ${gold.shade} 78%, ${gold.base} 100%)`
   const mask = svg('illustrations/meadow-foil.svg')
   return `<!doctype html><html><head>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;800&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gantari:wght@500;700&display=block" rel="stylesheet">
 <style>
   html, body { margin: 0; }
   body {
     width: 1200px; height: 630px; overflow: hidden; box-sizing: border-box; padding: 26px;
     background: repeating-linear-gradient(-45deg, ${red} 0 24px, #fff 24px 36px, ${ink} 36px 60px, #fff 60px 72px);
-    color: ${ink}; font-family: 'Bricolage Grotesque', sans-serif;
+    color: ${ink}; font-family: 'Gantari', sans-serif;
   }
   .sheet {
     height: 100%; display: grid; grid-template-columns: 1fr 440px; align-items: center;
     background: ${canvas};
   }
   .copy { padding-left: 74px; }
-  .brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 800; letter-spacing: -0.035em; }
+  .brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 700; letter-spacing: -0.03em; }
   .brand img { width: 56px; height: 56px; }
-  h1 { margin: 40px 0 0; max-width: 580px; font-size: 70px; line-height: 0.98; font-weight: 800; letter-spacing: -0.045em; }
+  h1 { margin: 40px 0 0; max-width: 580px; font-size: 70px; line-height: 0.98; font-weight: 700; letter-spacing: -0.035em; }
   p { margin: 22px 0 0; font-size: 30px; font-weight: 500; color: rgb(24 32 74 / 0.66); }
   .card {
     position: relative; width: 318px; height: 442px; border-radius: 5px; overflow: hidden;

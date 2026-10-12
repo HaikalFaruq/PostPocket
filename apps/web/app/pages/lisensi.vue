@@ -27,7 +27,7 @@ useSeoMeta({
 
     <h2>Huruf</h2>
     <p>
-      Bricolage Grotesque, Caveat, dan VT323 dari Google Fonts, dengan
+      Gantari karya Lafontype, Caveat, dan VT323 dari Google Fonts, dengan
       <a href="https://openfontlicense.org/" target="_blank" rel="noopener"
         >SIL Open Font License 1.1</a
       >.
