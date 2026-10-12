@@ -168,10 +168,12 @@
   ],
   "stickers": [
     { "id": "heart", "label": "Hati", "src": "/stickers/heart.webp" },
+    { "id": "smiling-face", "label": "Wajah sayang", "src": "/stickers/smiling-face.webp" },
     { "id": "sparkles", "label": "Kilau", "src": "/stickers/sparkles.webp" },
     { "id": "star", "label": "Bintang", "src": "/stickers/star.webp" },
     { "id": "cherry-blossom", "label": "Bunga sakura", "src": "/stickers/cherry-blossom.webp" },
     { "id": "tulip", "label": "Tulip", "src": "/stickers/tulip.webp" },
+    { "id": "sunflower", "label": "Bunga matahari", "src": "/stickers/sunflower.webp" },
     { "id": "ribbon", "label": "Pita", "src": "/stickers/ribbon.webp" },
     { "id": "gift", "label": "Kado", "src": "/stickers/gift.webp" },
     { "id": "balloon", "label": "Balon", "src": "/stickers/balloon.webp" },
@@ -182,6 +184,7 @@
     { "id": "moon", "label": "Bulan", "src": "/stickers/moon.webp" },
     { "id": "cat", "label": "Kucing", "src": "/stickers/cat.webp" },
     { "id": "bear", "label": "Beruang", "src": "/stickers/bear.webp" },
+    { "id": "dog", "label": "Anjing", "src": "/stickers/dog.webp" },
     { "id": "love-letter", "label": "Surat cinta", "src": "/stickers/love-letter.webp" },
     { "id": "clover", "label": "Semanggi", "src": "/stickers/clover.webp" },
     { "id": "strawberry", "label": "Stroberi", "src": "/stickers/strawberry.webp" }
