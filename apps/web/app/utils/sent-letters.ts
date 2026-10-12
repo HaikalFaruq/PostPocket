@@ -9,6 +9,15 @@ async function read(): Promise<SentLetter[]> {
   return Array.isArray(stored) ? (stored as SentLetter[]) : []
 }
 
+/** Surat `slug` dikirim dari browser ini, jadi yang membukanya di sini adalah pengirimnya. */
+export async function sentHere(slug: string): Promise<boolean> {
+  try {
+    return (await read()).some((item) => item.slug === slug)
+  } catch {
+    return false
+  }
+}
+
 /**
  * Surat yang dikirim dari browser ini, lengkap dengan `editToken`. Server hanya menyimpan hash
  * token, jadi hanya browser pengirim yang bisa menghapus suratnya (kontrak API).
