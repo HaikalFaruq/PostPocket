@@ -47,7 +47,7 @@ function pick(index: number) {
           <IconButton label="Tahun sebelumnya" size="sm" variant="ghost" @click="shownYear--">
             <Icon name="chevron-left" :size="16" />
           </IconButton>
-          <p class="font-mono text-[13px] tracking-[0.12em]" aria-live="polite">{{ shownYear }}</p>
+          <p class="text-[15px] font-semibold tabular-nums" aria-live="polite">{{ shownYear }}</p>
           <IconButton label="Tahun berikutnya" size="sm" variant="ghost" @click="shownYear++">
             <Icon name="chevron-right" :size="16" />
           </IconButton>

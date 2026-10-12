@@ -43,13 +43,13 @@ const open = defineModel<boolean>('open', { default: false })
           <header class="relative shrink-0 border-b border-line-soft px-6 pt-6 pb-4 md:px-8">
             <p
               v-if="eyebrow"
-              class="font-mono text-[11px] tracking-[0.2em] uppercase"
+              class="text-caption font-medium"
               :class="tone === 'pocket' ? 'text-pocket-muted' : 'text-ink-muted'"
             >
               {{ eyebrow }}
             </p>
             <DialogTitle
-              class="mt-2 pr-12 text-[28px] leading-tight font-semibold tracking-[-0.035em]"
+              class="mt-2 pr-12 text-[28px] leading-tight font-extrabold tracking-[-0.04em]"
               :class="tone === 'pocket' ? 'text-pocket-ink' : 'text-ink'"
             >
               {{ title }}

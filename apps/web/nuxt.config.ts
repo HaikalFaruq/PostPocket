@@ -37,7 +37,7 @@ export default defineNuxtConfig({
       title: 'PostPocket',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-        { name: 'theme-color', content: '#f5f5f3' },
+        { name: 'theme-color', content: '#f1f4f8' },
         {
           name: 'description',
           content: 'Tangkap momen, simpan per hari, kirim sebagai surat foil 3D.',
@@ -52,12 +52,30 @@ export default defineNuxtConfig({
   },
 
   fonts: {
-    // Huruf Latin saja (Indonesia dan nama berhuruf aksen). Tanpa ini setiap ketebalan Inter ikut
+    // Huruf Latin saja (Indonesia dan nama berhuruf aksen). Tanpa ini setiap ketebalan ikut
     // membawa @font-face Cyrillic, Yunani, dan Vietnam, dan CSS awal yang memblokir render jadi
     // sepertiganya deklarasi font.
-    defaults: { subsets: ['latin', 'latin-ext'] },
+    // Font cadangan diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), supaya teks
+    // tidak melompat saat font aslinya selesai dimuat.
+    defaults: {
+      subsets: ['latin', 'latin-ext'],
+      fallbacks: {
+        'sans-serif': ['Arial', 'Roboto'],
+        'ui-sans-serif': ['Arial', 'Roboto'],
+        cursive: ['Arial', 'Roboto'],
+      },
+    },
+    priority: ['google'],
     families: [
-      { name: 'Inter', provider: 'google', weights: [400, 500, 600, 700] },
+      // Huruf antarmuka (docs/desain.md). Variabel, jadi satu berkas latin untuk semua ketebalan,
+      // dan di-preload karena dipakai di layar pertama. Sengaja tanpa `provider`: dengan provider,
+      // font cadangan di atas diganti kategori Google-nya (`sans-serif`) yang tidak punya ukuran.
+      {
+        name: 'Bricolage Grotesque',
+        weights: [400, 500, 600, 700, 800],
+        subsets: ['latin'],
+        preload: true,
+      },
       { name: 'Caveat', provider: 'google', weights: [400, 500, 600] },
       { name: 'VT323', provider: 'google', weights: [400] },
     ],
@@ -79,8 +97,8 @@ export default defineNuxtConfig({
       start_url: '/',
       scope: '/',
       display: 'standalone',
-      background_color: '#f5f5f3',
-      theme_color: '#f5f5f3',
+      background_color: '#f1f4f8',
+      theme_color: '#f1f4f8',
       icons: [
         { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
         { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },

@@ -7,18 +7,21 @@ test.beforeEach(async ({ page }) => {
 
 test('PillGroup: klik dan panah keyboard memindah pilihan', async ({ page }) => {
   const group = page.getByRole('radiogroup', { name: 'Bentuk kartu', exact: true })
-  await group.getByRole('radio', { name: 'Square' }).click()
-  await expect(group.getByRole('radio', { name: 'Square' })).toHaveAttribute('aria-checked', 'true')
+  await group.getByRole('radio', { name: 'Persegi' }).click()
+  await expect(group.getByRole('radio', { name: 'Persegi' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  )
   // Tekan seperti jari sungguhan: Reka memindah fokus sesudah keydown, jadi tombol jangan
   // langsung dilepas.
   await page.keyboard.down('ArrowRight')
   await page.waitForTimeout(60)
   await page.keyboard.up('ArrowRight')
-  await expect(group.getByRole('radio', { name: 'Landscape' })).toHaveAttribute(
+  await expect(group.getByRole('radio', { name: 'Mendatar' })).toHaveAttribute(
     'aria-checked',
     'true',
   )
-  await expect(group.getByRole('radio', { name: 'Square' })).toHaveAttribute(
+  await expect(group.getByRole('radio', { name: 'Persegi' })).toHaveAttribute(
     'aria-checked',
     'false',
   )

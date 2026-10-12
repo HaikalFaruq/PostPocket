@@ -5,7 +5,7 @@ import { dayKey, monthTitle } from '~/utils/memories'
 
 useSeoMeta({ title: 'Pocket · PostPocket', robots: 'noindex' })
 // Sama dengan --color-pocket-page di main.css.
-usePageTint('bg-pocket-page', '#efefef')
+usePageTint('bg-pocket-page', '#f1f4f8')
 
 /**
  * Kalender Pocket (PRD modul 2, referensi Day Pocket): setiap hari bisa diisi foto lalu dibungkus
@@ -61,14 +61,13 @@ function openDay(day: string) {
           <img src="/favicon.svg" alt="" class="size-8" />
           <div>
             <p class="text-[17px] leading-none font-bold tracking-[-0.02em]">PostPocket</p>
-            <p class="mt-1 text-caption text-pocket-muted">kantong kecil untuk momen-momenmu</p>
+            <p class="mt-1 text-caption text-pocket-muted">
+              kantong kecil untuk <span class="whitespace-nowrap">momen-momenmu</span>
+            </p>
           </div>
         </NuxtLink>
         <div class="flex items-center gap-2">
-          <p
-            class="hidden font-mono text-[11px] tracking-[0.16em] text-pocket-muted uppercase sm:block"
-            data-testid="saved-count"
-          >
+          <p class="hidden text-caption text-pocket-muted sm:block" data-testid="saved-count">
             {{ memories.savedDays }} hari tersimpan
           </p>
           <MonthPicker :year="year" :month="month" @pick="show" />
@@ -93,10 +92,7 @@ function openDay(day: string) {
       <section class="mt-5 rounded-[30px] bg-surface p-4 shadow-raised sm:p-7">
         <div class="flex flex-wrap items-start justify-between gap-3 px-1 sm:px-0">
           <div>
-            <p class="font-mono text-[11px] tracking-[0.2em] text-pocket-muted uppercase">
-              Kapsul waktu kecilmu
-            </p>
-            <h1 class="mt-1 text-[clamp(28px,7vw,40px)] font-semibold tracking-[-0.035em]">
+            <h1 class="text-[clamp(30px,8vw,42px)] leading-none font-extrabold tracking-[-0.045em]">
               {{ title }}
             </h1>
             <p class="mt-1 text-body text-pocket-muted">
@@ -121,7 +117,7 @@ function openDay(day: string) {
           <div
             v-for="weekday in WEEKDAYS"
             :key="weekday"
-            class="border-r border-b border-line-soft py-2 text-center font-mono text-[10px] tracking-[0.14em] text-pocket-muted uppercase"
+            class="border-r border-b border-line-soft py-2 text-center text-[11px] font-medium text-pocket-muted"
             aria-hidden="true"
           >
             {{ weekday }}
@@ -129,7 +125,7 @@ function openDay(day: string) {
           <div
             v-for="cell in cells"
             :key="cell.day"
-            class="pocket-cell relative aspect-[0.78] border-r border-b border-line-soft sm:aspect-[0.9]"
+            class="pocket-cell relative aspect-[0.72] border-r border-b border-line-soft sm:aspect-[0.9]"
             :class="{ 'is-outside': !cell.inMonth, 'is-today': cell.day === today }"
           >
             <button
@@ -143,14 +139,20 @@ function openDay(day: string) {
             >
               <!-- Di HP selnya sempit: hari ini cukup ditebalkan, pil hanya di layar lebar. -->
               <span
-                class="absolute top-1 left-1 font-mono text-[11px] sm:top-1.5 sm:left-1.5"
+                class="absolute top-1 left-1 text-[12px] font-medium tabular-nums sm:top-1.5 sm:left-1.5"
                 :class="
                   cell.day === today &&
                   'font-bold sm:rounded-full sm:bg-pocket-ink sm:px-1.5 sm:font-normal sm:text-white'
                 "
                 >{{ cell.date }}</span
               >
-              <span v-if="packetOf(cell.day)" class="mt-[50%] w-[54%] sm:mt-[26%]">
+              <!-- Titik gantung tepat di bawah baris tanggal (21px, 28px di layar lebar). Jepitan
+                   kantong menjulur 8% tinggi kantong (5,4% lebar sel) di atasnya, jadi kantong
+                   yang tersimpan tergantung di tempat jepitan sel kosong. -->
+              <span
+                v-if="packetOf(cell.day)"
+                class="mt-[calc(21px_+_5.4%)] w-1/2 sm:mt-[calc(28px_+_5.4%)]"
+              >
                 <SnackPacket
                   :color="packetOf(cell.day)!.color"
                   :sticker="packetOf(cell.day)!.sticker"
@@ -159,7 +161,7 @@ function openDay(day: string) {
               </span>
               <template v-else>
                 <span
-                  class="pocket-clip mt-[16%] h-3.5 w-1.5 sm:mt-[14%] sm:h-[18px] sm:w-[7px]"
+                  class="clothespin relative mt-[21px] h-2.5 w-[5px] sm:mt-7 sm:h-[18px] sm:w-[7px]"
                   aria-hidden="true"
                 />
                 <span
@@ -172,7 +174,7 @@ function openDay(day: string) {
             </button>
             <span
               v-else
-              class="absolute top-1 left-1 font-mono text-[11px] text-pocket-muted sm:top-1.5 sm:left-1.5"
+              class="absolute top-1 left-1 text-[12px] tabular-nums text-pocket-muted sm:top-1.5 sm:left-1.5"
               aria-hidden="true"
               >{{ cell.date }}</span
             >
@@ -206,12 +208,6 @@ function openDay(day: string) {
 }
 
 .pocket-cell button:hover {
-  background-color: rgb(74 59 48 / 0.03);
-}
-
-.pocket-clip {
-  border-radius: 2px;
-  background: var(--color-pocket-wood);
-  box-shadow: 0 1px 2px rgb(74 59 48 / 0.25);
+  background-color: var(--color-fill);
 }
 </style>

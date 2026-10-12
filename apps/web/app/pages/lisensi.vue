@@ -27,7 +27,7 @@ useSeoMeta({
 
     <h2>Huruf</h2>
     <p>
-      Inter, Caveat, dan VT323 dari Google Fonts, dengan
+      Bricolage Grotesque, Caveat, dan VT323 dari Google Fonts, dengan
       <a href="https://openfontlicense.org/" target="_blank" rel="noopener"
         >SIL Open Font License 1.1</a
       >.

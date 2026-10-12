@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 
 // Sama dengan --color-canvas dan --color-ink di main.css, serta emas di favicon.svg.
-const canvas = '#f5f5f3'
-const ink = '#111114'
+const canvas = '#f1f4f8'
+const ink = '#18204a'
 const gold = '#d9b45a'
 
 /** Amplop favicon (kotak 32) selebar `width` kali ukuran ikon, di tengah. */

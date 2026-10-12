@@ -170,7 +170,7 @@ onMounted(() => {
       class="w-full rounded-t-[24px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:max-w-md sm:rounded-[24px]"
     >
       <template v-if="state === 'sending'">
-        <h2 id="send-title" class="text-title font-semibold">Membuat link…</h2>
+        <h2 id="send-title" class="text-title">Membuat link…</h2>
         <ol class="mt-4 space-y-2" aria-live="polite">
           <li
             v-for="(item, index) in phases"
@@ -197,7 +197,7 @@ onMounted(() => {
       </template>
 
       <template v-else-if="state === 'done' && sent">
-        <h2 id="send-title" class="text-title font-semibold">Link surat siap</h2>
+        <h2 id="send-title" class="text-title">Link surat siap</h2>
         <p class="mt-1 text-ink-muted">
           Kirim link ini ke dia. Suratnya bisa dibuka sampai {{ expires }}.
           <template v-if="hasPhotos">
@@ -215,21 +215,23 @@ onMounted(() => {
           />
           <button
             type="button"
-            class="h-10 shrink-0 rounded-control bg-ink px-4 text-body font-semibold text-white"
+            class="h-10 shrink-0 rounded-control px-4 text-body font-semibold"
+            :class="canShare ? 'inset-ring inset-ring-line' : 'bg-ink text-white'"
             @click="copy"
           >
             {{ copied ? 'Tersalin' : 'Salin' }}
           </button>
         </div>
+        <!-- Di HP, cara paling umum mengirim link adalah lembar Bagikan (WhatsApp dan lainnya). -->
+        <button
+          v-if="canShare"
+          type="button"
+          class="mt-3 h-11 w-full rounded-control bg-ink text-body font-semibold text-white"
+          @click="share"
+        >
+          Bagikan link
+        </button>
         <div class="mt-3 flex flex-wrap gap-2">
-          <button
-            v-if="canShare"
-            type="button"
-            class="h-9 rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
-            @click="share"
-          >
-            Bagikan
-          </button>
           <a
             :href="sent.url"
             target="_blank"
@@ -249,7 +251,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="h-10 rounded-control bg-ink px-5 text-body font-semibold text-white"
+            class="h-10 rounded-control px-5 text-body font-semibold inset-ring inset-ring-line"
             @click="close"
           >
             Selesai
@@ -258,7 +260,7 @@ onMounted(() => {
       </template>
 
       <template v-else-if="state === 'deleted'">
-        <h2 id="send-title" class="text-title font-semibold">Surat dihapus</h2>
+        <h2 id="send-title" class="text-title">Surat dihapus</h2>
         <p class="mt-1 text-ink-muted">Link-nya sudah tidak bisa dibuka.</p>
         <button
           type="button"
@@ -270,7 +272,7 @@ onMounted(() => {
       </template>
 
       <template v-else>
-        <h2 id="send-title" class="text-title font-semibold">Link belum jadi</h2>
+        <h2 id="send-title" class="text-title">Link belum jadi</h2>
         <p role="alert" class="mt-1 text-ink-muted">{{ error }}</p>
         <div class="mt-6 flex gap-2">
           <button

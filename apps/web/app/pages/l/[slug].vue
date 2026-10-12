@@ -140,15 +140,19 @@ const formatDate = (value: string | null | undefined) =>
     </header>
 
     <main v-if="letter" class="flex flex-1 flex-col items-center">
-      <div class="relative h-[min(64dvh,560px)] w-full">
-        <ClientOnly>
-          <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
-          <template #fallback>
-            <div class="grid size-full place-items-center [container-type:size]">
-              <div class="rounded-[3px] shadow-raised" :style="placeholderStyle" />
-            </div>
-          </template>
-        </ClientOnly>
+      <h1 class="sr-only">{{ ownLetter ? 'Pratinjau suratmu' : 'Surat untukmu' }}</h1>
+      <!-- Suratnya datang dalam amplop par avion, sama dengan gambar pratinjau di chat. -->
+      <div class="airmail w-full">
+        <div class="relative h-[min(60dvh,540px)] w-full rounded-[3px] bg-canvas">
+          <ClientOnly>
+            <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
+            <template #fallback>
+              <div class="grid size-full place-items-center [container-type:size]">
+                <div class="rounded-[3px] shadow-raised" :style="placeholderStyle" />
+              </div>
+            </template>
+          </ClientOnly>
+        </div>
       </div>
       <!-- Sebelum dibuka, satu-satunya langkah adalah mengetuk kartu; balasan baru muncul sesudahnya. -->
       <p
@@ -176,7 +180,7 @@ const formatDate = (value: string | null | undefined) =>
             class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-5 text-body font-semibold text-white hover:bg-ink/90"
             data-testid="reply"
           >
-            Bikin balasan <Icon name="arrow-right" :size="15" />
+            Bikin balasan
           </NuxtLink>
         </div>
       </template>
@@ -206,15 +210,15 @@ const formatDate = (value: string | null | undefined) =>
       class="flex flex-1 flex-col items-center justify-center pb-16 text-center"
       data-testid="letter-missing"
     >
-      <h1 class="text-title font-semibold">
+      <h1 class="text-title">
         {{ missing ? 'Surat ini sudah tidak tersedia' : 'Surat belum bisa dimuat' }}
       </h1>
-      <p class="mt-2 max-w-sm text-ink-muted">
-        {{
-          missing
-            ? 'Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau link-nya terpotong saat disalin.'
-            : 'Coba muat ulang halaman ini sebentar lagi.'
-        }}
+      <p class="mt-2 max-w-sm text-pretty text-ink-muted">
+        <template v-if="missing">
+          Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau
+          <span class="whitespace-nowrap">link-nya</span> terpotong saat disalin.
+        </template>
+        <template v-else>Coba muat ulang halaman ini sebentar lagi.</template>
       </p>
       <NuxtLink
         to="/letter/new"
@@ -225,7 +229,7 @@ const formatDate = (value: string | null | undefined) =>
     </main>
 
     <footer class="py-6 text-center text-caption text-ink-muted">
-      PostPocket versi beta · ada yang tidak beres?
+      Ada yang tidak beres dengan surat ini?
       <FeedbackLink class="font-semibold text-ink underline underline-offset-2" />
     </footer>
   </div>

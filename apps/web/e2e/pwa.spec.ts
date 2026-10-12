@@ -59,7 +59,7 @@ test('Beranda tetap terbuka offline, halaman yang belum tersimpan diganti halama
   await context.setOffline(true)
   const response = await page.reload()
   expect(response?.fromServiceWorker()).toBe(true)
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Tangkap momen')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Kenangan kecil')
   await expect(page.getByRole('button', { name: /Contoh surat/ })).toBeVisible()
 
   await page.goto('/lab')
@@ -113,7 +113,7 @@ test('Pocket dan TV tetap terbuka offline, lengkap dengan stiker dan kenangan di
   const today = page.locator('[data-day]').last()
   await today.click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan tanpa foto' }).click()
   // Modal baru tertutup setelah data tertulis di IndexedDB.
   await expect(dialog).toBeHidden()
   await expect(today).toHaveAttribute('data-saved', 'true')

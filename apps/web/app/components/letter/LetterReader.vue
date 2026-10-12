@@ -34,12 +34,13 @@ useBackToClose(open, () => {
   <DialogRoot v-model:open="open">
     <DialogPortal>
       <DialogOverlay
-        class="fixed inset-0 z-40 bg-[rgb(28_24_20/0.92)] backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
+        class="fixed inset-0 z-40 bg-[rgb(24_32_74/0.94)] backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
       />
       <DialogContent
         class="fixed inset-0 z-50 overflow-y-auto overscroll-contain px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))] data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
         :aria-describedby="undefined"
         data-testid="letter-reader"
+        data-surface="dark"
       >
         <div class="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
           <DialogTitle class="text-body font-semibold text-white">Surat untukmu</DialogTitle>

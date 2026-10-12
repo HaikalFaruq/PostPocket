@@ -16,7 +16,7 @@ import {
 } from './letter-template'
 
 const template = (id: string) => byId(letter.templates, id)!
-// Ilustrasi (0.72), Portrait, Square, dan Landscape.
+// Ilustrasi (0.72), Tegak, Persegi, dan Mendatar.
 const ratios = [0.72, 0.75, 1, 1.3333]
 
 /** Batas kotak elemen sebelum diputar, dalam pecahan lebar dan tinggi halaman. */

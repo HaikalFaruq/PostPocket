@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * Kartu langkah bernomor.
- * - `section`: gaya Foil Studio, nomor di lingkaran hitam, dipisah garis tipis (Letter).
- * - `card`: gaya Day Pocket, nomor "01" monospace di kartu putih (Pocket).
+ * Bagian formulir.
+ * - `section`: langkah bernomor yang dipisah garis tipis (editor surat, urutannya memang langkah).
+ * - `card`: bagian tanpa nomor untuk pilihan yang bebas urutan (modal Pocket); dipisah garis di
+ *   dalam satu lembar putih, bukan kartu-kartu yang seragam.
  */
 const props = withDefaults(
   defineProps<{
@@ -17,9 +18,7 @@ const props = withDefaults(
 )
 
 const headingId = useId()
-const number = computed(() =>
-  props.variant === 'card' ? String(props.step).padStart(2, '0') : String(props.step),
-)
+const number = computed(() => String(props.step))
 </script>
 
 <template>
@@ -48,20 +47,12 @@ const number = computed(() =>
     </div>
   </section>
 
-  <section
-    v-else
-    :aria-labelledby="headingId"
-    class="rounded-[20px] bg-surface p-4 shadow-[0_1px_2px_rgb(17_17_20/0.04)]"
-  >
+  <section v-else :aria-labelledby="headingId" class="px-4 py-4 sm:px-5">
     <div class="flex items-start gap-3">
-      <span
-        class="grid size-8 shrink-0 place-items-center rounded-full bg-fill font-mono text-[11px] font-medium"
-        aria-hidden="true"
-        >{{ number }}</span
-      >
       <div class="min-w-0">
-        <h2 :id="headingId" class="text-body font-semibold">
-          <span class="sr-only">Langkah {{ step }}: </span>{{ title }}
+        <h2 :id="headingId" class="text-[15px] font-bold tracking-[-0.01em]">
+          {{ title }}
+          <span v-if="hint" class="ml-1 font-normal text-ink-muted">{{ hint }}</span>
         </h2>
         <p v-if="description" class="text-caption text-ink-muted">{{ description }}</p>
       </div>
@@ -69,7 +60,7 @@ const number = computed(() =>
         <slot name="action" />
       </div>
     </div>
-    <div class="mt-3 sm:pl-11">
+    <div class="mt-3">
       <slot />
     </div>
   </section>

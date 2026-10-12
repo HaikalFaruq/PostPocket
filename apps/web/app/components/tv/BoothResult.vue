@@ -157,7 +157,7 @@ function focusPrimary(event: Event) {
         class="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-[24px] bg-surface p-5"
       >
         <div class="flex items-center justify-between">
-          <h2 id="booth-result-title" class="text-title font-semibold">Hasil Booth</h2>
+          <h2 id="booth-result-title" class="text-title">Hasil Booth</h2>
           <IconButton label="Tutup" size="sm" variant="ghost" @click="discard('close')">
             <Icon name="close" :size="15" />
           </IconButton>
@@ -184,7 +184,7 @@ function focusPrimary(event: Event) {
         >
           {{ saved.pocket ? '✓ Tersimpan di Pocket' : 'Simpan ke Pocket hari ini' }}
         </button>
-        <div class="mt-2 grid grid-cols-3 gap-2">
+        <div class="mt-2 grid grid-cols-1 gap-2 min-[480px]:grid-cols-3">
           <button type="button" class="booth-action" :disabled="busy || saved.cd" @click="putInCd">
             {{ saved.cd ? '✓ Di CD' : 'Masukkan ke CD' }}
           </button>
@@ -192,7 +192,7 @@ function focusPrimary(event: Event) {
             Pakai di surat
           </button>
           <button type="button" class="booth-action" :disabled="busy" @click="download">
-            {{ saved.file ? '✓ Diunduh' : 'Unduh PNG' }}
+            {{ saved.file ? '✓ Diunduh' : 'Unduh gambar' }}
           </button>
         </div>
         <p v-if="message" role="status" class="mt-3 text-caption text-ink-muted">{{ message }}</p>

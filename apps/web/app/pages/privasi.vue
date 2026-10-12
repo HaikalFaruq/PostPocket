@@ -41,8 +41,9 @@ useSeoMeta({
 
     <h2>Siapa yang bisa membuka suratmu</h2>
     <p>
-      Siapa pun yang memegang link-nya. Link berisi kode acak yang sulit ditebak, tidak muncul di
-      mesin pencari, dan tidak didaftar di mana pun, jadi bagikan hanya ke orang yang kamu tuju.
+      Siapa pun yang memegang <span class="whitespace-nowrap">link-nya</span>. Link berisi kode acak
+      yang sulit ditebak, tidak muncul di mesin pencari, dan tidak didaftar di mana pun, jadi
+      bagikan hanya ke orang yang kamu tuju.
     </p>
 
     <h2>Berapa lama disimpan</h2>
@@ -62,8 +63,9 @@ useSeoMeta({
     <h2>Alamat IP dan pembatasan spam</h2>
     <p>
       Satu jaringan bisa membuat paling banyak 10 surat per jam. Untuk menghitungnya, server
-      menyimpan versi tersandi (hash berkunci) dari alamat IP pengirim, bukan alamat IP-nya, dan
-      menghapusnya paling lambat 2 jam kemudian. Fungsi server PostPocket tidak mencatat alamat IP.
+      menyimpan versi tersandi (hash berkunci) dari alamat IP pengirim, bukan alamat
+      <span class="whitespace-nowrap">IP-nya</span>, dan menghapusnya paling lambat 2 jam kemudian.
+      Fungsi server PostPocket tidak mencatat alamat IP.
     </p>
     <p>
       Penyedia hosting (Supabase dan Vercel) tetap mencatat alamat IP di log teknis mereka untuk

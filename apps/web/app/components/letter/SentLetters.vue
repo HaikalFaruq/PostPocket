@@ -89,7 +89,7 @@ async function remove(item: SentRecord) {
         data-testid="sent-letters"
       >
         <div class="flex items-start justify-between gap-3">
-          <DialogTitle class="text-title font-semibold">Surat terkirim</DialogTitle>
+          <DialogTitle class="text-title">Surat terkirim</DialogTitle>
           <DialogClose as-child>
             <IconButton label="Tutup" size="sm" variant="ghost">
               <Icon name="close" :size="15" />
@@ -111,7 +111,7 @@ async function remove(item: SentRecord) {
               {{ item.preview || 'Surat tanpa teks' }}
             </p>
             <p class="mt-0.5 text-caption text-ink-muted">
-              Dibuat {{ date(item.publishedAt) }} · bisa dibuka sampai {{ date(item.expiresAt) }}
+              Dibuat {{ date(item.publishedAt) }}, bisa dibuka sampai {{ date(item.expiresAt) }}
             </p>
             <div class="mt-2.5 flex flex-wrap gap-2">
               <button

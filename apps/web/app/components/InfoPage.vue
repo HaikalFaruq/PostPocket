@@ -14,7 +14,7 @@ defineProps<{ title: string; lead?: string }>()
       </NuxtLink>
     </header>
     <main class="info-page flex-1 pt-4 pb-16">
-      <h1 class="text-title font-semibold">{{ title }}</h1>
+      <h1 class="text-title">{{ title }}</h1>
       <p v-if="lead" class="mt-2 text-body text-ink-muted">{{ lead }}</p>
       <slot />
     </main>

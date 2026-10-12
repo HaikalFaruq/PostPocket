@@ -217,7 +217,7 @@ const contentSummary = computed(() => {
   const photos = filled.value.filter((e) => e.kind === 'photo').length
   const stickers = filled.value.filter((e) => e.kind === 'sticker').length
   const parts = [photos && `${photos} foto`, stickers && `${stickers} stiker`].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'Belum ada foto atau stiker.'
+  return parts.length ? parts.join(', ') : 'Belum ada foto atau stiker.'
 })
 
 // "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG. Draf yang sudah jadi link
@@ -319,7 +319,7 @@ async function startOver() {
     <main class="relative min-h-0 flex-1">
       <NuxtLink
         to="/"
-        class="absolute top-4 left-4 z-10 inline-flex items-center gap-1 text-caption text-ink-muted hover:text-ink"
+        class="absolute top-2 left-3 z-10 inline-flex min-h-11 items-center gap-1 px-1 text-body text-ink-muted hover:text-ink"
       >
         <Icon name="chevron-left" :size="14" /> PostPocket
       </NuxtLink>
@@ -343,7 +343,7 @@ async function startOver() {
         v-if="isDesktop"
         class="pointer-events-none absolute inset-x-0 bottom-6 text-center text-caption text-ink-muted"
       >
-        {{ cardHint }} · geser untuk memutar
+        {{ cardHint }}, geser untuk memutar
       </p>
       <div
         v-if="dragging"
@@ -359,7 +359,7 @@ async function startOver() {
       </template>
 
       <div class="px-6 pt-6 pb-1">
-        <h1 class="text-title font-semibold">Surat foil</h1>
+        <h1 class="text-title">Surat foil</h1>
         <p class="mt-1 text-ink-muted">
           Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu kirim lewat link.
         </p>
