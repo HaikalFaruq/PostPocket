@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PhotoFilter } from '@postpocket/presets'
+import type { BoothLayout } from '~/utils/booth'
 
 /**
  * Pratinjau kamera Booth di layar TV, dengan filter aktif dan efeknya. Kamera depan dicerminkan
@@ -12,6 +13,9 @@ const props = defineProps<{
   /** Jepretan ke berapa dari berapa, selama memotret. */
   progress?: { shot: number; total: number } | null
   flash: number
+  /** Tata letak hasil dan jepretan yang sudah diambil, untuk pratinjau di pojok layar. */
+  layout: BoothLayout
+  captured: string[]
 }>()
 const emit = defineEmits<{ ready: []; error: [message: string] }>()
 const video = ref<HTMLVideoElement | null>(null)
@@ -78,6 +82,7 @@ const filterCss = computed(() => {
     <div
       v-if="countdown !== null"
       class="absolute inset-0 grid place-items-center font-tv text-[clamp(72px,22vw,140px)] text-white"
+      data-testid="booth-countdown"
       style="text-shadow: 0 0 18px rgb(0 0 0 / 0.6)"
       aria-live="assertive"
     >
@@ -91,6 +96,11 @@ const filterCss = computed(() => {
     >
       FOTO {{ progress.shot }}/{{ progress.total }}
     </p>
+    <BoothLayoutPreview
+      :layout="layout"
+      :shots="captured"
+      :active="countdown !== null || !!progress"
+    />
     <div v-if="flash" :key="flash" class="booth-flash absolute inset-0 bg-white" />
   </div>
 </template>
