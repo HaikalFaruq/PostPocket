@@ -131,6 +131,25 @@ test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ pag
   await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
 })
 
+test('foto yang ditambah ke kantong kosong langsung bisa dikirim sebagai surat', async ({
+  page,
+}) => {
+  // Kantong disimpan tanpa foto, lalu fotonya ditambah setelah kantong disobek.
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: /^Simpan/ }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.goto(`/pocket/${TODAY}`)
+  await page.getByRole('button', { name: 'Buka kantong' }).click()
+  const send = page.getByRole('button', { name: 'Kirim sebagai surat' })
+  await expect(send).toBeDisabled()
+  await page.getByLabel('Tambah foto ke kantong').setInputFiles(await photos(page, [20]))
+  await expect(page.getByTestId('moment')).toHaveCount(1)
+  await expect(send).toBeEnabled()
+})
+
 test('buka kantong: disobek, foto keluar, lalu dikirim sebagai surat', async ({ page }) => {
   await page.goto('/pocket')
   await saveDay(page, TODAY, [20, 200])
@@ -212,25 +231,6 @@ test('foto kenangan pertama meminta penyimpanan permanen, sekali saja', async ({
   await page.getByTestId('pocket-upload').setInputFiles(await photos(page, [200]))
   await expect(page.getByTestId('moment')).toHaveCount(2)
   expect(await calls()).toBe(1)
-})
-
-test('foto yang ditambah ke kantong kosong langsung bisa dikirim sebagai surat', async ({
-  page,
-}) => {
-  // Kantong disimpan tanpa foto, lalu fotonya ditambah setelah kantong disobek.
-  await page.goto('/pocket')
-  await page.locator(`[data-day="${TODAY}"]`).click()
-  const dialog = page.getByRole('dialog')
-  await dialog.getByRole('button', { name: /^Simpan/ }).click()
-  await expect(dialog).toBeHidden()
-
-  await page.goto(`/pocket/${TODAY}`)
-  await page.getByRole('button', { name: 'Buka kantong' }).click()
-  const send = page.getByRole('button', { name: 'Kirim sebagai surat' })
-  await expect(send).toBeDisabled()
-  await page.getByLabel('Tambah foto ke kantong').setInputFiles(await photos(page, [20]))
-  await expect(page.getByTestId('moment')).toHaveCount(1)
-  await expect(send).toBeEnabled()
 })
 
 test('tanggal tanpa kantong menawarkan untuk membuatnya, tanggal yang belum datang ditolak', async ({
