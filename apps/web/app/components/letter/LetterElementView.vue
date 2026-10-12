@@ -67,6 +67,14 @@ const sticker = computed(() =>
   box-shadow: 0 0.5cqw 1.6cqw rgb(17 17 20 / 0.18);
 }
 
+/* Selama fotonya dimuat, bagian dalam bingkai tidak tampak kosong. */
+.letter-photo::before {
+  content: '';
+  position: absolute;
+  inset: 1.4cqw;
+  background-color: rgb(17 17 20 / 0.07);
+}
+
 .letter-photo > img,
 .letter-photo__empty {
   position: absolute;

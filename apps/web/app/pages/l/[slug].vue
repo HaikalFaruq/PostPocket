@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { byId, letter as letterPresets } from '@postpocket/presets'
+import { PHOTO_FRONT, cardRatio } from '~/utils/letter-draft'
 import { LetterApiError } from '~/utils/letter-api'
 import { sentHere } from '~/utils/sent-letters'
 
@@ -43,6 +45,41 @@ useSeoMeta({
   ogImageAlt: 'Sampul surat foil',
   twitterCard: 'summary_large_image',
   robots: 'noindex, nofollow',
+})
+
+// Gambar depan kartu adalah elemen terbesar (LCP) halaman ini, tapi kartunya baru dirender di
+// browser. Gambarnya di-preload dari HTML supaya unduhannya mulai bersamaan dengan halaman.
+const frontImages = computed(() => {
+  const design = letter.value?.design
+  if (!design) return []
+  if (design.illustration === PHOTO_FRONT)
+    return letter.value?.cover ? [letter.value.cover.url] : []
+  const art = byId(letterPresets.illustrations, design.illustration)
+  return art ? [art.art, art.foil].filter((href): href is string => !!href) : []
+})
+// Pengganti kartu selama JavaScript dimuat: ukuran dan warna kertasnya sama dengan kartu nanti,
+// jadi pergantiannya tidak terlihat seperti kedipan.
+const placeholderStyle = computed(() => {
+  const design = letter.value?.design
+  const ratio = design ? cardRatio(design, letter.value?.cover ?? null) : 0.72
+  const paper = design ? byId(letterPresets.papers, design.paper) : undefined
+  return {
+    aspectRatio: String(ratio),
+    width: `min(78cqw, ${(72 * ratio).toFixed(2)}cqh)`,
+    backgroundColor: paper?.color ?? 'var(--color-surface)',
+  }
+})
+
+useHead({
+  link: () =>
+    frontImages.value.map((href, index) => ({
+      rel: 'preload',
+      as: 'image',
+      href,
+      // Sama dengan <img> kartu dan pemuat kanvas, supaya preload-nya terpakai.
+      crossorigin: 'anonymous',
+      fetchpriority: index === 0 ? 'high' : 'auto',
+    })),
 })
 
 const open = ref(false)
@@ -107,8 +144,8 @@ const formatDate = (value: string | null | undefined) =>
         <ClientOnly>
           <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
           <template #fallback>
-            <div class="grid size-full place-items-center">
-              <div class="aspect-[0.72] h-[72%] rounded-[3px] bg-surface shadow-raised" />
+            <div class="grid size-full place-items-center [container-type:size]">
+              <div class="rounded-[3px] shadow-raised" :style="placeholderStyle" />
             </div>
           </template>
         </ClientOnly>
