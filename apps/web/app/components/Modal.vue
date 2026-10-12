@@ -34,7 +34,7 @@ const open = defineModel<boolean>('open', { default: false })
     </DialogTrigger>
     <DialogPortal>
       <DialogOverlay
-        class="fixed inset-0 z-40 bg-[rgb(28_24_20/0.32)] backdrop-blur-[2px] data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
+        class="scrim fixed inset-0 z-40 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
       />
       <div class="pointer-events-none fixed inset-0 z-50 grid md:place-items-center md:p-6">
         <DialogContent

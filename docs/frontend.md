@@ -78,7 +78,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 | `StickyCTA` | Letter, Booth | Tombol hitam selebar panel yang menempel di bawah; `loading` dan `disabled` |
 | `BottomSheet` | HP | Sheet yang bisa dilipat lewat chevron; slot `peek` untuk petunjuk dan `footer` untuk CTA |
 | `SidePanel` | Desktop | Kolom kanan 400 px setinggi layar; slot `footer` |
-| `Modal` | Pocket | Dua kolom (slot `preview` dan isi), layar penuh di HP, Esc menutup, fokus terkunci |
+| `Modal` | Pocket | Dua kolom (slot `preview` dan isi), layar penuh di HP, Esc menutup, fokus terkunci, latar `scrim` yang kabur seperti semua popup |
 | `IconButton` | Semua | Tombol bulat 32/40/44 px; `label` wajib |
 | `PhotoFrame` | Pocket, Booth, Letter | `polaroid`, `stamp` (tepi bergerigi), `ticket`; warna teks menyesuaikan warna bingkai |
 | `FoilCard` | Letter, Beranda, halaman penerima | Kartu lipat foil CSS 3D, lihat [spike](spikes/foil-3d.md) |

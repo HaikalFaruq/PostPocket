@@ -37,7 +37,7 @@ async function saveDay(page: Page, day: string, hues: number[]) {
   await expect(dialog).toBeVisible()
   await page.getByTestId('moment-upload').setInputFiles(await photos(page, hues))
   await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(hues.length)
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
   await expect(dialog).toBeHidden()
 }
 
@@ -114,8 +114,14 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   await expect(preview.locator('.photo-frame img')).toHaveAttribute('src', /^blob:/)
   await dialog.getByRole('radio', { name: 'Prangko' }).click()
   await expect(preview.locator('.photo-frame')).toHaveClass(/is-stamp/)
+  // Pilihan bingkai menunjukkan foto pertama dalam tiap bingkai.
+  await expect(dialog.getByRole('radio', { name: /Tiket bioskop/ }).locator('img')).toHaveAttribute(
+    'src',
+    /^blob:/,
+  )
+  await expect(dialog).toContainText('2 foto terselip')
 
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
   await expect(dialog).toBeHidden()
   const cell = page.locator(`[data-day="${TODAY}"]`)
   await expect(cell).toHaveAttribute('data-saved', 'true')
@@ -135,7 +141,7 @@ test('menutup modal dengan foto yang belum disimpan bertanya dulu', async ({ pag
   await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
 
   page.once('dialog', (confirm) => confirm.dismiss())
-  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await dialog.getByRole('button', { name: 'Batal' }).click()
   await expect(dialog).toBeVisible()
 
   // Back di HP juga bertanya dulu, dan tidak meninggalkan Pocket.
@@ -255,6 +261,38 @@ test('kantong juga bisa dibuka dengan keyboard', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Kantong sudah dibuka' })).toBeDisabled()
 })
 
+test('ganti desain: foto lama bisa dikeluarkan, kantong bisa dihapus, latarnya kabur', async ({
+  page,
+}) => {
+  await page.goto('/pocket')
+  await saveDay(page, TODAY, [20, 200])
+  await openPocket(page)
+  await page.getByRole('button', { name: 'Ganti desain kantong' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Ganti desain kantong' })).toBeVisible()
+  // Latar di belakang modal kabur.
+  const blur = await page
+    .locator('.scrim')
+    .first()
+    .evaluate(
+      (el) => getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter,
+    )
+  expect(blur).toContain('blur')
+
+  await expect(dialog).toContainText('2 foto terselip')
+  await dialog.getByRole('button', { name: 'Keluarkan foto 1 dari kantong' }).click()
+  await expect(dialog).toContainText('1 foto terselip')
+  await dialog.getByRole('button', { name: 'Simpan perubahan' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByTestId('line-photo')).toHaveCount(1)
+
+  await page.getByRole('button', { name: 'Ganti desain kantong' }).click()
+  page.once('dialog', (confirm) => confirm.accept())
+  await dialog.getByRole('button', { name: 'Hapus kantong' }).click()
+  await expect(page).toHaveURL(/\/pocket$/)
+  await expect(page.locator(`[data-day="${TODAY}"]`)).not.toHaveAttribute('data-saved', 'true')
+})
+
 test('putar di TV: isi kantong langsung diputar, foto baru masuk ke kantong yang sama', async ({
   page,
 }) => {
@@ -354,7 +392,7 @@ test('foto HEIC bisa dipilih dan tampil, juga di browser yang tidak membuka HEIC
       timeout: 20_000,
     })
     .toEqual([480, 360])
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
   await expect(dialog).toBeHidden()
 
   await openPocket(page)

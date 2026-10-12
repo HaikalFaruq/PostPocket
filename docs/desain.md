@@ -22,6 +22,8 @@ Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 
 **Modul.** Pocket dan TV memakai kertas dan tinta yang sama dengan Beranda. Ciri tiap modul ada di bendanya: kantong jajan dan jepitan kayu (utility `clothespin`) di Pocket, TV jadul berlayar VT323 di Memori TV dan Booth.
 
+**Lapisan mengambang.** Modal, lembar, dan popup memakai utility `scrim`: halaman di belakangnya kabur (blur 14 px) dan sedikit gelap, jadi yang mengambang terasa terangkat tanpa memutus konteks.
+
 **Satu hal yang berani.** Garis par avion merah-biru hanya membingkai surat: kartu contoh di Beranda dan halaman surat penerima. Bagian lain dibuat tenang.
 
 ## Aturan
@@ -34,7 +36,7 @@ Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
    - kartu identik dengan bayangan yang sama;
    - font mono untuk label kecil.
 
-   Kecuali bagian dari benda itu sendiri, misalnya cap tanggal di foto, merek di punggung kartu, atau tulisan di layar TV.
+   Kecuali bagian dari benda itu sendiri, misalnya cap tanggal di foto, merek di punggung kartu, atau tulisan di layar TV. Modal kantong Pocket juga pengecualian: kartu langkah bernomor 01–04 mengikuti Day Pocket, keputusan Kall pada 13 Oktober 2026.
 3. **Kata-kata dari sudut pandang user.** Kalimat biasa (bukan huruf kapital semua), kata kerja yang jelas, dan satu nama untuk satu aksi di seluruh alur.
 4. **Batas mutu tetap berlaku:** kontras minimal 4,5:1 untuk teks, fokus keyboard terlihat, `prefers-reduced-motion` dihormati, dan tata letak tetap rapi dari HP 360 px sampai desktop.
 

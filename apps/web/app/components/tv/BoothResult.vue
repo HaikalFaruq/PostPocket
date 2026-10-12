@@ -151,7 +151,7 @@ function focusPrimary(event: Event) {
 
 <template>
   <div
-    class="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4"
+    class="scrim fixed inset-0 z-50 grid place-items-center p-4"
     data-testid="booth-result"
     @click.self="discard('close')"
   >

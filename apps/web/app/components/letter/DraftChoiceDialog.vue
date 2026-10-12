@@ -54,7 +54,7 @@ function focusSafeChoice(event: Event) {
 <template>
   <DialogRoot :open="!!asking" @update:open="(isOpen: boolean) => !isOpen && answer(null)">
     <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-[60] bg-ink/40 data-[state=open]:animate-fade-in" />
+      <DialogOverlay class="scrim fixed inset-0 z-[60] data-[state=open]:animate-fade-in" />
       <DialogContent
         class="fixed inset-x-0 bottom-0 z-[60] rounded-t-[24px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[24px]"
         data-testid="draft-choice"

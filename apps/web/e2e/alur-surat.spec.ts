@@ -41,7 +41,7 @@ async function sendFromPocket(page: Page, size = { width: 600, height: 450 }) {
   })
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
   await expect(dialog).toBeHidden()
   await sendAgainFromPocket(page)
 }

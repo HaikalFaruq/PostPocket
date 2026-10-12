@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { byId, letter, pocket } from '@postpocket/presets'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
-import { longDate } from '~/utils/calendar'
+import { longDate, shortDate } from '~/utils/calendar'
 import { readExifDate } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import type { DraftPhoto } from '~/utils/letter-draft'
 import type { PocketDay } from '~/utils/memories'
 
 /**
- * Modal "Simpan satu hari kecil" (PRD Pocket): warna kantong, stiker, bingkai foto, dan momen.
- * Preview kantong berubah langsung. Dipakai juga untuk mengganti desain kantong yang sudah ada.
+ * Modal "Simpan satu hari kecil" (PRD Pocket, mengikuti Day Pocket): empat kartu bernomor untuk
+ * warna kantong, stiker, bingkai foto, dan foto hari itu. Preview kantong di kiri berubah langsung.
+ * Dipakai juga untuk mengganti desain kantong yang sudah ada: foto lama bisa dikeluarkan dan
+ * kantongnya bisa dihapus. Semua perubahan baru tersimpan setelah "Simpan".
  */
 const props = defineProps<{ day: string }>()
 const open = defineModel<boolean>('open', { default: false })
-const emit = defineEmits<{ saved: [day: PocketDay] }>()
+const emit = defineEmits<{ saved: [day: PocketDay]; deleted: [] }>()
 const memories = useMemories()
 
 const existing = computed(() => memories.data.days[props.day])
@@ -23,12 +25,20 @@ const frame = ref(pocket.frames[0]!.id)
 const frameColor = ref(pocket.frameColors[0]!.id)
 const customColor = ref('#c8a2c8')
 const added = shallowRef<{ photo: DraftPhoto; url: string; takenAt?: string }[]>([])
-/** Kantong ini akan berisi foto: yang baru dipilih atau yang sudah ada. */
-const hasPhotos = computed(() => added.value.length > 0 || !!existing.value?.moments.length)
+/** Foto lama yang dikeluarkan; baru benar-benar dihapus setelah "Simpan". */
+const removed = ref<Set<string>>(new Set())
+const keptUrls = ref<Record<string, string | null>>({})
 const busy = ref(false)
 const preparing = ref(false)
 const error = ref('')
-const existingUrl = ref<string | null>(null)
+
+const kept = computed(() => (existing.value?.moments ?? []).filter((id) => !removed.value.has(id)))
+const photoCount = computed(() => kept.value.length + added.value.length)
+const dirty = computed(() => added.value.length > 0 || removed.value.size > 0)
+const saveLabel = computed(() => {
+  if (existing.value) return 'Simpan perubahan'
+  return photoCount.value ? 'Simpan kantong' : 'Simpan tanpa foto'
+})
 
 // Isi ulang pilihan setiap modal dibuka: dari kantong yang sudah ada, atau bawaan.
 watch(open, async (isOpen) => {
@@ -42,15 +52,19 @@ watch(open, async (isOpen) => {
     frameColor.value = 'custom'
   } else frameColor.value = day?.frameColor ?? pocket.frameColors[0]!.id
   clearAdded()
+  removed.value = new Set()
   error.value = ''
-  existingUrl.value = day?.moments[0] ? await memories.photoUrl(day.moments[0]) : null
+  const urls: Record<string, string | null> = {}
+  for (const id of day?.moments ?? []) urls[id] = await memories.photoUrl(id)
+  keptUrls.value = urls
 })
 
 const packetColor = computed(
   () => byId(pocket.packetColors, packet.value) ?? pocket.packetColors[0]!,
 )
 const stickerItem = computed(() => byId(letter.stickers, sticker.value))
-const frameVariant = computed(() => frame.value as 'polaroid' | 'stamp' | 'ticket')
+type FrameVariant = 'polaroid' | 'stamp' | 'ticket'
+const frameVariant = computed(() => frame.value as FrameVariant)
 const frameHex = computed(() =>
   frameColor.value === 'custom'
     ? customColor.value
@@ -61,14 +75,16 @@ const comboName = computed(
     // Seperti tulisan di kemasan jajan: rasa kantong dan stikernya.
     `Rasa ${packetColor.value.flavor.toLowerCase()}, stiker ${(stickerItem.value?.label ?? '').toLowerCase()}`,
 )
-const previewPhoto = computed(() => added.value[0]?.url ?? existingUrl.value)
+const previewPhoto = computed(
+  () => added.value[0]?.url ?? keptUrls.value[kept.value[0] ?? ''] ?? null,
+)
 
 const packetOptions = pocket.packetColors.map((item) => ({
   value: item.id,
   label: item.label,
   color: item.color,
 }))
-const frameOptions = pocket.frames.map((item) => ({ value: item.id, label: item.label }))
+const frameOptions = pocket.frames.map((item) => ({ ...item, variant: item.id as FrameVariant }))
 const frameColorOptions = pocket.frameColors.map((item) => ({
   value: item.id,
   label: item.label,
@@ -107,6 +123,10 @@ function removeAdded(index: number) {
   added.value = added.value.filter((_, i) => i !== index)
 }
 
+function removeKept(id: string) {
+  removed.value = new Set([...removed.value, id])
+}
+
 function clearAdded() {
   for (const item of added.value) URL.revokeObjectURL(item.url)
   added.value = []
@@ -127,11 +147,13 @@ async function save() {
       sticker: sticker.value,
       frame: frame.value,
       frameColor: frameColor.value === 'custom' ? customColor.value : frameColor.value,
-      moments: [...(existing.value?.moments ?? []), ...ids],
+      moments: [...kept.value, ...ids],
       savedAt: existing.value?.savedAt ?? new Date().toISOString(),
     }
     await memories.saveDay(day)
+    if (removed.value.size) await memories.deleteMoments([...removed.value])
     clearAdded()
+    removed.value = new Set()
     open.value = false
     emit('saved', day)
   } catch {
@@ -141,11 +163,34 @@ async function save() {
   }
 }
 
-/** Foto yang sudah dipilih tapi belum disimpan tidak dibuang tanpa bertanya. */
-function setOpen(next: boolean) {
-  if (!next && added.value.length && !busy.value) {
-    if (!window.confirm('Foto yang kamu pilih belum disimpan. Tetap tutup?')) return
+/** Hapus kantong beserta fotonya, setelah bertanya. */
+async function removePocket() {
+  const count = existing.value?.moments.length ?? 0
+  const photos = count ? ` beserta ${count} fotonya` : ''
+  const ok = window.confirm(
+    `Hapus kantong ${shortDate(props.day)}${photos}? Foto yang sudah masuk CD di Memori TV juga ikut terhapus.`,
+  )
+  if (!ok) return
+  busy.value = true
+  try {
+    await memories.deleteDay(props.day)
     clearAdded()
+    removed.value = new Set()
+    open.value = false
+    emit('deleted')
+  } catch {
+    error.value = 'Gagal menghapus di perangkat ini. Coba lagi.'
+  } finally {
+    busy.value = false
+  }
+}
+
+/** Perubahan foto yang belum disimpan tidak dibuang tanpa bertanya. */
+function setOpen(next: boolean) {
+  if (!next && dirty.value && !busy.value) {
+    if (!window.confirm('Perubahan fotomu belum disimpan. Tetap tutup?')) return
+    clearAdded()
+    removed.value = new Set()
   }
   open.value = next
 }
@@ -170,10 +215,10 @@ onBeforeUnmount(clearAdded)
     <template #preview>
       <!-- Di HP nama kombinasi ada di bawah kantong; di layar lebar di pojok kiri bawah. -->
       <div
-        class="flex h-full flex-col items-center justify-center gap-4"
+        class="flex h-full flex-col items-center justify-center gap-5"
         data-testid="packet-preview"
       >
-        <div class="w-[min(56%,300px)] pt-6">
+        <div class="w-[min(52%,290px)] pt-6 md:w-[min(56%,300px)]">
           <SnackPacket
             :color="packetColor.color"
             :sticker="stickerItem"
@@ -191,133 +236,217 @@ onBeforeUnmount(clearAdded)
       </div>
     </template>
 
-    <!-- Foto dulu, karena itu isi kantongnya; tampilan kantong menyusul. Satu lembar dengan
-         garis pemisah, bukan kartu bernomor yang seragam. -->
-    <div class="divide-y divide-line-soft rounded-[20px] bg-surface">
-      <StepCard
-        :step="1"
-        title="Foto hari ini"
-        variant="card"
-        description="Pilih beberapa foto sekaligus: JPG, PNG, atau HEIC. Tanggalnya diambil dari foto bila ada."
+    <StepCard
+      :step="1"
+      title="Warna kantong"
+      :hint="packetColor.label"
+      description="Bungkus kecil untuk hari ini"
+      variant="card"
+    >
+      <SwatchGroup
+        v-model="packet"
+        label="Warna kantong"
+        :options="packetOptions"
+        size="md"
+        check
+      />
+    </StepCard>
+
+    <StepCard
+      :step="2"
+      title="Stiker"
+      :hint="stickerItem?.label"
+      description="Satu sentuhan terakhir di depan kantong"
+      variant="card"
+    >
+      <RadioGroupRoot
+        v-model="sticker"
+        aria-label="Stiker"
+        orientation="horizontal"
+        loop
+        class="grid grid-cols-6 gap-1.5 sm:grid-cols-7"
       >
-        <div class="flex flex-wrap gap-2">
-          <div
-            v-for="(item, index) in added"
-            :key="item.url"
-            class="relative size-16 overflow-hidden rounded-[10px]"
+        <RadioGroupItem
+          v-for="item in letter.stickers"
+          :key="item.id"
+          :value="item.id"
+          :aria-label="item.label"
+          :title="item.label"
+          class="sticker-option aspect-square rounded-[12px] p-1.5"
+        >
+          <img :src="item.src" alt="" class="size-full" draggable="false" />
+        </RadioGroupItem>
+      </RadioGroupRoot>
+    </StepCard>
+
+    <StepCard
+      :step="3"
+      title="Bingkai foto"
+      description="Cara tiap foto dicetak saat kantong dibuka"
+      variant="card"
+    >
+      <RadioGroupRoot
+        v-model="frame"
+        aria-label="Bingkai foto"
+        orientation="horizontal"
+        loop
+        class="grid grid-cols-3 gap-2"
+      >
+        <RadioGroupItem
+          v-for="item in frameOptions"
+          :key="item.id"
+          :value="item.id"
+          class="frame-option flex flex-col items-center gap-1 rounded-[14px] px-2 pt-3 pb-2.5 text-center"
+        >
+          <span
+            class="frame-option__art grid h-[74px] w-full place-items-center"
+            aria-hidden="true"
           >
-            <img :src="item.url" alt="" class="size-full object-cover" />
-            <button
-              type="button"
-              class="absolute top-0.5 right-0.5 grid size-6 place-items-center rounded-full bg-ink/70 text-white"
-              :aria-label="`Hapus foto ${index + 1}`"
-              @click="removeAdded(index)"
+            <PhotoFrame
+              :variant="item.variant"
+              :color="frameHex"
+              :src="previewPhoto ?? undefined"
+              :class="item.id === 'ticket' ? 'w-[78%]' : 'w-[46%]'"
             >
-              <Icon name="close" :size="12" />
-            </button>
-          </div>
+              <span />
+            </PhotoFrame>
+          </span>
+          <span class="text-[13px] leading-tight font-bold">{{ item.label }}</span>
+          <span class="text-[11px] leading-snug text-ink-muted">{{ item.hint }}</span>
+        </RadioGroupItem>
+      </RadioGroupRoot>
+
+      <p class="mt-4 mb-2 text-[13px] font-semibold">
+        Warna bingkai
+        <span class="ml-1 font-normal text-ink-muted">
+          {{
+            frameColor === 'custom' ? 'Warna sendiri' : byId(pocket.frameColors, frameColor)?.label
+          }}
+        </span>
+      </p>
+      <div class="flex flex-wrap items-center gap-2.5">
+        <SwatchGroup v-model="frameColor" label="Warna bingkai" :options="frameColorOptions" check>
+          <Swatch
+            v-for="item in frameColorOptions"
+            :key="item.value"
+            :value="item.value"
+            :label="item.label"
+            :color="item.color"
+            check
+          />
+          <Swatch value="custom" label="Warna sendiri" :color="customColor" check />
+        </SwatchGroup>
+        <label
+          v-if="frameColor === 'custom'"
+          class="inline-flex items-center gap-2 text-caption text-ink-muted"
+        >
+          Pilih warna
+          <input v-model="customColor" type="color" class="h-8 w-10 rounded" />
+        </label>
+      </div>
+    </StepCard>
+
+    <StepCard
+      :step="4"
+      title="Foto hari ini"
+      :description="photoCount ? `${photoCount} foto terselip` : 'Belum ada foto di kantong ini'"
+      variant="card"
+    >
+      <button
+        type="button"
+        class="add-photos flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left"
+        :disabled="busy"
+        @click="fileInput?.click()"
+      >
+        <Icon name="image-plus" :size="20" />
+        <span class="min-w-0 flex-1">
+          <span class="block text-body font-semibold">
+            {{ preparing ? 'Menyiapkan foto…' : 'Tambah foto' }}
+          </span>
+          <span class="block text-[11.5px] text-ink-muted">
+            JPG, PNG, HEIC, dan lainnya. Hanya tersimpan di perangkat ini.
+          </span>
+        </span>
+        <Icon name="plus" :size="18" />
+      </button>
+
+      <ul v-if="photoCount" class="mt-3 flex flex-wrap gap-2" aria-label="Foto di kantong">
+        <li
+          v-for="(id, index) in kept"
+          :key="id"
+          class="relative size-16 overflow-hidden rounded-[10px] bg-fill"
+        >
+          <img v-if="keptUrls[id]" :src="keptUrls[id]!" alt="" class="size-full object-cover" />
           <button
             type="button"
-            class="grid size-16 place-items-center rounded-[10px] border border-dashed border-line text-ink-muted hover:bg-fill"
-            :disabled="busy"
-            aria-label="Tambah foto"
-            @click="fileInput?.click()"
+            class="thumb-remove"
+            :aria-label="`Keluarkan foto ${index + 1} dari kantong`"
+            @click="removeKept(id)"
           >
-            <Icon name="plus" :size="18" />
+            <Icon name="close" :size="12" />
           </button>
-        </div>
-        <p v-if="preparing" class="mt-2 text-caption text-ink-muted" aria-live="polite">
-          Menyiapkan foto… Foto HEIC butuh beberapa detik.
-        </p>
-        <p v-if="existing?.moments.length" class="mt-2 text-caption text-ink-muted">
-          Sudah ada {{ existing.moments.length }} foto di kantong ini.
-        </p>
-        <p v-if="error" role="alert" class="mt-2 text-caption text-ink-muted">{{ error }}</p>
-        <input
-          ref="fileInput"
-          type="file"
-          accept="image/*"
-          multiple
-          class="sr-only"
-          tabindex="-1"
-          aria-label="Pilih foto momen"
-          data-testid="moment-upload"
-          @change="onFiles"
-        />
-      </StepCard>
-
-      <StepCard :step="2" title="Warna kantong" :hint="packetColor.label" variant="card">
-        <SwatchGroup
-          v-model="packet"
-          label="Warna kantong"
-          :options="packetOptions"
-          size="md"
-          check
-        />
-      </StepCard>
-
-      <StepCard :step="3" title="Stiker" :hint="stickerItem?.label" variant="card">
-        <RadioGroupRoot
-          v-model="sticker"
-          aria-label="Stiker"
-          orientation="horizontal"
-          loop
-          class="grid grid-cols-6 gap-1.5 sm:grid-cols-7"
+        </li>
+        <li
+          v-for="(item, index) in added"
+          :key="item.url"
+          class="relative size-16 overflow-hidden rounded-[10px]"
         >
-          <RadioGroupItem
-            v-for="item in letter.stickers"
-            :key="item.id"
-            :value="item.id"
-            :aria-label="item.label"
-            :title="item.label"
-            class="sticker-option aspect-square rounded-[12px] p-1.5"
+          <img :src="item.url" alt="" class="size-full object-cover" />
+          <button
+            type="button"
+            class="thumb-remove"
+            :aria-label="`Hapus foto ${index + 1}`"
+            @click="removeAdded(index)"
           >
-            <img :src="item.src" alt="" class="size-full" draggable="false" />
-          </RadioGroupItem>
-        </RadioGroupRoot>
-      </StepCard>
-
-      <StepCard :step="4" title="Bingkai foto" variant="card">
-        <PillGroup v-model="frame" label="Bingkai foto" :options="frameOptions" />
-        <div class="mt-3 flex flex-wrap items-center gap-2.5">
-          <SwatchGroup
-            v-model="frameColor"
-            label="Warna bingkai"
-            :options="frameColorOptions"
-            check
-          >
-            <Swatch
-              v-for="item in frameColorOptions"
-              :key="item.value"
-              :value="item.value"
-              :label="item.label"
-              :color="item.color"
-              check
-            />
-            <Swatch value="custom" label="Warna sendiri" :color="customColor" check />
-          </SwatchGroup>
-          <label
-            v-if="frameColor === 'custom'"
-            class="inline-flex items-center gap-2 text-caption text-ink-muted"
-          >
-            Pilih warna
-            <input v-model="customColor" type="color" class="h-8 w-10 rounded" />
-          </label>
-        </div>
-      </StepCard>
-    </div>
+            <Icon name="close" :size="12" />
+          </button>
+        </li>
+      </ul>
+      <p v-if="preparing" class="mt-2 text-caption text-ink-muted" aria-live="polite">
+        Foto HEIC butuh beberapa detik.
+      </p>
+      <p v-if="removed.size" class="mt-2 text-caption text-ink-muted">
+        {{ removed.size }} foto akan dikeluarkan dari kantong saat disimpan.
+      </p>
+      <p v-if="error" role="alert" class="mt-2 text-caption text-ink-muted">{{ error }}</p>
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*"
+        multiple
+        class="sr-only"
+        tabindex="-1"
+        aria-label="Pilih foto momen"
+        data-testid="moment-upload"
+        @change="onFiles"
+      />
+    </StepCard>
 
     <template #footer>
-      <button type="button" class="text-body text-ink-muted hover:text-ink" @click="setOpen(false)">
-        Nanti saja
+      <!-- Di HP cukup ikonnya, supaya tombol simpan tidak terjepit. -->
+      <button
+        v-if="existing"
+        type="button"
+        class="mr-auto inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 text-body whitespace-nowrap text-ink-muted hover:text-ink"
+        :disabled="busy"
+        @click="removePocket"
+      >
+        <Icon name="trash" :size="16" /> <span class="max-sm:sr-only">Hapus kantong</span>
       </button>
       <button
         type="button"
-        class="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-body font-semibold text-white disabled:opacity-50"
+        class="min-h-10 px-1 text-body whitespace-nowrap text-ink-muted hover:text-ink"
+        @click="setOpen(false)"
+      >
+        Batal
+      </button>
+      <button
+        type="button"
+        class="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-body font-semibold whitespace-nowrap text-white disabled:opacity-50"
         :disabled="busy"
         @click="save"
       >
-        <Icon name="check" :size="15" /> {{ hasPhotos ? 'Simpan' : 'Simpan tanpa foto' }}
+        <Icon name="check" :size="15" /> {{ saveLabel }}
       </button>
     </template>
   </Modal>
@@ -325,15 +454,58 @@ onBeforeUnmount(clearAdded)
 
 <style scoped>
 .sticker-option {
-  transition: background-color 150ms;
+  background-color: var(--color-fill);
+  transition:
+    background-color 150ms,
+    box-shadow 150ms;
 }
 
 .sticker-option:hover {
-  background-color: var(--color-fill);
+  background-color: var(--color-line-soft);
 }
 
 .sticker-option[data-state='checked'] {
   background-color: var(--color-surface);
   box-shadow: inset 0 0 0 1.5px var(--color-pocket-ink);
+}
+
+.frame-option {
+  background-color: var(--color-fill);
+  transition:
+    background-color 150ms,
+    box-shadow 150ms;
+}
+
+.frame-option:hover {
+  background-color: var(--color-line-soft);
+}
+
+.frame-option[data-state='checked'] {
+  background-color: var(--color-surface);
+  box-shadow: inset 0 0 0 1.5px var(--color-pocket-ink);
+}
+
+.add-photos {
+  border: 1.5px dashed var(--color-line);
+  background-color: var(--color-panel);
+  color: var(--color-pocket-ink);
+  transition: background-color 150ms;
+}
+
+.add-photos:hover {
+  background-color: var(--color-fill);
+}
+
+.thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--color-ink) 72%, transparent);
+  color: var(--color-white);
 }
 </style>

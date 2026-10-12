@@ -8,6 +8,8 @@ import {
   monthTitle,
   normalizeMemories,
   parseDay,
+  withoutMoments,
+  type MemoryData,
   type Moment,
 } from '../app/utils/memories'
 
@@ -129,5 +131,62 @@ describe('dayAlbum', () => {
       moments: ['b', 'a'],
       kind: 'day',
     })
+  })
+})
+
+describe('withoutMoments', () => {
+  const data: MemoryData = {
+    version: 1,
+    moments: {
+      a: moment('a', '2026-10-01', '2026-10-01T10:00:00.000Z'),
+      b: moment('b', '2026-10-01', '2026-10-01T11:00:00.000Z'),
+      c: moment('c', '2026-10-02', '2026-10-02T09:00:00.000Z'),
+    },
+    days: {
+      '2026-10-01': {
+        day: '2026-10-01',
+        packet: 'blue',
+        sticker: 'heart',
+        frame: 'polaroid',
+        frameColor: 'cream',
+        moments: ['a', 'b'],
+        savedAt: '2026-10-01T12:00:00.000Z',
+      },
+      '2026-10-02': {
+        day: '2026-10-02',
+        packet: 'pink',
+        sticker: 'heart',
+        frame: 'stamp',
+        frameColor: 'cream',
+        moments: ['c'],
+        savedAt: '2026-10-02T12:00:00.000Z',
+      },
+    },
+    albums: [
+      {
+        id: 'x',
+        title: 'Liburan',
+        emoji: '📀',
+        color: '#ff8fa3',
+        moments: ['b', 'c'],
+        createdAt: '2026-10-02T12:00:00.000Z',
+      },
+    ],
+  }
+
+  it('foto yang dikeluarkan hilang dari kantong dan dari CD buatan sendiri', () => {
+    const next = withoutMoments(data, ['b'])
+    expect(Object.keys(next.moments)).toEqual(['a', 'c'])
+    expect(next.days['2026-10-01']!.moments).toEqual(['a'])
+    expect(next.albums[0]!.moments).toEqual(['c'])
+    // Data asli tidak diubah.
+    expect(data.days['2026-10-01']!.moments).toEqual(['a', 'b'])
+  })
+
+  it('menghapus kantong sekalian semua fotonya, kantong lain tetap', () => {
+    const next = withoutMoments(data, ['a', 'b'], '2026-10-01')
+    expect(Object.keys(next.days)).toEqual(['2026-10-02'])
+    expect(Object.keys(next.moments)).toEqual(['c'])
+    expect(next.albums[0]!.moments).toEqual(['c'])
   })
 })

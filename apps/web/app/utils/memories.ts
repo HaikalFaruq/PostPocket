@@ -58,6 +58,25 @@ export interface MemoryData {
   albums: Album[]
 }
 
+/**
+ * Data tanpa momen-momen ini: dikeluarkan dari kantong dan album CD juga. `dropDay` sekalian
+ * menghapus kantong hari itu.
+ */
+export function withoutMoments(data: MemoryData, ids: string[], dropDay?: string): MemoryData {
+  const gone = new Set(ids)
+  const keep = (list: string[]) => list.filter((id) => !gone.has(id))
+  return {
+    ...data,
+    moments: Object.fromEntries(Object.entries(data.moments).filter(([id]) => !gone.has(id))),
+    days: Object.fromEntries(
+      Object.entries(data.days)
+        .filter(([key]) => key !== dropDay)
+        .map(([key, day]) => [key, { ...day, moments: keep(day.moments) }]),
+    ),
+    albums: data.albums.map((album) => ({ ...album, moments: keep(album.moments) })),
+  }
+}
+
 export function emptyMemories(): MemoryData {
   return { version: 1, moments: {}, days: {}, albums: [] }
 }

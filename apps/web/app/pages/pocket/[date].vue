@@ -233,7 +233,7 @@ const editOpen = ref(false)
       data-testid="pocket-upload"
       @change="onFiles"
     />
-    <SaveDayModal v-model:open="editOpen" :day="day" />
+    <SaveDayModal v-model:open="editOpen" :day="day" @deleted="navigateTo('/pocket')" />
   </div>
 </template>
 

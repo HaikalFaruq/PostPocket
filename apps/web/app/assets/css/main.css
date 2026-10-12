@@ -134,6 +134,16 @@
   background: var(--airmail);
 }
 
+/*
+ * Latar di belakang modal, lembar, dan popup: halaman di belakangnya kabur dan sedikit gelap, jadi
+ * yang mengambang terasa terangkat tanpa memutus konteks.
+ */
+@utility scrim {
+  background-color: color-mix(in srgb, var(--color-ink) 22%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+
 /* Jepitan kayu Pocket: dipakai kantong dan sel kalender yang masih menunggu kantong. */
 @utility clothespin {
   border-radius: 3px;
