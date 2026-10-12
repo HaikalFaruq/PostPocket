@@ -124,6 +124,34 @@ describe('createLetterApi', () => {
     }
   })
 
+  it('fungsi dipanggil di region DB-nya; unggahan ke signedUrl tidak', async () => {
+    const fetch = vi.fn(async () => respond(200, {}))
+    const api = createLetterApi({
+      base: 'https://api.test',
+      apiKey: 'k',
+      fetch,
+      region: 'ap-southeast-2',
+    })
+    await api.create({} as never)
+    await api.publish('id', 't')
+    await api.get('x7Kp2qLm9A')
+    await api.open('x7Kp2qLm9A')
+    await api.remove('id', 't')
+    await api.upload(
+      { path: 'a/b.jpg', token: 't', signedUrl: 'https://s.test/up?token=t' },
+      new Blob(['x']),
+    )
+    const urls = fetch.mock.calls.map((call) => (call as unknown as [string])[0])
+    expect(urls.slice(0, 5)).toEqual([
+      'https://api.test/letters?forceFunctionRegion=ap-southeast-2',
+      'https://api.test/letters/id/publish?forceFunctionRegion=ap-southeast-2',
+      'https://api.test/l/x7Kp2qLm9A?forceFunctionRegion=ap-southeast-2',
+      'https://api.test/l/x7Kp2qLm9A/open?forceFunctionRegion=ap-southeast-2',
+      'https://api.test/letters/id?forceFunctionRegion=ap-southeast-2',
+    ])
+    expect(urls[5]).toBe('https://s.test/up?token=t')
+  })
+
   it('jaringan putus jadi kode network', async () => {
     const fetch = vi.fn(async () => Promise.reject(new TypeError('Failed to fetch')))
     const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch, retryDelay: 0 })

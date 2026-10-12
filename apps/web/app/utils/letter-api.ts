@@ -259,9 +259,15 @@ export function createLetterApi(options: {
   fetch?: typeof globalThis.fetch
   /** Jeda sebelum GET surat dicoba sekali lagi, dalam milidetik. */
   retryDelay?: number
+  /**
+   * Region tempat fungsi dijalankan (kontrak 0.2.2, `forceFunctionRegion`). Tidak berlaku untuk
+   * unggahan ke `signedUrl`, yang langsung ke Storage.
+   */
+  region?: string
 }): LetterApi {
   const base = options.base.replace(/\/$/, '')
   const run = options.fetch ?? globalThis.fetch.bind(globalThis)
+  const query = options.region ? `?forceFunctionRegion=${encodeURIComponent(options.region)}` : ''
 
   /** `alsoOk`: satu status selain 2xx yang di kontrak membawa body sukses. */
   async function call<T>(
@@ -274,7 +280,7 @@ export function createLetterApi(options: {
     if (init.editToken) headers['x-edit-token'] = init.editToken
     let response: Response
     try {
-      response = await run(`${base}${path}`, {
+      response = await run(`${base}${path}${query}`, {
         method,
         headers,
         body: init.body === undefined ? undefined : JSON.stringify(init.body),

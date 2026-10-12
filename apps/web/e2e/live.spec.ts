@@ -29,6 +29,12 @@ test('gerbang Sprint 2: surat terbuka di HP lain tanpa login dan preview-nya sia
 }) => {
   test.setTimeout(120_000)
   const message = `Uji gerbang Sprint 2 ${new Date().toISOString()}`
+  // Semua panggilan fungsi jalan di region DB-nya, Sydney (kontrak 0.2.2).
+  const regions: { url: string; region?: string }[] = []
+  page.on('response', (response) => {
+    if (response.url().includes('/functions/v1/'))
+      regions.push({ url: response.url(), region: response.headers()['x-sb-edge-region'] })
+  })
 
   // Pengirim: teks dan satu foto isi, lalu Buat link ke backend asli.
   await page.goto('/letter/new')
@@ -53,6 +59,11 @@ test('gerbang Sprint 2: surat terbuka di HP lain tanpa login dan preview-nya sia
   const dialog = page.getByTestId('send-letter')
   await expect(dialog).toHaveAttribute('data-state', 'done', { timeout: 60_000 })
   const url = await page.getByTestId('sent-url').inputValue()
+  expect(regions.length).toBeGreaterThan(0)
+  for (const call of regions) {
+    expect(call.url).toContain('forceFunctionRegion=ap-southeast-2')
+    expect(call.region).toBe('ap-southeast-2')
+  }
 
   try {
     // Crawler WhatsApp: meta OG dari server, gambar OG publik, JPEG 1200×630 ≤ 300.000 byte.
