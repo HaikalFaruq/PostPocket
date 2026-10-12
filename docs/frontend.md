@@ -38,7 +38,7 @@ apps/web/
   app/assets/css/main.css   design token (@theme Tailwind) dan gaya dasar
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
   app/components/letter/    komponen khusus Letter: FoilCard, LetterPage, LetterEditor, FrontPicker, dll.
-  app/components/tv/        TvSet, CdShelf, TvSlideshow, BoothCamera, BoothResult
+  app/components/tv/        TvSet, CdShelf, CdDisc, TvSlideshow, BoothCamera, BoothLayoutPreview, BoothResult
   app/components/pocket/    SnackPacket (kantong snack), SaveDayModal (modal simpan hari), MonthPicker
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/workers/              heic.worker.ts: HEIC ke JPEG dengan libheif, dimuat hanya saat ada foto HEIC
@@ -172,8 +172,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 3 (minggu 6–7)**
 
-- [x] Halaman TV: badan clay dengan 8 warna, panel filter, arsip CD coverflow, slideshow
-- [x] Booth: hitung mundur, strip 1×4 / 2×2 / satu foto, unduh PNG dengan filter yang sama dengan layar
+- [x] Halaman TV: badan clay dengan 8 warna, panel filter, rak CD (ketuk punggung untuk memilih, ketuk lagi untuk membuka, lalu seret piringan ke TV atau tekan Masukkan CD; piringan terbang ke slot), slideshow
+- [x] Booth: hitung mundur, strip 1×4 / 2×2 / satu foto dengan pratinjau bentuk hasilnya di layar, unduh PNG dengan filter yang sama dengan layar
 - [x] Kirim hasil Booth ke Letter
 
 **Sprint 4 dan beta (minggu 8–10)**

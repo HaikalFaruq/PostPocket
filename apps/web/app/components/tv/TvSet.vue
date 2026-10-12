@@ -2,20 +2,39 @@
 /**
  * Badan TV clay: dua antena, layar dengan slot CD di bawahnya, panel gelap di kanan, dan dua kaki.
  * Warnanya hanya variabel CSS `--clay`, jadi ganti warna tidak memuat gambar baru (PRD).
+ * Slot CD punya tiga keadaan: kosong, terbuka (siap menelan piringan), dan berisi (lampunya
+ * menyala). `drop` menandai piringan yang sedang diseret di atas TV.
  */
-defineProps<{ clay: string }>()
+withDefaults(
+  defineProps<{ clay: string; slotState?: 'idle' | 'open' | 'loaded'; drop?: boolean }>(),
+  { slotState: 'idle', drop: false },
+)
+const root = ref<HTMLElement | null>(null)
+const slotEl = ref<HTMLElement | null>(null)
+const screenEl = ref<HTMLElement | null>(null)
+defineExpose({ root, slotEl, screenEl })
 </script>
 
 <template>
-  <div class="tv" :style="{ '--clay': clay }">
+  <div ref="root" class="tv" :class="{ 'is-drop': drop }" :style="{ '--clay': clay }">
     <span class="tv-antenna tv-antenna--left" aria-hidden="true" />
     <span class="tv-antenna tv-antenna--right" aria-hidden="true" />
     <div class="tv-body">
-      <div>
-        <div class="tv-screen" data-testid="tv-screen">
+      <div class="tv-front">
+        <div ref="screenEl" class="tv-screen" data-testid="tv-screen">
           <slot name="screen" />
         </div>
-        <div class="tv-slot" aria-hidden="true" />
+        <div
+          ref="slotEl"
+          class="tv-slot"
+          :class="`is-${slotState}`"
+          data-testid="tv-slot"
+          :data-state="slotState"
+          aria-hidden="true"
+        >
+          <span class="tv-slot__mouth" />
+          <span class="tv-slot__led" />
+        </div>
       </div>
       <div class="tv-panel">
         <slot name="panel" />
@@ -44,6 +63,7 @@ defineProps<{ clay: string }>()
   background: var(--clay);
   filter: brightness(0.78);
   transform-origin: bottom center;
+  transition: background-color 250ms;
 }
 
 .tv-antenna::before {
@@ -73,10 +93,41 @@ defineProps<{ clay: string }>()
   border-radius: 36px;
   background: var(--clay);
   box-shadow:
-    inset 0 -10px 0 rgb(0 0 0 / 0.08),
+    inset 0 -12px 0 rgb(0 0 0 / 0.09),
     inset 0 8px 0 rgb(255 255 255 / 0.3),
-    0 26px 44px -22px rgb(17 17 20 / 0.5);
-  transition: background-color 250ms;
+    inset 0 0 0 1px rgb(255 255 255 / 0.18),
+    0 26px 44px -22px rgb(24 32 74 / 0.5);
+  transition:
+    background-color 250ms,
+    box-shadow 200ms,
+    transform 200ms var(--ease-card);
+}
+
+/* Kilau tanah liat: cahaya dari kiri atas dan bayangan lembut di bawah, apa pun warnanya. */
+.tv-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.3), transparent 32%),
+    radial-gradient(120% 70% at 50% 115%, rgb(0 0 0 / 0.14), transparent 60%);
+  pointer-events: none;
+}
+
+.tv-front,
+.tv-panel {
+  position: relative;
+}
+
+/* Piringan yang diseret di atas TV: badannya sedikit terangkat dan bercahaya. */
+.tv.is-drop .tv-body {
+  box-shadow:
+    inset 0 -12px 0 rgb(0 0 0 / 0.09),
+    inset 0 8px 0 rgb(255 255 255 / 0.3),
+    0 0 0 4px color-mix(in srgb, var(--color-tv-glow) 55%, transparent),
+    0 30px 50px -22px rgb(24 32 74 / 0.55);
+  transform: scale(1.01);
 }
 
 @media (min-width: 640px) {
@@ -99,13 +150,57 @@ defineProps<{ clay: string }>()
   isolation: isolate;
 }
 
+/* Slot CD: celah gelap di badan TV, dengan lampu kecil yang menyala kalau ada CD di dalamnya. */
 .tv-slot {
-  width: 46%;
-  height: 8px;
+  position: relative;
+  display: grid;
+  width: 58%;
+  height: 16px;
   margin: 12px auto 0;
-  border-radius: 8px;
-  background: rgb(0 0 0 / 0.32);
-  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.4);
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--clay) 80%, black);
+  box-shadow:
+    inset 0 2px 3px rgb(0 0 0 / 0.3),
+    0 1px 0 rgb(255 255 255 / 0.35);
+  transition: background-color 250ms;
+}
+
+.tv-slot__mouth {
+  width: 84%;
+  height: 4px;
+  border-radius: 4px;
+  background: #0b0d18;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.8);
+  transition:
+    height 200ms var(--ease-card),
+    box-shadow 200ms;
+}
+
+.tv-slot.is-open .tv-slot__mouth {
+  height: 6px;
+  box-shadow:
+    0 0 12px 2px color-mix(in srgb, var(--color-tv-glow) 70%, transparent),
+    inset 0 1px 2px rgb(0 0 0 / 0.8);
+}
+
+.tv-slot__led {
+  position: absolute;
+  top: 50%;
+  right: 3.5%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  transform: translateY(-50%);
+  transition:
+    background-color 200ms,
+    box-shadow 200ms;
+}
+
+.tv-slot.is-loaded .tv-slot__led {
+  background: #7dffb6;
+  box-shadow: 0 0 6px #7dffb6;
 }
 
 .tv-panel {
@@ -131,5 +226,17 @@ defineProps<{ clay: string }>()
   border-radius: 0 0 10px 10px;
   background: var(--clay);
   filter: brightness(0.82);
+  transition: background-color 250ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-body,
+  .tv-slot__mouth {
+    transition: none;
+  }
+
+  .tv.is-drop .tv-body {
+    transform: none;
+  }
 }
 </style>

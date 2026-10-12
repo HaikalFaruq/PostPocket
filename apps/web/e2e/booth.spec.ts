@@ -13,10 +13,20 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   const record = page.getByTestId('booth-record')
   await expect(record).toBeEnabled({ timeout: 10_000 })
   await page.getByRole('radio', { name: 'Noir' }).click()
+  // Pratinjau di pojok layar menunjukkan bentuk hasilnya sebelum merekam.
+  const preview = page.getByTestId('booth-preview')
+  await expect(preview).toHaveAttribute('data-layout', 'strip')
+  await expect(preview.locator('.booth-preview__cell')).toHaveCount(4)
+  await page.getByRole('radio', { name: 'Grid 2×2' }).click()
+  await expect(preview).toHaveAttribute('data-layout', 'grid')
+  await page.getByRole('radio', { name: 'Satu foto' }).click()
+  await expect(preview.locator('.booth-preview__cell')).toHaveCount(1)
+  await page.getByRole('radio', { name: 'Strip 1×4' }).click()
   await record.click()
-  await expect(page.getByTestId('booth-camera')).toContainText('3')
-  // Selama memotret, layar menunjukkan jepretan ke berapa.
+  await expect(page.getByTestId('booth-countdown')).toHaveText('3')
+  // Selama memotret, layar menunjukkan jepretan ke berapa, dan petak pratinjau terisi.
   await expect(page.getByTestId('booth-progress')).toContainText(/FOTO \d\/4/, { timeout: 10_000 })
+  await expect(preview.locator('.booth-preview__cell.is-filled').first()).toBeVisible()
 
   const result = page.getByTestId('booth-result')
   await expect(result).toBeVisible({ timeout: 15_000 })
@@ -40,8 +50,10 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
 
   await result.getByRole('button', { name: 'Tutup' }).click()
   await page.getByRole('button', { name: 'KELUAR' }).click()
-  // Empat jepretan masuk album bulan ini dan CD Photo Booth.
+  // Empat jepretan masuk album bulan ini dan CD Photo Booth, yang langsung terpilih di rak.
   await expect(page.getByTestId('cd-shelf').locator('.cd-case')).toHaveCount(2)
+  await expect(page.locator('.cd-item.is-current .cd-case')).toHaveAccessibleName(/Photo Booth/)
+  await expect(page.getByTestId('cd-thumbs').locator('li')).toHaveCount(4)
 })
 
 test('Booth tanpa izin kamera menawarkan foto dari galeri', async ({ page, browserName }) => {

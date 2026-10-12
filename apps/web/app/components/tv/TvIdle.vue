@@ -7,7 +7,9 @@
     <TvEffects :effects="['noise', 'scanlines']" />
     <div class="relative text-center font-tv text-white">
       <p class="tv-idle__signal text-[clamp(28px,7vw,44px)] tracking-[0.18em]">NO SIGNAL</p>
-      <p class="mt-1 text-[clamp(14px,3vw,18px)] tracking-[0.2em] opacity-70">MASUKKAN CD</p>
+      <p class="mt-1 text-[clamp(14px,3vw,18px)] tracking-[0.2em] opacity-70">
+        KETUK UNTUK PILIH CD
+      </p>
     </div>
   </div>
 </template>

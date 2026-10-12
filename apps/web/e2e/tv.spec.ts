@@ -44,42 +44,139 @@ test('ganti warna clay langsung mengubah badan TV tanpa memuat gambar', async ({
   expect(requests.filter((url) => /\.(png|jpe?g|webp|svg)/.test(url))).toEqual([])
 })
 
+test('layar TV yang kosong diketuk membawa ke rak CD, dan ganti filter terlihat di layar', async ({
+  page,
+}) => {
+  await expect(page.getByTestId('tv-idle')).toContainText('KETUK UNTUK PILIH CD')
+  await page.getByTestId('tv-pick-cd').click()
+  await expect(page.getByTestId('cd-shelf')).toBeFocused()
+  await page.getByRole('radio', { name: 'Noir' }).click()
+  await expect(page.getByTestId('tv-screen')).toContainText('FILTER NOIR')
+})
+
+test('Back di HP menutup Booth dan kembali ke TV', async ({ page }) => {
+  await page.getByRole('button', { name: 'PHOTO BOOTH' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Booth')
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Memori TV')
+  await expect(page).toHaveURL(/\/tv$/)
+})
+
 test('foto masuk album, CD diputar dengan filter, lalu dikeluarkan', async ({ page }) => {
   await addPhotos(page, [20, 200])
   await expect(page.getByTestId('cd-shelf').locator('[data-album^="bulan-"]')).toHaveCount(1)
-  await page.getByTestId('cd-disc').click({ position: { x: 110, y: 70 } })
+  // CD kosong pertama jadi CD bulan ini (bukan dua CD yang isinya sama), dan rak memberi tahu
+  // fotonya sudah masuk.
+  await expect(page.locator('.cd-item.is-current')).toHaveAttribute('data-album', /^bulan-/)
+  await expect(page.getByTestId('cd-notice')).toHaveText(/2 foto masuk ke /)
+  await expect(page.getByTestId('cd-thumbs').locator('li')).toHaveCount(2)
 
+  // "Masukkan CD": piringan keluar dari case, terbang ke slot, lalu TV menyala.
+  await page.getByTestId('cd-insert').click()
   const slideshow = page.getByTestId('tv-slideshow')
   await expect(slideshow).toBeVisible()
+  await expect(page.getByTestId('tv-slot')).toHaveAttribute('data-state', 'loaded')
   await expect(slideshow.locator('img')).toHaveAttribute('src', /^blob:/)
   await expect(slideshow).toContainText('/2')
+  // Ketuk layar untuk foto berikutnya.
+  const counter = page.getByTestId('tv-counter')
+  const before = (await counter.textContent())!
+  await page.getByTestId('tv-next').click()
+  await expect(counter).not.toHaveText(before)
   // Rak CD memberi tahu bahwa album di tengah sedang diputar, bukan menyuruh memasukkannya lagi.
-  await expect(page.getByText(/sedang diputar di TV/i)).toBeVisible()
+  await expect(page.getByTestId('cd-hint')).toContainText(/sedang diputar di TV/i)
   await page.getByRole('radio', { name: 'Noir' }).click()
   await expect(slideshow).toHaveAttribute('data-filter', 'noir')
-  await expect(slideshow.locator('img')).toHaveCSS('filter', /grayscale/)
+  // Saat foto berganti ada dua gambar yang bersilang; yang baru selalu yang terakhir.
+  await expect(slideshow.locator('img').last()).toHaveCSS('filter', /grayscale/)
 
-  await page.getByRole('button', { name: 'KELUARKAN CD' }).click()
+  // Foto yang ditambahkan ke CD yang sedang diputar langsung tampil di TV.
+  await addPhotos(page, [300])
+  await expect(slideshow).toContainText('3/3')
+
+  await page.getByRole('button', { name: 'KELUARKAN CD', exact: true }).click()
   await expect(page.getByTestId('tv-idle')).toBeVisible()
-  await expect(page.getByText(/ketuk piringan untuk memutar/i)).toBeVisible()
+  await expect(page.getByTestId('tv-slot')).toHaveAttribute('data-state', 'idle')
+  // Piringannya kembali ke case dalam keadaan terbuka, siap dimasukkan lagi.
+  await expect(page.getByTestId('cd-shelf')).toHaveAttribute('data-open', 'true')
+  await expect(page.getByTestId('cd-hint')).toContainText(/seret piringan ke TV/i)
 })
 
-test('rak CD bisa digeser lewat tombol panah dan keyboard, dan tetap ada setelah dimuat ulang', async ({
+test('piringan diseret ke TV mulai diputar; dilepas di luar TV kembali ke rak', async ({
+  page,
+}) => {
+  await addPhotos(page, [60, 240])
+  await expect(page.getByTestId('cd-notice')).toBeVisible()
+  // Ketuk CD yang terpilih untuk membuka case-nya.
+  await page.locator('.cd-item.is-current .cd-case').click()
+  await expect(page.getByTestId('cd-shelf')).toHaveAttribute('data-open', 'true')
+  const disc = page.getByTestId('cd-disc')
+
+  /** Seret piringan ke titik `to` (belum dilepas). Tunggu dulu animasi case dan gulir selesai. */
+  async function dragDisc(to: { x: number; y: number }) {
+    const box = (await disc.boundingBox())!
+    const from = { x: box.x + box.width * 0.75, y: box.y + box.height / 2 }
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    for (let i = 1; i <= 12; i++) {
+      await page.mouse.move(
+        from.x + ((to.x - from.x) * i) / 12,
+        from.y + ((to.y - from.y) * i) / 12,
+      )
+    }
+    return from
+  }
+
+  // Dilepas di samping rak: tidak diputar, piringannya kembali.
+  await page.waitForTimeout(600)
+  const box = (await disc.boundingBox())!
+  await dragDisc({ x: box.x + box.width * 0.75 + 60, y: box.y + box.height / 2 - 20 })
+  await page.mouse.up()
+  await expect(disc).toBeVisible()
+  await expect(page.getByTestId('tv-idle')).toBeVisible()
+
+  // Dilepas di atas TV: slot terbuka selama piringan di atasnya, lalu TV memutar albumnya.
+  // Piringan di tengah layar, jadi bagian bawah TV kelihatan di atasnya, juga di HP.
+  await disc.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  await page.waitForTimeout(600)
+  const tv = (await page.locator('.tv').boundingBox())!
+  await dragDisc({ x: tv.x + tv.width / 2, y: tv.y + tv.height - 40 })
+  await expect(page.getByTestId('tv-slot')).toHaveAttribute('data-state', 'open')
+  await page.mouse.up()
+  await expect(page.getByTestId('tv-slideshow')).toBeVisible()
+  await expect(page.getByTestId('tv-slot')).toHaveAttribute('data-state', 'loaded')
+})
+
+test('CD baru bisa dibuat dan diberi nama; CD kosong belum bisa diputar; rak bisa digeser keyboard', async ({
   page,
 }) => {
   await addPhotos(page, [40])
+  await expect(page.getByTestId('cd-notice')).toBeVisible()
   const shelf = page.getByTestId('cd-shelf')
-  // Album bulanan dari foto tadi, lalu "Album pertama" buatan otomatis.
-  await expect(shelf.locator('.cd-case')).toHaveCount(2)
-  await expect(shelf).toHaveAttribute('data-index', '0')
-  await page.getByRole('button', { name: 'Album berikutnya' }).click()
+  await expect(shelf.locator('.cd-item')).toHaveCount(1)
+
+  // CD buatan sendiri langsung dipilih dan siap diberi nama.
+  await page.getByRole('button', { name: 'CD baru' }).click()
+  await expect(shelf.locator('.cd-item')).toHaveCount(2)
   await expect(shelf).toHaveAttribute('data-index', '1')
+  await page.getByLabel('Nama album').fill('Liburan')
+  await page.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await expect(page.locator('.cd-item.is-current .cd-case')).toHaveAccessibleName(/Liburan/)
+
+  // CD kosong: Enter tidak memutar apa-apa, dan user diminta menambah foto dulu.
   await shelf.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('cd-notice')).toHaveText(/masih kosong/)
+  await expect(page.getByTestId('tv-idle')).toBeVisible()
+
+  // Panah pindah album, Spasi membuka case, Enter memasukkan CD.
   await page.keyboard.press('ArrowLeft')
   await expect(shelf).toHaveAttribute('data-index', '0')
+  await page.keyboard.press(' ')
+  await expect(shelf).toHaveAttribute('data-open', 'true')
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('tv-slideshow')).toBeVisible()
 
   await page.reload()
-  await expect(page.getByTestId('cd-shelf').locator('.cd-case')).toHaveCount(2)
+  await expect(page.getByTestId('cd-shelf').locator('.cd-item')).toHaveCount(2)
 })
