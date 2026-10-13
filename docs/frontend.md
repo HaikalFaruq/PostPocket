@@ -172,7 +172,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus
 - [x] `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`, dan meta tag OG memakai URL gambar OG dari `GET /l/:slug`, atau gambar OG bawaan kalau sudah dihapus
 - [x] Region fungsi Vercel `sin1` (Singapura), bukan US. Supabase-nya di Sydney (`ap-southeast-2`), bukan Singapura ([Deploy](#deploy))
-- [ ] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp ([cara cek](#gerbang-sprint-2))
+- [x] Gerbang: link terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp ([cara cek](#gerbang-sprint-2)), lolos 13 Oktober 2026
 
 **Sprint 3 (minggu 6–7)**
 
@@ -220,6 +220,14 @@ Begitu Edge Function `letters` dan `l` ter-deploy, gerbangnya dicek dalam tiga l
 3. Terakhir, cek manual: kirim linknya lewat WhatsApp ke HP lain, pastikan preview (judul dan sampul) muncul dan suratnya terbuka tanpa login.
 
 Langkah 1 bisa dicoba ke server lokal dengan mock: jalankan build dengan `NUXT_MOCK_API=1 NUXT_PUBLIC_API_BASE=/mock-api`, lalu pakai `LIVE_BASE_URL=http://127.0.0.1:4320`.
+
+Hasil 13 Oktober 2026, setelah region fungsi Sydney (#31, #33) ter-deploy:
+
+| Langkah | Hasil |
+| --- | --- |
+| 1. Tes live | Lolos di Android dan iPhone. Semua panggilan fungsi dijawab dari `ap-southeast-2` |
+| 2. `check:preview` | Semua aturan lolos untuk surat dari Bintang: halaman 200, gambar OG JPEG 1200×630 sebesar 162.145 byte, `noindex` |
+| 3. WhatsApp | Kall dan Bintang saling kirim surat. Preview tampil dan suratnya terbuka tanpa login |
 
 ## Deploy
 
