@@ -104,10 +104,10 @@ Tabel `letter_events` hanya berisi tiga kolom:
 | Kolom | Isi |
 | --- | --- |
 | `kind` | `created`, `opened`, atau `replied` |
-| `occurred_at` | Waktu kejadian |
+| `occurred_at` | Waktu kejadian, dibulatkan ke bawah ke jam penuh (UTC) |
 | `after_hours` | Jam penuh sejak surat (untuk `replied`: surat yang dibalas) di-publish. Kosong untuk `created` |
 
-Tabel ini tidak menyimpan `letter_id`, slug, IP, user agent, cookie, atau isi surat. Satu baris tidak bisa dikaitkan ke surat atau pengirimnya, dan event tetap ada setelah suratnya dihapus di hari ke-30. Akibatnya, analitiknya berupa jumlah per periode, bukan alur per surat. Misalnya: berapa surat dibuat minggu ini, berapa persen yang dibuka, dan berapa lama sampai dibuka.
+Tabel ini tidak menyimpan `letter_id`, slug, IP, user agent, cookie, atau isi surat. Tidak ada kolom yang menunjuk ke surat. Waktunya sengaja dibulatkan ke jam: trigger jalan di transaksi yang sama, jadi `now()` yang presisi akan sama persis dengan `published_at` atau `opened_at` dan bisa di-join 1:1 ke suratnya. Setelah suratnya dihapus di hari ke-30, event tidak bisa dikaitkan lagi, tapi tetap ada. Akibatnya, analitiknya berupa jumlah per periode, bukan alur per surat. Misalnya: berapa surat dibuat minggu ini, berapa persen yang dibuka, dan berapa lama sampai dibuka.
 
 Event dicatat trigger di tabel `letters`, dalam transaksi yang sama dengan perubahannya. Jadi Edge Functions tidak berubah, dan event tidak hilang kalau fungsi gagal di tengah jalan.
 
@@ -119,7 +119,7 @@ Event dicatat trigger di tabel `letters`, dalam transaksi yang sama dengan perub
 
 "Dibuat" dan "dibalas" dihitung saat publish, bukan saat `POST /letters`. Draf yang tidak pernah dikirim terhapus setelah 24 jam dan tidak dihitung. Balasan juga dihitung sebagai surat dibuat.
 
-Tabel ini memakai RLS tanpa policy, dan hak `anon`/`authenticated` dicabut. Datanya dibaca lewat SQL di dashboard, misalnya view `letter_stats_weekly` (jumlah per jenis per minggu, plus median `after_hours` untuk `opened`). Baris lebih tua dari 13 bulan dihapus `run_cleanup()`.
+Baris lebih tua dari 13 bulan dihapus `run_cleanup()`. Datanya dibaca lewat SQL di dashboard, misalnya view `letter_stats_weekly`: jumlah per jenis per minggu (WIB), plus median `after_hours`.
 
 ### Monitoring error
 
@@ -127,15 +127,27 @@ Untuk sekarang tidak ada layanan luar (Sentry dan sejenisnya), supaya tidak ada 
 
 - Setiap respons 5xx dari `letters`, `l`, dan `cleanup` dicatat ke tabel `function_errors`, dengan kolom:
   - `function`, `route` (pola, misalnya `/l/:slug`, bukan path aslinya);
-  - `status`, `error` (nama dan pesan error, dipotong 200 karakter);
+  - `status`, `error_name` (misalnya `TypeError`, `PostgrestError`), `error_code` (kode PostgREST atau Postgres seperti `PGRST116` atau `57014`, atau status Storage);
   - `occurred_at`.
 
-  Header, body, IP, slug, dan token tidak dicatat. Barisnya disimpan 30 hari, lalu dihapus `run_cleanup()`.
+  Pesan error tidak disimpan. Error `fetch` di Deno menyertakan URL lengkap, termasuk filter PostgREST seperti `slug=eq.…`, dan error Postgres kadang menyertakan nilai input. Nama dan kode disaring dengan pola huruf, angka, dan garis bawah di fungsi dan sekali lagi di constraint tabel. Header, body, IP, slug, dan token tidak dicatat. Barisnya disimpan 30 hari, lalu dihapus `run_cleanup()`.
+- Pencatatannya best effort lewat `EdgeRuntime.waitUntil()`. Respons 500 keluar tanpa menunggu insert, dan kalau insert-nya gagal (biasanya justru saat DB bermasalah), cukup ditulis ke log.
 - Log Edge Function di dashboard Supabase tetap jadi tempat detail. Log itu dicatat penyedia, sesuai kalimat log teknis di `/privasi`.
 - Hasil panggilan job pembersihan dicek dari `net._http_response`.
-- View `function_errors_daily` merangkum error per fungsi per hari. Selama beta, view ini dicek tiap hari bareng pemantauan kuota storage dan egress.
+- View `function_errors_daily` merangkum error per fungsi, route, dan kode per hari (WIB). Selama beta, view ini dicek tiap hari bareng pemantauan kuota storage dan egress.
+- 5xx dari gateway atau platform tidak lewat kode fungsi, jadi tidak masuk `function_errors`. Contohnya boot error, `WORKER_LIMIT`, dan timeout. Pengecekan harian tetap melihat Logs dan Invocations tiap fungsi di dashboard.
 
 Error di browser (frontend) belum tercakup. Kalau nanti perlu, butuh endpoint baru, yang masuk kontrak dulu.
+
+### Akses
+
+Relasi baru di schema `public` otomatis dapat grant ke `anon` dan `authenticated`. View yang dibuat `postgres` juga jalan dengan hak pemiliknya, jadi RLS tabel di bawahnya dilewati. Karena itu:
+
+- `letter_events` dan `function_errors` memakai RLS tanpa policy, dan hak `anon`/`authenticated` dicabut;
+- `letter_stats_weekly` dan `function_errors_daily` dibuat `with (security_invoker = true)`, dan hak `anon`/`authenticated` juga dicabut;
+- pgTAP memastikan `anon` dan `authenticated` tidak bisa `select` dari keempatnya.
+
+Yang bisa membaca hanya secret key dan SQL di dashboard.
 
 ## Checklist per sprint
 
