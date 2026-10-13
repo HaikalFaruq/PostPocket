@@ -22,7 +22,7 @@ Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 
 **Modul.** Pocket dan TV memakai kertas dan tinta yang sama dengan Beranda. Ciri tiap modul ada di bendanya: kantong jajan dan jepitan kayu (utility `clothespin`) di Pocket, TV jadul berlayar VT323 di Memori TV dan Booth.
 
-**Lapisan mengambang.** Modal, lembar, dan popup memakai utility `scrim`: halaman di belakangnya kabur (blur 14 px) dan sedikit gelap, jadi yang mengambang terasa terangkat tanpa memutus konteks.
+**Lapisan mengambang.** Modal, lembar, dan popup memakai utility `scrim`: halaman di belakangnya kabur (blur 14 px) dan sedikit gelap, jadi yang mengambang terasa terangkat tanpa memutus konteks. Di browser yang menggambar tanpa GPU (`data-render="cpu"` di `<html>`), latarnya cukup diredupkan, dan animasi kantong serta tali Pocket langsung ke keadaan akhirnya.
 
 **Satu hal yang berani.** Garis par avion merah-biru hanya membingkai surat: kartu contoh di Beranda dan halaman surat penerima. Bagian lain dibuat tenang.
 

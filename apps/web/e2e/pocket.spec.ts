@@ -280,7 +280,7 @@ test('ganti desain: foto lama bisa dikeluarkan, kantong bisa dihapus, latarnya k
     .first()
     .evaluate((el) => ({
       blur: getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter,
-      software: document.documentElement.classList.contains('no-blur'),
+      software: document.documentElement.dataset.render === 'cpu',
     }))
   expect(scrim.blur).toContain(scrim.software ? 'none' : 'blur')
 

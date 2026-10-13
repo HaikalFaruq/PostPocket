@@ -1,12 +1,13 @@
 import { isSoftwareRenderer } from '~/utils/render'
 
 /**
- * Latar kabur popup (utility `scrim`) hanya untuk browser yang menggambar dengan GPU. Tanpa GPU,
- * setiap frame animasi harus mengaburkan ulang seluruh layar dengan CPU sampai popup tersendat; di
- * sana latarnya cukup diredupkan lewat kelas `no-blur` di <html>.
+ * Browser yang menggambar tanpa GPU (renderer WebGL perangkat lunak, atau WebGL tidak ada) diberi
+ * `data-render="cpu"` di <html>. Di sana efek yang mahal per frame dimatikan: latar popup cukup
+ * diredupkan (bukan dikaburkan), dan kantong serta tali foto Pocket langsung ke keadaan akhirnya
+ * seperti saat pengguna meminta gerakan dikurangi.
  */
 export default defineNuxtPlugin(() => {
-  if (isSoftwareRenderer(webglRenderer())) document.documentElement.classList.add('no-blur')
+  if (isSoftwareRenderer(webglRenderer())) document.documentElement.dataset.render = 'cpu'
 })
 
 /** Nama renderer WebGL, atau `null` kalau WebGL tidak ada. */

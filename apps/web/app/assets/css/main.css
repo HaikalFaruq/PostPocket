@@ -147,11 +147,11 @@
 }
 
 /*
- * Tanpa GPU (kelas dari plugins/blur.client.ts) atau kalau pengguna meminta transparansi
+ * Tanpa GPU (data-render dari plugins/render.client.ts) atau kalau pengguna meminta transparansi
  * dikurangi, latar popup cukup diredupkan: mengaburkan seluruh layar dengan CPU membuat popup
  * tersendat.
  */
-.no-blur .scrim {
+[data-render='cpu'] .scrim {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background-color: color-mix(in srgb, var(--color-ink) 40%, transparent);

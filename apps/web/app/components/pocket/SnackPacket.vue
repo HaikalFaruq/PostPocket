@@ -386,7 +386,9 @@ const backEdge = computed(() =>
 }
 
 .is-instant .packet__body,
-.is-instant .packet__top {
+.is-instant .packet__top,
+:global([data-render='cpu']) .packet__body,
+:global([data-render='cpu']) .packet__top {
   transition: none;
   animation: none;
 }

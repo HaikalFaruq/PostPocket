@@ -6,6 +6,7 @@ import { photoTime } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { dayKey } from '~/utils/memories'
 import { sendPhotoToLetter } from '~/utils/pending-photo'
+import { calmMotion } from '~/utils/render'
 
 useSeoMeta({ title: 'Kantong · PostPocket', robots: 'noindex' })
 // Sama dengan --color-pocket-page di main.css.
@@ -120,7 +121,7 @@ onMounted(() => {
 function tear() {
   torn.value = true
   remember()
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduced = calmMotion()
   // Pengguna keyboard langsung bisa menggeser tali (atau menambah foto ke kantong kosong).
   nextTick(() =>
     line.value ? line.value.focus() : actions.value?.querySelector('button')?.focus(),

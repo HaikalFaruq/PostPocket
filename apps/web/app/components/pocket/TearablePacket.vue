@@ -14,6 +14,7 @@ import {
   type Tear,
   type TearDir,
 } from '~/utils/packet-tear'
+import { calmMotion } from '~/utils/render'
 
 /**
  * Kantong yang bisa dibuka dua cara: ketuk (atau Enter/Spasi) untuk menyobek otomatis dari kiri ke
@@ -128,7 +129,7 @@ function tearOpen() {
   const dir = tear.value?.dir ?? 1
   const from = tear.value ? tearProgress(tear.value) : 0
   let current = tear.value ?? beginTear(dir)
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduce = calmMotion()
   if (reduce) {
     tear.value = extendTear(current, startEdge(dir) + dir * PACKET_W, TEAR_Y)
     finish()

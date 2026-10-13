@@ -10,6 +10,7 @@ import {
   stringY,
   swingStep,
 } from '~/utils/photo-line'
+import { calmMotion } from '~/utils/render'
 
 /**
  * Foto kantong yang sudah dibuka, dijepit jepitan kayu di tali yang melengkung (gaya Polaroid Line
@@ -404,7 +405,7 @@ function takeOver() {
 }
 
 onMounted(() => {
-  reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+  reduce = calmMotion()
   measure()
   sim.off = sim.target = offsetFor(active, spacing.value, range.value)
   resize = new ResizeObserver(measure)

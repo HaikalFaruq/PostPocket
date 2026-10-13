@@ -156,6 +156,8 @@ test('Back di HP menutup pilihan draf tanpa memindahkan halaman', async ({ page 
 })
 
 test('draf berisi 4 foto tidak ditawari "Tambahkan ke draf"', async ({ page }) => {
+  // Lima kali bolak-balik Pocket dan editor surat.
+  test.setTimeout(60_000)
   await sendFromPocket(page)
   await expect(page).toHaveURL(/\/letter\/new$/)
   for (let i = 0; i < 3; i++) {
