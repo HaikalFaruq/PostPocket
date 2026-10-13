@@ -14,10 +14,13 @@ import {
 /**
  * Foto kantong yang sudah dibuka, dijepit jepitan kayu di tali yang melengkung (gaya Polaroid Line
  * Carousel). Tali bisa diseret, diketuk fotonya, digeser panah keyboard, atau lewat tombol; foto
- * berayun di jepitannya mengikuti kecepatan geseran lalu tenang dengan sedikit pantulan, dan tetap
- * bergoyang pelan tertiup angin. Foto yang disorot adalah yang sedang dilihat (`v-model:index`): di HP
- * selalu di tengah; di layar lebar tali tidak menyisakan ujung yang kosong, dan kalau semua foto muat,
- * kelompoknya di tengah. Simulasinya ditulis langsung ke DOM tiap frame, bukan lewat state Vue.
+ * berayun di jepitannya mengikuti kecepatan geseran lalu tenang dengan sedikit pantulan, dan
+ * sesekali bergoyang pelan tertiup angin.
+ *
+ * Foto yang disorot adalah yang sedang dilihat (`v-model:index`): di HP selalu di tengah; di layar
+ * lebar tali tidak menyisakan ujung yang kosong, dan kalau semua foto muat, kelompoknya di tengah.
+ * Simulasinya ditulis langsung ke DOM, bukan lewat state Vue, dan berhenti saat semuanya diam
+ * supaya hemat baterai.
  */
 export interface LinePhoto {
   id: string
@@ -106,6 +109,7 @@ function goTo(i: number) {
   active = clamp(i, 0, Math.max(0, count.value - 1))
   sim.target = offsetFor(active, spacing.value, range.value)
   if (index.value !== active) index.value = active
+  wake()
 }
 
 function step(dir: number) {
@@ -138,11 +142,13 @@ function measure() {
 watch(range, () => {
   sim.target = offsetFor(active, spacing.value, range.value)
   if (!drag) sim.off = sim.target
+  wake()
 })
 
 watch(count, (n, before) => {
   if (active > n - 1) goTo(n - 1)
   if (n !== before) nextTick(measure)
+  nextTick(wake)
 })
 
 function onDown(event: PointerEvent) {
@@ -179,6 +185,7 @@ function onMove(event: PointerEvent) {
   if (off < lo) off = lo + (off - lo) * 0.35
   if (off > hi) off = hi + (off - hi) * 0.35
   sim.off = off
+  wake()
 }
 
 function onUp(event: PointerEvent) {
@@ -191,6 +198,7 @@ function onUp(event: PointerEvent) {
     goTo(releaseIndex(active, d.off, sim.off, d.v, spacing.value, count.value))
     return
   }
+  wake()
   // Ketukan (bukan geseran yang dibatalkan browser) di foto tetangga membawanya ke depan.
   if (event.type !== 'pointerup') return
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-i]')
@@ -215,9 +223,30 @@ let raf = 0
 let visible = true
 let reduce = false
 let prev = 0
+// Nilai terakhir yang ditulis ke tiap kartu dan ke tali: DOM hanya disentuh kalau berubah. Dicatat
+// per elemen, karena foto baru bisa menyelip di tengah tali.
+const written = new WeakMap<HTMLElement, Record<string, string>>()
+let writtenPath = ''
+
+function put(el: HTMLElement, key: string, value: string) {
+  let last = written.get(el)
+  if (!last) written.set(el, (last = {}))
+  if (last[key] === value) return
+  last[key] = value
+  if (key === 'on') el.dataset.on = value
+  else el.style.setProperty(key, value)
+}
+
+/** Jalankan lagi simulasinya; berhenti sendiri saat tali dan semua foto sudah diam. */
+function wake() {
+  if (raf || !visible) return
+  prev = performance.now()
+  raf = requestAnimationFrame(tick)
+}
 let observer: IntersectionObserver | null = null
 let resize: ResizeObserver | null = null
 let timer = 0
+let breeze = 0
 
 function tick(now: number) {
   raf = 0
@@ -247,6 +276,7 @@ function tick(now: number) {
     ? clamp(active + Math.round((sim.off - d.off) / gap), 0, Math.max(0, n - 1))
     : active
   let flying = false
+  let swinging = false
   for (let i = 0; i < (pending ? 0 : n); i++) {
     const el = cards[i]
     if (!el) continue
@@ -254,7 +284,6 @@ function tick(now: number) {
     let angle = sim.angle[i] ?? 0
     let spin = sim.spin[i] ?? 0
     ;[angle, spin] = swingStep(angle, spin, lineVel, dt, gain)
-    if (gain) angle += Math.sin(now / 1300 + i * 1.7) * 0.0009 * gain
     let left = x - cw / 2
     let top = stringY(x, w, Y0, sag) - 4
     let scale = 1
@@ -288,33 +317,52 @@ function tick(now: number) {
           scale = small + (1 - small) * Math.min(1, e)
           angle = (1 - Math.min(1, e)) * (i % 2 ? 0.4 : -0.4)
         }
-        spin = (i % 2 ? -1 : 1) * 2.4
+        spin = (i % 2 ? -1 : 1) * 1.3
       }
     }
     if (!flying && (x < -cw * 1.5 || x > w + cw * 1.5)) {
-      el.style.visibility = 'hidden'
+      put(el, 'visibility', 'hidden')
       continue
     }
-    el.style.visibility = 'visible'
+    // Ayunan di bawah 0,1 derajat sudah tidak terlihat.
+    if (Math.abs(angle) > 0.0015 || Math.abs(spin) > 0.015) swinging = true
     sim.angle[i] = angle
     sim.spin[i] = spin
-    el.style.opacity = opacity === 1 ? '' : opacity.toFixed(2)
-    el.style.clipPath = clip
-    el.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) rotate(${angle.toFixed(4)}rad)${scale === 1 ? '' : ` scale(${scale.toFixed(3)})`}`
-    el.dataset.on = String(i === shown)
+    put(el, 'visibility', 'visible')
+    put(el, 'opacity', opacity === 1 ? '' : opacity.toFixed(2))
+    put(el, 'clip-path', clip)
+    put(
+      el,
+      'transform',
+      `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) rotate(${angle.toFixed(4)}rad)${scale === 1 ? '' : ` scale(${scale.toFixed(3)})`}`,
+    )
+    put(el, 'on', String(i === shown))
     // Di atas kantong (z-20), tetap di bawah modal dan lembar (z-40 ke atas).
-    el.style.zIndex = String(21 + (i === shown ? 15 : Math.max(0, 14 - Math.abs(i - shown))))
+    put(el, 'z-index', String(21 + (i === shown ? 15 : Math.max(0, 14 - Math.abs(i - shown)))))
   }
   if (entrance) {
     if (arriving.value && now > entrance.start[0]! + FLIGHT_MS * 0.7) arriving.value = false
     if (!flying && now > Math.max(...entrance.start) + FLIGHT_MS) entrance = null
   }
-  path.value?.setAttribute('d', `M0 ${Y0} Q${w / 2} ${Y0 + 2 * sag} ${w} ${Y0}`)
+  const curve = `M0 ${Y0} Q${w / 2} ${Y0 + 2 * sag} ${w} ${Y0}`
+  if (curve !== writtenPath) {
+    writtenPath = curve
+    path.value?.setAttribute('d', curve)
+  }
+  // Tali yang sudah diam tidak menggambar ulang apa-apa sampai ada yang menggerakkannya lagi.
+  const resting =
+    !d && !pending && !entrance && Math.abs(sim.vel) < 0.5 && Math.abs(sim.off - sim.target) < 0.5
+  if (resting && !swinging) {
+    sim.off = sim.target
+    sim.vel = 0
+    return
+  }
   raf = requestAnimationFrame(tick)
 }
 
 function startEntrance() {
   pending = false
+  wake()
   const origin = props.from?.getBoundingClientRect()
   const box = stage.value?.getBoundingClientRect()
   if (!origin || !box || reduce) {
@@ -329,6 +377,16 @@ function startEntrance() {
     heights: props.photos.map((_, i) => cards[i]?.offsetHeight ?? 0),
   }
   arriving.value = true
+}
+
+/** Hembusan angin pelan sesekali: foto bergoyang sedikit lalu tenang lagi. */
+function gust() {
+  if (reduce || !props.swing || drag || entrance || document.hidden || !visible) return
+  const now = performance.now()
+  for (let i = 0; i < count.value; i++) {
+    sim.spin[i] = (sim.spin[i] ?? 0) + Math.sin(now / 700 + i * 1.7) * 0.26 * props.swing
+  }
+  wake()
 }
 
 /** Putar otomatis ke foto berikutnya sampai user menyentuh layar atau menekan tombol. */
@@ -349,10 +407,7 @@ onMounted(() => {
   if (stage.value) resize.observe(stage.value)
   observer = new IntersectionObserver(([entry]) => {
     visible = !!entry?.isIntersecting
-    if (visible && !raf) {
-      prev = performance.now()
-      raf = requestAnimationFrame(tick)
-    }
+    wake()
   })
   if (stage.value) observer.observe(stage.value)
   // Setelah lebar foto yang terukur terpasang, supaya tinggi tiap foto sudah benar.
@@ -362,6 +417,7 @@ onMounted(() => {
   prev = performance.now()
   raf = requestAnimationFrame(tick)
   if (props.autoplay && !reduce) timer = window.setInterval(autoplayTick, props.autoplay)
+  breeze = window.setInterval(gust, 8000)
   window.addEventListener('pointerdown', takeOver, { capture: true, passive: true })
   window.addEventListener('keydown', takeOver, { capture: true, passive: true })
 })
@@ -371,6 +427,7 @@ onBeforeUnmount(() => {
   observer?.disconnect()
   resize?.disconnect()
   window.clearInterval(timer)
+  window.clearInterval(breeze)
   window.removeEventListener('pointerdown', takeOver, { capture: true })
   window.removeEventListener('keydown', takeOver, { capture: true })
 })
