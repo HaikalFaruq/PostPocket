@@ -5,9 +5,15 @@ import { isSoftwareRenderer } from '~/utils/render'
  * `data-render="cpu"` di <html>. Di sana efek yang mahal per frame dimatikan: latar popup cukup
  * diredupkan (bukan dikaburkan), dan kantong serta tali foto Pocket langsung ke keadaan akhirnya
  * seperti saat pengguna meminta gerakan dikurangi.
+ *
+ * Browser yang dikendalikan tes otomatis (`navigator.webdriver`) diperlakukan sama: di CI selalu
+ * tanpa GPU, tapi WebKit di Linux hanya menyebut renderernya "WebKit WebGL". Latar kabur dan
+ * animasinya dicek lewat screenshot dan di HP sungguhan.
  */
 export default defineNuxtPlugin(() => {
-  if (isSoftwareRenderer(webglRenderer())) document.documentElement.dataset.render = 'cpu'
+  if (navigator.webdriver || isSoftwareRenderer(webglRenderer())) {
+    document.documentElement.dataset.render = 'cpu'
+  }
 })
 
 /** Nama renderer WebGL, atau `null` kalau WebGL tidak ada. */

@@ -274,7 +274,8 @@ test('ganti desain: foto lama bisa dikeluarkan, kantong bisa dihapus, latarnya k
   await page.getByRole('button', { name: 'Ganti desain kantong' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Ganti desain kantong' })).toBeVisible()
-  // Latar di belakang modal kabur, kecuali di browser tanpa GPU (seperti CI) yang cukup meredup.
+  // Latar di belakang modal kabur. Di tes otomatis dan browser tanpa GPU cukup diredupkan (lihat
+  // plugins/render.client.ts); latar kaburnya dicek lewat screenshot.
   const scrim = await page
     .locator('.scrim')
     .first()
