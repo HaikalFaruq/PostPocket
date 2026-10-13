@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PostPocket API
-  version: 0.2.1
+  version: 0.2.2
   description: |
     Kontrak API rilis 1 antara frontend (`apps/web`) dan backend (Supabase Edge Functions).
     Rilis 1 hanya melayani surat yang dikirim; Pocket, TV, dan Booth tetap di browser.
@@ -37,6 +37,14 @@ info:
       saat masanya lewat: surat jadi `404` begitu `expiresAt` lewat, dan foto (serta cover dan
       OG kalau gambar depannya foto user) tidak dikembalikan lagi begitu `photosExpireAt` lewat.
       Klien tidak pernah menerima URL berkas yang sudah dihapus.
+
+    **Region fungsi**
+
+    Panggil semua endpoint dengan query `?forceFunctionRegion=ap-southeast-2`, misalnya
+    `GET /l/{slug}?forceFunctionRegion=ap-southeast-2`. DB dan Storage ada di Sydney, sedangkan
+    tanpa query ini fungsi jalan di region terdekat dengan pemanggil (Singapura) dan setiap
+    query bolak-balik ke Sydney. Query ini dibaca gateway Supabase, bukan oleh fungsi, jadi
+    tidak mengubah respons. Header `x-region` juga bisa, tapi tidak diizinkan CORS.
 
     **Header umum**
 
