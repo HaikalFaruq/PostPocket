@@ -274,14 +274,15 @@ test('ganti desain: foto lama bisa dikeluarkan, kantong bisa dihapus, latarnya k
   await page.getByRole('button', { name: 'Ganti desain kantong' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Ganti desain kantong' })).toBeVisible()
-  // Latar di belakang modal kabur.
-  const blur = await page
+  // Latar di belakang modal kabur, kecuali di browser tanpa GPU (seperti CI) yang cukup meredup.
+  const scrim = await page
     .locator('.scrim')
     .first()
-    .evaluate(
-      (el) => getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter,
-    )
-  expect(blur).toContain('blur')
+    .evaluate((el) => ({
+      blur: getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter,
+      software: document.documentElement.classList.contains('no-blur'),
+    }))
+  expect(scrim.blur).toContain(scrim.software ? 'none' : 'blur')
 
   await expect(dialog).toContainText('2 foto terselip')
   await dialog.getByRole('button', { name: 'Keluarkan foto 1 dari kantong' }).click()

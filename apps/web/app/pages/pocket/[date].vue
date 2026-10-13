@@ -227,6 +227,7 @@ const editOpen = ref(false)
         :frame-color="frameColor"
         :from="restored ? null : packetEl"
         :from-y="0.2"
+        :paused="editOpen"
       />
       <p
         v-else

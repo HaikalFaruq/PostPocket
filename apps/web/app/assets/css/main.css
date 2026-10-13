@@ -146,6 +146,25 @@
   backdrop-filter: blur(14px) saturate(1.15);
 }
 
+/*
+ * Tanpa GPU (kelas dari plugins/blur.client.ts) atau kalau pengguna meminta transparansi
+ * dikurangi, latar popup cukup diredupkan: mengaburkan seluruh layar dengan CPU membuat popup
+ * tersendat.
+ */
+.no-blur .scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  }
+}
+
 /* Jepitan kayu Pocket: dipakai kantong dan sel kalender yang masih menunggu kantong. */
 @utility clothespin {
   border-radius: 3px;

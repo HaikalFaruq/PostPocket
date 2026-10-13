@@ -49,6 +49,8 @@ const props = withDefaults(
     from?: HTMLElement | null
     /** Tinggi mulut kantong di elemen `from`, 0 di atas sampai 1 di bawah. */
     fromY?: number
+    /** Ada modal di atasnya: tidak ada angin dan putar otomatis yang menggerakkan tali. */
+    paused?: boolean
   }>(),
   {
     frame: 'polaroid',
@@ -59,6 +61,7 @@ const props = withDefaults(
     autoplay: 4500,
     from: null,
     fromY: 0.2,
+    paused: false,
   },
 )
 
@@ -381,7 +384,8 @@ function startEntrance() {
 
 /** Hembusan angin pelan sesekali: foto bergoyang sedikit lalu tenang lagi. */
 function gust() {
-  if (reduce || !props.swing || drag || entrance || document.hidden || !visible) return
+  if (reduce || !props.swing || props.paused || drag || entrance || document.hidden || !visible)
+    return
   const now = performance.now()
   for (let i = 0; i < count.value; i++) {
     sim.spin[i] = (sim.spin[i] ?? 0) + Math.sin(now / 700 + i * 1.7) * 0.26 * props.swing
@@ -391,7 +395,7 @@ function gust() {
 
 /** Putar otomatis ke foto berikutnya sampai user menyentuh layar atau menekan tombol. */
 function autoplayTick() {
-  if (userTook || drag || entrance || document.hidden || !visible) return
+  if (userTook || props.paused || drag || entrance || document.hidden || !visible) return
   goTo(active >= count.value - 1 ? 0 : active + 1)
 }
 
