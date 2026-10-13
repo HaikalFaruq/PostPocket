@@ -5,6 +5,10 @@ import { expect, test, type Page } from '@playwright/test'
 
 const TODAY = '2026-10-10'
 
+// Simpan kantong memproses foto di thread utama. WebKit di CI (tanpa GPU) kadang butuh lebih dari
+// 5 detik sampai modalnya tertutup, jadi tunggu lebih lama dari batas bawaan expect.
+const SAVE_TIMEOUT = 15_000
+
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 10, 10, 0))
   await page.goto('/letter/new')
@@ -42,7 +46,7 @@ async function sendFromPocket(page: Page, size = { width: 600, height: 450 }) {
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
   await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
-  await expect(dialog).toBeHidden()
+  await expect(dialog).toBeHidden({ timeout: SAVE_TIMEOUT })
   await sendAgainFromPocket(page)
 }
 

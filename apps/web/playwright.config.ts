@@ -26,7 +26,9 @@ export default defineConfig({
   },
   projects: [
     { name: 'android', use: { ...devices['Pixel 7'], launchOptions: fakeCamera } },
-    { name: 'iphone', use: { ...devices['iPhone 15'] } },
+    // WebKit di CI menggambar tanpa GPU, jadi tes Pocket di sini 15–30 detik, mepet batas bawaan
+    // 30 detik. Batasnya dilonggarkan supaya CI yang sedang lambat tidak menggagalkan tes.
+    { name: 'iphone', use: { ...devices['iPhone 15'] }, timeout: 60_000 },
     {
       name: 'desktop',
       use: {
