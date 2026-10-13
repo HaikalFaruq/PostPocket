@@ -324,9 +324,15 @@ test('goresan jari yang berhenti di tengah dituntaskan dengan satu ketukan', asy
       touchPoints: x === undefined ? [] : [{ x, y }],
     })
   await touch('touchStart', art.x + 8 * unit)
-  for (let x = 18; x <= 90; x += 8) await touch('touchMove', art.x + x * unit)
+  for (let x = 18; x <= 90; x += 8) {
+    await touch('touchMove', art.x + x * unit)
+    await page.waitForTimeout(16)
+  }
   await touch('touchEnd')
   await expect(page.getByText('Geser terus sampai ujung')).toBeVisible()
+  // Jari diangkat sebentar dulu: ketukan yang langsung menyusul goresan dipakai Chrome untuk
+  // menghentikan sisa gerak goresannya, bukan untuk klik.
+  await page.waitForTimeout(400)
   await page.touchscreen.tap(art.x + art.width / 2, art.y + art.height / 2)
   await expect(page.getByTestId('pocket-day')).toHaveAttribute('data-torn', 'true')
 })
