@@ -147,7 +147,12 @@ Relasi baru di schema `public` otomatis dapat grant ke `anon` dan `authenticated
 - `letter_stats_weekly` dan `function_errors_daily` dibuat `with (security_invoker = true)`, dan hak `anon`/`authenticated` juga dicabut;
 - pgTAP memastikan `anon` dan `authenticated` tidak bisa `select` dari keempatnya.
 
-Yang bisa membaca hanya secret key dan SQL di dashboard.
+Yang bisa membaca hanya secret key dan SQL di dashboard (SQL Editor), atau CLI yang di-link:
+
+```sh
+supabase db query --linked "select * from letter_stats_weekly order by week desc, kind"
+supabase db query --linked "select * from function_errors_daily where day > current_date - 7 order by day desc"
+```
 
 ## Checklist per sprint
 
@@ -179,8 +184,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 3 (minggu 6–7)**
 
-- [ ] Event analitik: surat dibuat, dibuka, dibalas
-- [ ] Monitoring error
+- [x] Event analitik: surat dibuat, dibuka, dibalas ([Analitik](#analitik-dan-monitoring-error))
+- [x] Monitoring error tanpa layanan luar (`function_errors`, plus log dashboard untuk error gateway)
 - [ ] Review keamanan semua endpoint
 
 **Sprint 4 dan beta (minggu 8–10)**
@@ -196,6 +201,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 | `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `status`, `edit_token_hash`, `reply_to_id`, `created_at`, `draft_expires_at`, `published_at`, `expires_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at` |
 | `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`cover`/`og`), `key` (kunci foto di `content`, khusus `photo`), `mime`, `size`, `width`, `height`, `uploaded_at` |
 | `rate_limit_hits` | `bucket`, `key` (HMAC dari IP, bukan IP mentah), `created_at`. Diisi `take_rate_limit()` |
+| `letter_events` | `kind` (`created`/`opened`/`replied`), `occurred_at` (dibulatkan ke jam), `after_hours`. Diisi trigger `letters_record_event` |
+| `function_errors` | `function`, `route` (pola), `status`, `error_name`, `error_code`, `occurred_at`. Diisi Edge Functions lewat `_shared/errors.ts` |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
 - `owner_id` boleh kosong selama belum ada login.
@@ -207,7 +214,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
 - Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key.
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
-- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()` dan `run_cleanup()` untuk job pembersihan. Semuanya hanya bisa dijalankan secret key.
+- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()` dan `run_cleanup()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -243,6 +250,7 @@ Kode bersama ada di `_shared/`:
 - `validate.ts`: body `POST /letters` dicek dengan skema dari kontrak (`_shared/openapi.json`, hasil `scripts/bundle-contract.sh`), lalu aturan isi dicek dengan preset dan `contentLimits` dari `packages/presets`, sama seperti mock frontend.
 - `image.ts`: membaca tipe dan dimensi dari isi berkas, lalu membuang EXIF, XMP, IPTC, dan komentar tanpa kompres ulang.
 - `files.ts`: hapus berkas lewat Storage API dulu, baru barisnya. Dipakai `DELETE /letters/{id}` dan job pembersihan.
+- `errors.ts`: mencatat error 5xx ke `function_errors` (pola route, nama, dan kode saja), best effort lewat `EdgeRuntime.waitUntil()`.
 - `db.ts`: klien secret key. Secret key diambil dari env yang disediakan Supabase (`SUPABASE_SECRET_KEYS`), jadi tidak perlu `secrets set`.
 
 Yang terjadi saat publish: setiap berkas diunduh dari Storage, ukurannya harus sama persis dengan metadata, tipe dan dimensinya dibaca dari isi berkas (bukan dari header). Kalau ada metadata yang tersisa atau content-type dari browser salah, berkasnya ditulis ulang tanpa metadata. Baru setelah itu `slug` dibuat dan status jadi `sent`.

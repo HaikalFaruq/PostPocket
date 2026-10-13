@@ -8,6 +8,7 @@
 //   kalau gambar depannya foto user, lalu mengisi photos_deleted_at.
 
 import { type AssetRow, check, db, type LetterRow, ok, secretKey } from '../_shared/db.ts'
+import { recordError } from '../_shared/errors.ts'
 import { deleteLetters, frontIsPhoto, removeAssets } from '../_shared/files.ts'
 import { bytea, sameHash, sha256 } from '../_shared/token.ts'
 
@@ -91,6 +92,7 @@ Deno.serve(async (request) => {
     return Response.json(result)
   } catch (error) {
     console.error(error)
+    recordError('/cleanup', 500, error)
     return Response.json({ error: 'internal' }, { status: 500 })
   }
 })

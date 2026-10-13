@@ -1,6 +1,8 @@
 // Respons, CORS, dan pemeriksaan apikey yang sama untuk fungsi `letters` dan `l`.
 // Aturannya ada di docs/api/openapi.yaml bagian CORS dan Error.
 
+import { recordError } from './errors.ts'
+
 export type ErrorCode =
   | 'invalid_request'
   | 'invalid_design'
@@ -100,6 +102,8 @@ function publishableKeys(): string[] {
 export function serve(handler: (request: Request, path: string) => Promise<Response>) {
   return async (request: Request): Promise<Response> => {
     if (request.method === 'OPTIONS') return preflight(request)
+    // Di Supabase path-nya diawali nama fungsi, misalnya /letters/<id>/publish.
+    const path = new URL(request.url).pathname.replace(/\/+$/, '')
     try {
       const apikey = request.headers.get('apikey')
       if (!apikey || !publishableKeys().includes(apikey)) {
@@ -109,12 +113,11 @@ export function serve(handler: (request: Request, path: string) => Promise<Respo
           'header apikey tidak ada atau bukan publishable key',
         )
       }
-      // Di Supabase path-nya diawali nama fungsi, misalnya /letters/<id>/publish.
-      const path = new URL(request.url).pathname.replace(/\/+$/, '')
       return await handler(request, path)
     } catch (error) {
       if (error instanceof ApiError) return errorResponse(request, error)
       console.error(error)
+      recordError(path, 500, error)
       return errorResponse(request, new ApiError(500, 'internal', 'kesalahan server'))
     }
   }

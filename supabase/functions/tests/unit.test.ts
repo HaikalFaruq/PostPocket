@@ -1,6 +1,7 @@
 // Unit test tanpa database. Jalankan dari supabase/functions: deno test tests/unit.test.ts
 
 import { assert, assertEquals, assertNotEquals, assertThrows } from '@std/assert'
+import { errorFields, routePattern } from '../_shared/errors.ts'
 import { chunks } from '../_shared/files.ts'
 import { ApiError } from '../_shared/http.ts'
 import { imageInfo, stripMetadata } from '../_shared/image.ts'
@@ -174,4 +175,42 @@ Deno.test('chunks memotong daftar untuk filter .in() yang panjang', () => {
     200,
     50,
   ])
+})
+
+Deno.test('routePattern membuang id dan slug dari path', () => {
+  assertEquals(routePattern('/letters'), '/letters')
+  assertEquals(routePattern('/letters/0f8c6a52-1c1e-4d1b-9a1e-1f2b3c4d5e6f'), '/letters/:id')
+  assertEquals(routePattern('/letters/0f8c6a52/publish'), '/letters/:id/publish')
+  assertEquals(routePattern('/l/abcdefghij'), '/l/:slug')
+  assertEquals(routePattern('/l/AbCdE12345/open'), '/l/:slug/open')
+  assertEquals(routePattern('/cleanup'), '/cleanup')
+  assertEquals(routePattern('/l'), '/:other')
+  assertEquals(routePattern('/l/abcdefghij/bukan'), '/:other')
+  assertEquals(routePattern('/letters/a/publish/lagi'), '/:other')
+})
+
+Deno.test('errorFields hanya menyimpan nama dan kode yang cocok pola, tanpa pesan', () => {
+  assertEquals(
+    errorFields({ message: 'canceling statement', code: '57014', details: null, hint: null }),
+    { error_name: null, error_code: '57014' },
+  )
+  assertEquals(
+    errorFields(
+      new TypeError(
+        'error sending request for url (https://x.supabase.co/rest/v1/letters?slug=eq.AbCdE12345)',
+      ),
+    ),
+    { error_name: 'TypeError', error_code: null },
+  )
+  assertEquals(
+    errorFields({ name: 'StorageApiError', statusCode: '400', message: 'Object not found' }),
+    { error_name: 'StorageApiError', error_code: '400' },
+  )
+  // Nilai input yang kebawa di kode atau nama ditolak pola.
+  assertEquals(
+    errorFields({ name: 'invalid input syntax for type uuid: "x"', code: 'id=eq.0f8c6a52-1c1e' }),
+    { error_name: null, error_code: null },
+  )
+  assertEquals(errorFields('teks biasa'), { error_name: null, error_code: null })
+  assertEquals(errorFields(null), { error_name: null, error_code: null })
 })
