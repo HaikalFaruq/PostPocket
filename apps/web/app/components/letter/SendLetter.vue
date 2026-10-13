@@ -156,7 +156,7 @@ onMounted(() => {
 
 <template>
   <div
-    class="fixed inset-0 z-50 grid items-end bg-ink/40 sm:place-items-center"
+    class="scrim fixed inset-0 z-50 grid items-end sm:place-items-center"
     data-testid="send-letter"
     :data-state="state"
     @click.self="close"

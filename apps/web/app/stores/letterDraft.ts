@@ -171,14 +171,14 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       updatedAt: Date.now(),
     }
     try {
-      await set(DRAFT_KEY, draft)
+      // Foto ditulis dulu, baru isi draf yang menunjuknya. Kalau halaman ditinggal di tengah jalan,
+      // draf lama tetap utuh dan tidak pernah menunjuk foto yang belum tersimpan (slotnya kosong).
       let wrotePhoto = false
-      if (photoDirty) {
-        const current = photo.value
-        if (current) await set(PHOTO_KEY, await toStoredPhoto(current))
-        else await del(PHOTO_KEY)
-        wrotePhoto = !!current
-        photoDirty = false
+      const current = photo.value
+      const frontChanged = photoDirty
+      if (frontChanged && current) {
+        await set(PHOTO_KEY, await toStoredPhoto(current))
+        wrotePhoto = true
       }
       for (const key of [...dirtyPhotos]) {
         const item = photos.value[key]
@@ -188,6 +188,11 @@ export const useLetterDraft = defineStore('letterDraft', () => {
           wrotePhoto = true
         }
         dirtyPhotos.delete(key)
+      }
+      await set(DRAFT_KEY, draft)
+      if (frontChanged) {
+        if (!current) await del(PHOTO_KEY)
+        photoDirty = false
       }
       // Draf berfoto ikut dijaga dari pembersihan penyimpanan browser.
       if (wrotePhoto) void requestPersistentStorage()

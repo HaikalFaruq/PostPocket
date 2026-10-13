@@ -34,7 +34,7 @@ const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(
   <div class="mx-auto flex min-h-dvh max-w-6xl flex-col px-4 sm:px-6">
     <header class="flex items-center gap-2.5 py-5">
       <img src="/favicon.svg" alt="" class="size-7" />
-      <p class="text-[20px] leading-none font-extrabold tracking-[-0.035em]">PostPocket</p>
+      <p class="text-[20px] leading-none font-bold tracking-[-0.03em]">PostPocket</p>
     </header>
 
     <main class="grid flex-1 gap-10 pb-10 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-16">
@@ -78,7 +78,7 @@ const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(
 
       <div class="lg:order-1">
         <h1
-          class="text-[38px] leading-[0.95] font-extrabold tracking-[-0.045em] text-balance sm:text-[60px]"
+          class="text-[38px] leading-[0.95] font-bold tracking-[-0.035em] text-balance sm:text-[60px]"
         >
           Kenangan kecil, dikirim jadi surat.
         </h1>

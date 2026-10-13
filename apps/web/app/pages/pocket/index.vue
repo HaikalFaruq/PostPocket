@@ -92,7 +92,7 @@ function openDay(day: string) {
       <section class="mt-5 rounded-[30px] bg-surface p-4 shadow-raised sm:p-7">
         <div class="flex flex-wrap items-start justify-between gap-3 px-1 sm:px-0">
           <div>
-            <h1 class="text-[clamp(30px,8vw,42px)] leading-none font-extrabold tracking-[-0.045em]">
+            <h1 class="text-[clamp(30px,8vw,42px)] leading-none font-bold tracking-[-0.035em]">
               {{ title }}
             </h1>
             <p class="mt-1 text-body text-pocket-muted">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isPocketDay, longDate, monthGrid, shiftMonth, shortDate } from '../app/utils/calendar'
-import { parseExifDate, readExifDate } from '../app/utils/exif'
+import { parseExifDate, photoTime, readExifDate } from '../app/utils/exif'
 
 /** JPEG kecil dengan segmen EXIF berisi tanggal, di IFD Exif (asli) atau di IFD0. */
 function jpeg(date: string, options: { little?: boolean; original?: boolean } = {}): Blob {
@@ -87,5 +87,18 @@ describe('kalender', () => {
     expect(isPocketDay('2025-02-29', '2026-10-10')).toBe(false)
     expect(isPocketDay('2026-13-01', '2026-10-10')).toBe(false)
     expect(isPocketDay('kemarin', '2026-10-10')).toBe(false)
+  })
+})
+
+describe('photoTime', () => {
+  it('memakai EXIF kalau ada, kalau tidak waktu berkasnya, bukan waktu dipilih', async () => {
+    const noExif = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'layar.png', {
+      lastModified: Date.UTC(2026, 9, 3, 7, 30),
+    })
+    expect(await photoTime(noExif)).toBe('2026-10-03T07:30:00.000Z')
+    const withExif = new File([await jpeg('2026:10:05 14:30:00').arrayBuffer()], 'a.jpg', {
+      lastModified: Date.UTC(2026, 9, 9),
+    })
+    expect(await photoTime(withExif)).toBe(await readExifDate(jpeg('2026:10:05 14:30:00')))
   })
 })

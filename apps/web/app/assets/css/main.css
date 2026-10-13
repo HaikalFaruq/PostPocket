@@ -36,6 +36,8 @@
   --color-pocket-ink: #18204a;
   --color-pocket-muted: rgb(24 32 74 / 0.66);
   --color-pocket-wood: #ead2a4;
+  /* Tali rami tempat foto kantong dijepit. */
+  --color-pocket-twine: #a48d6c;
   --color-pocket-ok: #a6d08f;
 
   /* Aksen TV: clay pink dan panel gelap */
@@ -47,8 +49,7 @@
   --color-tv-panel: #2a2a2a;
   --color-tv-panel-ink: rgb(255 255 255 / 0.92);
 
-  --font-sans:
-    'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Gantari', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-letter: 'Caveat', cursive;
   --font-tv: 'VT323', ui-monospace, monospace;
@@ -61,8 +62,8 @@
   --text-body--line-height: 1.5;
   --text-title: 24px;
   --text-title--line-height: 1.15;
-  --text-title--letter-spacing: -0.03em;
-  --text-title--font-weight: 800;
+  --text-title--letter-spacing: -0.025em;
+  --text-title--font-weight: 700;
   --text-display: 42px;
   --text-display--line-height: 1.05;
   --text-display--letter-spacing: -0.03em;
@@ -116,6 +117,8 @@
   /* Butiran kilau foil */
   --texture-glitter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.6 -.75'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
   --card-open-ms: 520ms;
+  /* Cincin pelangi untuk pilihan "warna sendiri". */
+  --spectrum: conic-gradient(#f87171, #fbbf24, #a3e635, #22d3ee, #818cf8, #e879f9, #f87171);
   /* Garis par avion merah dan biru: satu-satunya hiasan berani, hanya untuk membingkai surat. */
   --airmail: repeating-linear-gradient(
     -45deg,
@@ -131,6 +134,35 @@
   padding: 10px;
   border-radius: 6px;
   background: var(--airmail);
+}
+
+/*
+ * Latar di belakang modal, lembar, dan popup: halaman di belakangnya kabur dan sedikit gelap, jadi
+ * yang mengambang terasa terangkat tanpa memutus konteks.
+ */
+@utility scrim {
+  background-color: color-mix(in srgb, var(--color-ink) 22%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/*
+ * Tanpa GPU (data-render dari plugins/render.client.ts) atau kalau pengguna meminta transparansi
+ * dikurangi, latar popup cukup diredupkan: mengaburkan seluruh layar dengan CPU membuat popup
+ * tersendat.
+ */
+[data-render='cpu'] .scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  }
 }
 
 /* Jepitan kayu Pocket: dipakai kantong dan sel kalender yang masih menunggu kantong. */

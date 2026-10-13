@@ -18,9 +18,11 @@ PostPocket tempat anak muda Indonesia menyimpan momen kecil per hari, lalu mengi
 
 Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 
-**Huruf.** Bricolage Grotesque untuk semua teks antarmuka, dari judul sampai keterangan. Judul memakai ketebalan 800 dengan jarak huruf rapat, jadi terasa seperti cetakan kemasan. Caveat tetap untuk isi surat (tulisan tangan), dan VT323 tetap untuk layar TV. Font cadangannya diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), jadi teks tidak melompat saat Bricolage selesai dimuat.
+**Huruf.** Gantari untuk semua teks antarmuka, dari judul sampai keterangan. Gantari dibuat Anugrah Pasau dari Lafontype, foundry di Makassar: huruf buatan Indonesia untuk aplikasi anak muda Indonesia. Bentuknya bersih dan geometris tapi tetap hangat, dan bukan salah satu font yang sering muncul di desain buatan AI (Inter, Space Grotesk, Bricolage Grotesque, Plus Jakarta Sans, dan sejenisnya). Judul memakai ketebalan 700 dengan jarak huruf sedikit rapat, teks biasa 400, dan label 500–600. Caveat tetap untuk isi surat (tulisan tangan), dan VT323 tetap untuk layar TV. Font cadangannya diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), jadi teks tidak melompat saat Gantari selesai dimuat.
 
 **Modul.** Pocket dan TV memakai kertas dan tinta yang sama dengan Beranda. Ciri tiap modul ada di bendanya: kantong jajan dan jepitan kayu (utility `clothespin`) di Pocket, TV jadul berlayar VT323 di Memori TV dan Booth.
+
+**Lapisan mengambang.** Modal, lembar, dan popup memakai utility `scrim`: halaman di belakangnya kabur (blur 14 px) dan sedikit gelap, jadi yang mengambang terasa terangkat tanpa memutus konteks. Di browser yang menggambar tanpa GPU dan di tes otomatis (`data-render="cpu"` di `<html>`), latarnya cukup diredupkan, dan animasi kantong serta tali Pocket langsung ke keadaan akhirnya.
 
 **Satu hal yang berani.** Garis par avion merah-biru hanya membingkai surat: kartu contoh di Beranda dan halaman surat penerima. Bagian lain dibuat tenang.
 
@@ -34,8 +36,8 @@ Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
    - kartu identik dengan bayangan yang sama;
    - font mono untuk label kecil.
 
-   Kecuali bagian dari benda itu sendiri, misalnya cap tanggal di foto, merek di punggung kartu, atau tulisan di layar TV.
+   Kecuali bagian dari benda itu sendiri, misalnya cap tanggal di foto, merek di punggung kartu, atau tulisan di layar TV. Modal kantong Pocket juga pengecualian: kartu langkah bernomor 01–04 mengikuti Day Pocket, keputusan Kall pada 13 Oktober 2026.
 3. **Kata-kata dari sudut pandang user.** Kalimat biasa (bukan huruf kapital semua), kata kerja yang jelas, dan satu nama untuk satu aksi di seluruh alur.
 4. **Batas mutu tetap berlaku:** kontras minimal 4,5:1 untuk teks, fokus keyboard terlihat, `prefers-reduced-motion` dihormati, dan tata letak tetap rapi dari HP 360 px sampai desktop.
 
-Panduan yang dipakai: skill [frontend-design](https://github.com/anthropics/skills/tree/main/skills/frontend-design) dari Anthropic dan [Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) dari Vercel.
+Panduan yang dipakai: skill [frontend-design](https://github.com/anthropics/skills/tree/main/skills/frontend-design) dari Anthropic, skill [Impeccable](https://github.com/pbakaus/impeccable) (bagian `typeset` dan `craft-floor`, dipakai untuk memilih Gantari), dan [Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) dari Vercel.

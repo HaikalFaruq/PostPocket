@@ -20,6 +20,12 @@ export const iconPaths = {
   eject: 'M12 5l7 8H5zM5 18h14',
   link: 'M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
   download: 'M12 4v11M7 10l5 5 5-5M5 19h14',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3',
+  // Kembalikan: panah melengkung ke kiri.
+  undo: 'M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+  // Bingkai foto dengan tanda tambah di pojok.
+  'image-plus':
+    'M13 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M4 16l4.5-4.5L13 16l2.5-2.5L20 18M18 3v6M15 6h6',
   // Tombol Bagikan Safari, untuk petunjuk Tambah ke Layar Utama.
   share:
     'M12 3v12M8 7l4-4 4 4M8 11H7a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1',

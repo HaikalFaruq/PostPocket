@@ -3,7 +3,7 @@ import { byId, tv } from '@postpocket/presets'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 import { BOOTH_LAYOUTS, beep, captureShot, type BoothLayout } from '~/utils/booth'
 import { ejectKeyframes, followPointer, inside, insertKeyframes, type Box } from '~/utils/cd-flight'
-import { readExifDate } from '~/utils/exif'
+import { photoTime } from '~/utils/exif'
 import { PhotoError, decodePhoto, preparePhoto } from '~/utils/front-image'
 import { dayAlbum, dayKey, type AlbumView } from '~/utils/memories'
 
@@ -469,7 +469,7 @@ async function onFiles(event: Event) {
   try {
     const photos = []
     for (const file of files) {
-      const takenAt = (await readExifDate(file)) ?? undefined
+      const takenAt = await photoTime(file)
       photos.push({ photo: await preparePhoto(file), takenAt })
     }
     const today = dayKey(new Date())
@@ -711,7 +711,7 @@ const marqueeSeconds = computed(() => Math.max(8, marquee.value.length * 0.3))
 
       <div class="text-center">
         <!-- Halaman yang sama dipakai TV dan Booth; judulnya mengikuti yang sedang dibuka. -->
-        <h1 class="text-[clamp(36px,10vw,56px)] leading-none font-extrabold tracking-[-0.045em]">
+        <h1 class="text-[clamp(36px,10vw,56px)] leading-none font-bold tracking-[-0.035em]">
           {{ booth ? 'Booth' : 'Memori TV' }}
         </h1>
         <p class="mt-3 text-[14px] text-ink-muted" data-testid="tv-subtitle">

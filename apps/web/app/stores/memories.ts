@@ -8,6 +8,7 @@ import {
   albumShelf,
   emptyMemories,
   normalizeMemories,
+  withoutMoments,
   type Album,
   type MemoryData,
   type Moment,
@@ -145,29 +146,28 @@ export const useMemories = defineStore('memories', () => {
   }
 
   /** Hapus momen dari semua hari dan album, beserta fotonya. */
-  async function deleteMoment(id: string) {
-    const moments = Object.fromEntries(
-      Object.entries(data.value.moments).filter(([key]) => key !== id),
-    )
-    const days = Object.fromEntries(
-      Object.entries(data.value.days).map(([key, day]) => [
-        key,
-        { ...day, moments: day.moments.filter((m) => m !== id) },
-      ]),
-    )
-    const albums = data.value.albums.map((album) => ({
-      ...album,
-      moments: album.moments.filter((m) => m !== id),
-    }))
-    await persist({ ...data.value, moments, days, albums })
-    const url = urls.get(id)
-    urls.delete(id)
-    url?.then((value) => value && URL.revokeObjectURL(value))
-    try {
-      await del(PHOTO_PREFIX + id)
-    } catch {
-      // Tidak ada yang perlu dihapus.
+  /** Hapus momen-momen ini beserta fotonya, dari kantong dan album CD. */
+  async function deleteMoments(ids: string[], dropDay?: string) {
+    await persist(withoutMoments(data.value, ids, dropDay))
+    for (const id of ids) {
+      const url = urls.get(id)
+      urls.delete(id)
+      url?.then((value) => value && URL.revokeObjectURL(value))
+      try {
+        await del(PHOTO_PREFIX + id)
+      } catch {
+        // Tidak ada yang perlu dihapus.
+      }
     }
+  }
+
+  function deleteMoment(id: string) {
+    return deleteMoments([id])
+  }
+
+  /** Hapus satu kantong beserta semua fotonya. */
+  function deleteDay(day: string) {
+    return deleteMoments(data.value.days[day]?.moments ?? [], day)
   }
 
   /** Rak CD: album bulanan otomatis lalu album buatan user. */
@@ -191,5 +191,7 @@ export const useMemories = defineStore('memories', () => {
     addToAlbum,
     deleteAlbum,
     deleteMoment,
+    deleteMoments,
+    deleteDay,
   }
 })

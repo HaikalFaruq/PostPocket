@@ -41,7 +41,7 @@ async function sendFromPocket(page: Page, size = { width: 600, height: 450 }) {
   })
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
-  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
   await expect(dialog).toBeHidden()
   await sendAgainFromPocket(page)
 }
@@ -156,6 +156,8 @@ test('Back di HP menutup pilihan draf tanpa memindahkan halaman', async ({ page 
 })
 
 test('draf berisi 4 foto tidak ditawari "Tambahkan ke draf"', async ({ page }) => {
+  // Lima kali bolak-balik Pocket dan editor surat.
+  test.setTimeout(60_000)
   await sendFromPocket(page)
   await expect(page).toHaveURL(/\/letter\/new$/)
   for (let i = 0; i < 3; i++) {
@@ -165,6 +167,8 @@ test('draf berisi 4 foto tidak ditawari "Tambahkan ke draf"', async ({ page }) =
       .getByRole('button', { name: 'Tambahkan ke draf' })
       .click()
     await expect(page).toHaveURL(/\/letter\/new$/)
+    // Keterangannya muncul setelah draf tersimpan; baru kembali ke Pocket setelah itu.
+    await expect(page.getByText(/^Foto dari Pocket .* ditambahkan/)).toBeVisible()
   }
   await expect(page.getByText('4 foto', { exact: true })).toBeVisible()
 

@@ -39,12 +39,14 @@ apps/web/
   app/components/           komponen bersama dari PRD, dipanggil tanpa prefix: <StepCard>, <PillGroup>, ...
   app/components/letter/    komponen khusus Letter: FoilCard, LetterPage, LetterEditor, FrontPicker, dll.
   app/components/tv/        TvSet, CdShelf, CdDisc, TvSlideshow, BoothCamera, BoothLayoutPreview, BoothResult
-  app/components/pocket/    SnackPacket (kantong snack), SaveDayModal (modal simpan hari), MonthPicker
+  app/components/pocket/    SnackPacket (kantong foil SVG), TearablePacket (ketuk atau gores untuk menyobek),
+                            PhotoLine (foto dijepit di tali), SaveDayModal (modal simpan hari), MonthPicker
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/workers/              heic.worker.ts: HEIC ke JPEG dengan libheif, dimuat hanya saat ada foto HEIC
   app/stores/               useLetterDraft (draf surat) dan useMemories (momen, hari Pocket, album CD) di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
-                            color, foil, icons) dan util browser (front-image, photo-filter), diuji di test/
+                            color, foil, icons, packet-art, packet-tear, photo-line) dan util browser
+                            (front-image, photo-filter), diuji di test/
   app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /lab, /lab/foil, /lab/safari, /lab/kirim
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
@@ -76,7 +78,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 | `StickyCTA` | Letter, Booth | Tombol hitam selebar panel yang menempel di bawah; `loading` dan `disabled` |
 | `BottomSheet` | HP | Sheet yang bisa dilipat lewat chevron; slot `peek` untuk petunjuk dan `footer` untuk CTA |
 | `SidePanel` | Desktop | Kolom kanan 400 px setinggi layar; slot `footer` |
-| `Modal` | Pocket | Dua kolom (slot `preview` dan isi), layar penuh di HP, Esc menutup, fokus terkunci |
+| `Modal` | Pocket | Dua kolom (slot `preview` dan isi), layar penuh di HP, Esc menutup, fokus terkunci, latar `scrim` yang kabur seperti semua popup (diredupkan saja di browser tanpa GPU) |
 | `IconButton` | Semua | Tombol bulat 32/40/44 px; `label` wajib |
 | `PhotoFrame` | Pocket, Booth, Letter | `polaroid`, `stamp` (tepi bergerigi), `ticket`; warna teks menyesuaikan warna bingkai |
 | `FoilCard` | Letter, Beranda, halaman penerima | Kartu lipat foil CSS 3D, lihat [spike](spikes/foil-3d.md) |

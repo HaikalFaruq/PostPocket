@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * Bagian formulir.
- * - `section`: langkah bernomor yang dipisah garis tipis (editor surat, urutannya memang langkah).
- * - `card`: bagian tanpa nomor untuk pilihan yang bebas urutan (modal Pocket); dipisah garis di
- *   dalam satu lembar putih, bukan kartu-kartu yang seragam.
+ * - `section`: langkah bernomor yang dipisah garis tipis (editor surat).
+ * - `card`: kartu putih bernomor "01", "02", dan seterusnya dengan keterangan kecil di bawah
+ *   judulnya (modal Pocket, mengikuti Day Pocket).
  */
 const props = withDefaults(
   defineProps<{
@@ -19,6 +19,7 @@ const props = withDefaults(
 
 const headingId = useId()
 const number = computed(() => String(props.step))
+const padded = computed(() => String(props.step).padStart(2, '0'))
 </script>
 
 <template>
@@ -47,11 +48,20 @@ const number = computed(() => String(props.step))
     </div>
   </section>
 
-  <section v-else :aria-labelledby="headingId" class="px-4 py-4 sm:px-5">
+  <section
+    v-else
+    :aria-labelledby="headingId"
+    class="rounded-[18px] bg-surface px-4 py-4 shadow-[0_0_0_1px_var(--color-line-soft)] sm:px-5"
+  >
     <div class="flex items-start gap-3">
+      <span
+        class="mt-px grid size-7 shrink-0 place-items-center rounded-full bg-fill text-[11px] font-semibold text-ink-muted tabular-nums"
+        aria-hidden="true"
+        >{{ padded }}</span
+      >
       <div class="min-w-0">
         <h2 :id="headingId" class="text-[15px] font-bold tracking-[-0.01em]">
-          {{ title }}
+          <span class="sr-only">Langkah {{ step }}: </span>{{ title }}
           <span v-if="hint" class="ml-1 font-normal text-ink-muted">{{ hint }}</span>
         </h2>
         <p v-if="description" class="text-caption text-ink-muted">{{ description }}</p>
@@ -60,7 +70,7 @@ const number = computed(() => String(props.step))
         <slot name="action" />
       </div>
     </div>
-    <div class="mt-3">
+    <div class="mt-3.5">
       <slot />
     </div>
   </section>

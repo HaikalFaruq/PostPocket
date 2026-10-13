@@ -19,3 +19,30 @@ export function relativeLuminance(hex: string): number {
 export function isDark(hex: string): boolean {
   return relativeLuminance(hex) < 0.18
 }
+
+const toHex = (rgb: number[]) =>
+  `#${rgb
+    .map((c) =>
+      Math.round(Math.min(255, Math.max(0, c)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`
+
+/**
+ * Nada foil kantong dari satu warna preset. `deep` adalah warna yang dikalikan dirinya sendiri
+ * (seperti blend multiply): lebih gelap tapi tetap pekat dan senada, tidak keabu-abuan seperti
+ * dicampur hitam. `deeper` sekali lagi, `light` kebalikannya (screen), dan `soft` di antara warna
+ * dasar dan `light`. Bayangan dan kilau kantong memakai nada ini, jadi warna apa pun tetap hidup.
+ */
+export function packetTones(hex: string) {
+  const c = hexToRgb(hex).map((v) => v / 255)
+  const light = c.map((v) => 1 - (1 - v) * (1 - v))
+  return {
+    base: toHex(c.map((v) => v * 255)),
+    deep: toHex(c.map((v) => v * v * 255)),
+    deeper: toHex(c.map((v) => v * v * v * 255)),
+    light: toHex(light.map((v) => v * 255)),
+    soft: toHex(c.map((v, i) => ((v + light[i]!) / 2) * 255)),
+  }
+}

@@ -25,7 +25,7 @@ const reload = () => window.location.reload()
     <header class="mx-auto flex w-full max-w-3xl items-center gap-2 py-4">
       <a
         href="/"
-        class="inline-flex min-h-11 items-center gap-2 text-[17px] font-extrabold tracking-[-0.03em]"
+        class="inline-flex min-h-11 items-center gap-2 text-[17px] font-bold tracking-[-0.025em]"
         @click="home"
       >
         <img src="/favicon.svg" alt="" class="size-6" /> PostPocket

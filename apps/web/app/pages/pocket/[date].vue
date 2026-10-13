@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { byId, letter, pocket } from '@postpocket/presets'
+import type { LinePhoto } from '~/components/pocket/PhotoLine.vue'
 import { isPocketDay, longDate, shortDate } from '~/utils/calendar'
-import { readExifDate } from '~/utils/exif'
+import { photoTime } from '~/utils/exif'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
+import { dayKey } from '~/utils/memories'
 import { sendPhotoToLetter } from '~/utils/pending-photo'
+import { calmMotion } from '~/utils/render'
 
 useSeoMeta({ title: 'Kantong · PostPocket', robots: 'noindex' })
 // Sama dengan --color-pocket-page di main.css.
@@ -17,8 +20,9 @@ definePageMeta({
 })
 
 /**
- * Isi satu hari Pocket (PRD): ketuk kantong untuk menyobeknya, foto keluar berjajar dalam bingkai
- * pilihan. Dari sini bisa tambah foto, ganti desain, kirim sebagai surat, atau putar di TV.
+ * Isi satu hari Pocket (PRD): ketuk kantong untuk menyobeknya, foto keluar dan dijepit di tali
+ * dalam bingkai pilihan. Dari sini bisa tambah foto, ganti desain, kirim foto yang sedang di
+ * tengah tali sebagai surat, atau putar di TV.
  */
 const route = useRoute()
 const day = computed(() => String(route.params.date))
@@ -48,16 +52,86 @@ watch(
   { immediate: true },
 )
 
+const clock = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' })
+
+/** Urutan foto di tali: menurut waktu diambil, lalu urutan masuknya. */
+const ordered = computed(() => {
+  const time = (id: string) => Date.parse(memories.data.moments[id]?.takenAt ?? '') || 0
+  return (saved.value?.moments ?? [])
+    .map((id, i) => ({ id, i }))
+    .sort((a, b) => time(a.id) - time(b.id) || a.i - b.i)
+    .map(({ id }) => id)
+})
+
+/** Foto di tali: jamnya ditulis di bingkai, asalnya di keterangan bawah tali. */
+const linePhotos = computed<LinePhoto[]>(() =>
+  ordered.value.map((id) => {
+    const moment = memories.data.moments[id]
+    const taken = moment ? new Date(moment.takenAt) : null
+    const time = taken && !Number.isNaN(taken.getTime()) ? clock.format(taken) : null
+    const takenDay = taken && time ? dayKey(taken) : day.value
+    const caption =
+      moment?.source === 'booth'
+        ? 'Dari Booth'
+        : takenDay !== day.value
+          ? `Diambil ${shortDate(takenDay)}`
+          : undefined
+    return {
+      id,
+      src: urls.value[id] ?? null,
+      note: time ?? undefined,
+      title: time ? `Pukul ${time}` : 'Foto kenangan',
+      caption,
+    }
+  }),
+)
+
 const torn = ref(false)
-const selected = ref<string | null>(null)
+/** Kantong yang sudah dibuka lalu ditinggal lewat link (editor surat, TV) dan didatangi lagi lewat Back. */
+const restored = ref(false)
+/** Foto yang sedang dilihat di tali; dipakai "Kirim sebagai surat". */
+const active = ref(0)
+const selected = computed(() => ordered.value[active.value] ?? null)
+const packet = ref<{ el: HTMLElement | null } | null>(null)
+const packetEl = computed(() => packet.value?.el ?? null)
+const line = ref<{ focus: () => void } | null>(null)
 const actions = ref<HTMLElement | null>(null)
+
+// Keadaan terbuka disimpan di entri riwayat halaman ini: Back dari editor surat atau TV kembali ke
+// kantong yang terbuka di foto yang sama, sedangkan kunjungan baru dari kalender mulai tersegel.
+const OPEN_STATE = 'pocketOpen'
+function remember() {
+  if (!torn.value) return
+  try {
+    const state = { ...history.state, [OPEN_STATE]: { day: day.value, index: active.value } }
+    history.replaceState(state, '')
+  } catch {
+    // Riwayat tidak bisa ditulis (jarang); kantong saja yang tersegel lagi.
+  }
+}
+watch(active, remember)
+onMounted(() => {
+  const state = history.state?.[OPEN_STATE] as { day?: string; index?: number } | undefined
+  if (state?.day !== day.value) return
+  restored.value = true
+  torn.value = true
+  active.value = Math.max(0, Number(state.index) || 0)
+})
+
 function tear() {
   torn.value = true
-  selected.value ??= saved.value?.moments[0] ?? null
-  // Di HP yang pendek, foto dan tombolnya muncul di bawah kantong; gulir sampai kelihatan.
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  remember()
+  const reduced = calmMotion()
+  // Pengguna keyboard langsung bisa menggeser tali (atau menambah foto ke kantong kosong).
   nextTick(() =>
-    actions.value?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' }),
+    line.value ? line.value.focus() : actions.value?.querySelector('button')?.focus(),
+  )
+  // Di HP yang pendek, foto dan tombolnya muncul di bawah kantong; gulir sampai kelihatan setelah
+  // fotonya selesai keluar dari kantong.
+  window.setTimeout(
+    () =>
+      actions.value?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' }),
+    reduced ? 0 : 1400,
   )
 }
 
@@ -75,14 +149,13 @@ async function onFiles(event: Event) {
   try {
     const photos = []
     for (const file of files) {
-      const takenAt = (await readExifDate(file)) ?? undefined
-      photos.push({ photo: await preparePhoto(file), takenAt })
+      photos.push({ photo: await preparePhoto(file), takenAt: await photoTime(file) })
     }
     const ids = await memories.addMoments(photos, { day: day.value, source: 'upload' })
     await memories.saveDay({ ...saved.value, moments: [...saved.value.moments, ...ids] })
-    // Kantong yang tadinya kosong: foto pertama langsung terpilih, supaya "Kirim sebagai surat"
-    // tidak tetap nonaktif tanpa penjelasan.
-    selected.value ??= ids[0] ?? null
+    // Tali bergeser ke foto pertama yang baru, jadi kelihatan fotonya sudah masuk dan langsung
+    // bisa dikirim sebagai surat.
+    if (ids[0]) active.value = Math.max(0, ordered.value.indexOf(ids[0]))
   } catch (problem) {
     error.value = problem instanceof PhotoError ? problem.message : 'Foto gagal disimpan.'
   } finally {
@@ -103,7 +176,7 @@ const editOpen = ref(false)
 
 <template>
   <div class="min-h-dvh bg-pocket-page text-pocket-ink">
-    <main class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
+    <main class="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
       <header class="py-4">
         <NuxtLink
           to="/pocket"
@@ -113,84 +186,21 @@ const editOpen = ref(false)
         </NuxtLink>
       </header>
 
-      <h1 class="mt-1 text-[clamp(26px,7vw,34px)] leading-tight font-extrabold tracking-[-0.04em]">
+      <h1 class="mt-1 text-[clamp(26px,7vw,34px)] leading-tight font-bold tracking-[-0.03em]">
         {{ longDate(day) }}
       </h1>
 
       <template v-if="memories.ready && saved">
-        <div class="mt-8 flex flex-col items-center" data-testid="pocket-day" :data-torn="torn">
-          <button
-            type="button"
-            class="w-[min(56%,240px)] pt-4"
-            :aria-label="torn ? 'Kantong sudah dibuka' : 'Buka kantong'"
-            :disabled="torn"
-            @click="tear"
-          >
-            <SnackPacket :color="color" :sticker="sticker" :torn="torn" />
-          </button>
-          <p v-if="!torn" class="mt-4 text-caption text-pocket-muted">
-            Ketuk kantong untuk menyobeknya
-          </p>
-        </div>
-
-        <div v-if="torn" class="mt-6">
-          <!-- Ruang lebih di sekeliling foto supaya bayangan bingkainya tidak terpotong. -->
-          <div class="-mx-4 snap-x overflow-x-auto sm:-mx-6">
-            <div
-              class="mx-auto flex w-max gap-4 px-6 pt-3 pb-8"
-              role="listbox"
-              aria-label="Foto di kantong"
-            >
-              <button
-                v-for="(id, index) in saved.moments"
-                :key="id"
-                type="button"
-                role="option"
-                :aria-selected="selected === id"
-                class="moment w-36 shrink-0 snap-center rounded-[6px] outline-offset-4 sm:w-40"
-                :class="{ 'is-selected': selected === id }"
-                :style="{ '--delay': `${index * 90}ms`, '--tilt': `${index % 2 ? 3 : -3}deg` }"
-                data-testid="moment"
-                @click="selected = id"
-              >
-                <PhotoFrame :variant="frame" :color="frameColor" :src="urls[id] ?? undefined" />
-              </button>
-            </div>
-          </div>
-          <p
-            v-if="!saved.moments.length"
-            class="pb-6 text-center text-caption text-pocket-muted"
-            data-testid="pocket-no-photos"
-          >
-            Kantong ini masih kosong. Tambahkan foto pertamamu.
-          </p>
-
-          <div ref="actions" class="mt-2 flex scroll-mb-6 flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              class="pocket-action"
-              :disabled="busy"
-              @click="fileInput?.click()"
-            >
-              <Icon name="plus" :size="15" /> {{ busy ? 'Menyiapkan foto…' : 'Tambah foto' }}
-            </button>
-            <button type="button" class="pocket-action" @click="editOpen = true">
-              Ganti desain kantong
-            </button>
-            <button type="button" class="pocket-action" :disabled="!selected" @click="sendAsLetter">
-              <Icon name="link" :size="15" /> Kirim sebagai surat
-            </button>
-            <NuxtLink
-              v-if="saved.moments.length"
-              :to="`/tv?hari=${day}`"
-              class="pocket-action pocket-action--primary"
-            >
-              <Icon name="play" :size="15" /> Putar di TV
-            </NuxtLink>
-          </div>
-          <p v-if="error" role="alert" class="mt-3 text-center text-caption text-pocket-muted">
-            {{ error }}
-          </p>
+        <div class="mt-6 flex flex-col items-center" data-testid="pocket-day" :data-torn="torn">
+          <TearablePacket
+            ref="packet"
+            class="relative z-20 w-[min(58%,250px)]"
+            :color="color"
+            :sticker="sticker"
+            :opened="torn"
+            :restored="restored"
+            @open="tear"
+          />
         </div>
       </template>
 
@@ -204,20 +214,67 @@ const editOpen = ref(false)
           Buat kantong
         </button>
       </div>
-
-      <input
-        ref="fileInput"
-        type="file"
-        accept="image/*"
-        multiple
-        class="sr-only"
-        tabindex="-1"
-        aria-label="Tambah foto ke kantong"
-        data-testid="pocket-upload"
-        @change="onFiles"
-      />
     </main>
-    <SaveDayModal v-model:open="editOpen" :day="day" />
+
+    <template v-if="memories.ready && saved && torn">
+      <!-- Tali selebar layar: foto tetangga mengintip dari tepi. -->
+      <PhotoLine
+        v-if="linePhotos.length"
+        ref="line"
+        v-model:index="active"
+        class="mt-4"
+        :photos="linePhotos"
+        :frame="frame"
+        :frame-color="frameColor"
+        :from="restored ? null : packetEl"
+        :from-y="0.2"
+        :paused="editOpen"
+      />
+      <p
+        v-else
+        class="mt-6 pb-6 text-center text-caption text-pocket-muted"
+        data-testid="pocket-no-photos"
+      >
+        Kantong ini masih kosong. Tambahkan foto pertamamu.
+      </p>
+
+      <div class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
+        <div ref="actions" class="mt-6 flex scroll-mb-6 flex-wrap justify-center gap-2">
+          <button type="button" class="pocket-action" :disabled="busy" @click="fileInput?.click()">
+            <Icon name="plus" :size="15" /> {{ busy ? 'Menyiapkan foto…' : 'Tambah foto' }}
+          </button>
+          <button type="button" class="pocket-action" @click="editOpen = true">
+            Ganti desain kantong
+          </button>
+          <button type="button" class="pocket-action" :disabled="!selected" @click="sendAsLetter">
+            <Icon name="link" :size="15" /> Kirim sebagai surat
+          </button>
+          <NuxtLink
+            v-if="saved.moments.length"
+            :to="`/tv?hari=${day}`"
+            class="pocket-action pocket-action--primary"
+          >
+            <Icon name="play" :size="15" /> Putar di TV
+          </NuxtLink>
+        </div>
+        <p v-if="error" role="alert" class="mt-3 text-center text-caption text-pocket-muted">
+          {{ error }}
+        </p>
+      </div>
+    </template>
+
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/*"
+      multiple
+      class="sr-only"
+      tabindex="-1"
+      aria-label="Tambah foto ke kantong"
+      data-testid="pocket-upload"
+      @change="onFiles"
+    />
+    <SaveDayModal v-model:open="editOpen" :day="day" @deleted="navigateTo('/pocket')" />
   </div>
 </template>
 
@@ -243,29 +300,5 @@ const editOpen = ref(false)
 
 .pocket-action:disabled {
   opacity: 0.45;
-}
-
-/* Foto keluar dari kantong satu per satu. */
-.moment {
-  animation: moment-out 520ms var(--ease-card) both;
-  animation-delay: var(--delay);
-  transform: rotate(var(--tilt));
-}
-
-.moment.is-selected {
-  outline: 2px solid var(--color-pocket-ink);
-}
-
-@keyframes moment-out {
-  from {
-    opacity: 0;
-    transform: translateY(-40px) rotate(0deg) scale(0.9);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .moment {
-    animation: none;
-  }
 }
 </style>
