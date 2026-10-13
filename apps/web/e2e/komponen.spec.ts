@@ -54,6 +54,8 @@ test('BottomSheet: tombol chevron melipat dan membuka sheet', async ({ page }) =
   const reopen = phone.getByRole('button', { name: 'Tampilkan opsi' })
   await expect(reopen).toHaveAttribute('aria-expanded', 'false')
   await expect(phone.getByRole('region', { name: 'Opsi contoh' })).toBeHidden()
+  // Tombol utama di footer tidak ikut dilipat.
+  await expect(phone.getByRole('button', { name: 'Buat link untuk dikirim' })).toBeVisible()
   await reopen.click()
   await expect(phone.getByRole('region', { name: 'Opsi contoh' })).toBeVisible()
 })

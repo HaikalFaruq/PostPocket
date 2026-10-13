@@ -400,3 +400,16 @@ test('petunjuk di bawah kartu mengikuti keadaan kartunya', async ({ page, isMobi
   await expect(card).toHaveAttribute('aria-pressed', 'true')
   await expect(hint).toHaveText('Ketuk kartu untuk menutup')
 })
+
+test('tombol Buat link tetap terlihat waktu opsi dilipat', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Opsi yang bisa dilipat hanya ada di sheet HP')
+  const send = page.getByRole('button', { name: 'Buat link untuk dikirim' })
+  const options = page.getByRole('region', { name: 'Opsi surat' })
+  await expect(send).toBeInViewport({ ratio: 1 })
+  await page.getByRole('button', { name: 'Sembunyikan opsi' }).click()
+  await expect(options).toBeHidden()
+  await expect(send).toBeInViewport({ ratio: 1 })
+  await page.getByRole('button', { name: 'Tampilkan opsi' }).click()
+  await expect(options).toBeVisible()
+  await expect(send).toBeInViewport({ ratio: 1 })
+})
