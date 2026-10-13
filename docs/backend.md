@@ -119,7 +119,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] `GET /l/:slug` dan `POST /l/:slug/open`
 - [x] `DELETE /letters/:id`
 - [x] `noindex` untuk surat: halaman `/l/:slug` memakai `robots: noindex` (Kall), respons API memakai `Cache-Control: no-store`
-- [ ] Gerbang rilis: link surat terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp
+- [x] Gerbang rilis: link surat terbuka di HP lain tanpa login dan preview-nya tampil di WhatsApp, lolos 13 Oktober 2026 (hasil cek di [frontend.md](frontend.md#gerbang-sprint-2))
 
 **Sprint 3 (minggu 6–7)**
 
