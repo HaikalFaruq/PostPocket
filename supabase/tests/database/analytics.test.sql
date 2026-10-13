@@ -3,6 +3,10 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(23);
 
+-- Mulai dari tabel kosong (dibatalkan rollback di akhir), walau stack lokal sudah dipakai.
+delete from public.letter_events;
+delete from public.function_errors;
+
 -- Draf surat dan balasannya.
 select public.create_letter(
   '00000000-0000-4000-8000-0000000000a1', '{}', '{"version":1,"elements":[]}',

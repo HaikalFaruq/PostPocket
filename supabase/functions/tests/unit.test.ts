@@ -1,9 +1,9 @@
 // Unit test tanpa database. Jalankan dari supabase/functions: deno test tests/unit.test.ts
 
-import { assert, assertEquals, assertNotEquals, assertThrows } from '@std/assert'
+import { assert, assertEquals, assertNotEquals, assertRejects, assertThrows } from '@std/assert'
 import { errorFields, routePattern } from '../_shared/errors.ts'
 import { chunks } from '../_shared/files.ts'
-import { ApiError } from '../_shared/http.ts'
+import { ApiError, readJson } from '../_shared/http.ts'
 import { imageInfo, stripMetadata } from '../_shared/image.ts'
 import { ipPrefix, newSlug, sameHash, sha256 } from '../_shared/token.ts'
 import { parseCreateRequest } from '../_shared/validate.ts'
@@ -213,4 +213,28 @@ Deno.test('errorFields hanya menyimpan nama dan kode yang cocok pola, tanpa pesa
   )
   assertEquals(errorFields('teks biasa'), { error_name: null, error_code: null })
   assertEquals(errorFields(null), { error_name: null, error_code: null })
+})
+
+Deno.test('readJson berhenti membaca begitu body lewat batas', async () => {
+  const post = (body: BodyInit, headers?: HeadersInit) =>
+    new Request('http://x/letters', { method: 'POST', body, headers })
+  assertEquals(await readJson(post('{"a":1}')), { a: 1 })
+  await assertRejects(() => readJson(post('x'.repeat(101)), 100), ApiError, 'body terlalu besar')
+  // Content-Length yang sudah lewat batas ditolak tanpa membaca body.
+  await assertRejects(
+    () => readJson(post('{}', { 'content-length': '5000000' })),
+    ApiError,
+    'body terlalu besar',
+  )
+  // Body tanpa Content-Length (chunked) tetap dihentikan di batas.
+  let pulled = 0
+  const endless = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulled++
+      controller.enqueue(new Uint8Array(64 * 1024))
+    },
+  })
+  await assertRejects(() => readJson(post(endless)), ApiError, 'body terlalu besar')
+  assert(pulled < 10, `body raksasa dibaca ${pulled} potong`)
+  await assertRejects(() => readJson(post('{bukan json')), ApiError, 'bukan JSON')
 })

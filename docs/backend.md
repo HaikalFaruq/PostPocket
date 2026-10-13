@@ -186,7 +186,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Event analitik: surat dibuat, dibuka, dibalas ([Analitik](#analitik-dan-monitoring-error))
 - [x] Monitoring error tanpa layanan luar (`function_errors`, plus log dashboard untuk error gateway)
-- [ ] Review keamanan semua endpoint
+- [x] Review keamanan semua endpoint ([hasil](#review-keamanan))
 
 **Sprint 4 dan beta (minggu 8–10)**
 
@@ -289,6 +289,35 @@ Di stack lokal, Kong menimpa header CORS dengan `*`, jadi test CORS di `api.test
 - Rate limit pembuatan surat per IP untuk pengguna anonim.
 - Surat pribadi tidak boleh masuk mesin pencari (`noindex`).
 - Secret seperti service role key tidak pernah di-commit.
+
+### Review keamanan
+
+Review semua endpoint dan akses langsung ke Supabase, Oktober 2026 (Sprint 3). Diuji ke produksi dengan publishable key, kecuali yang ditandai lokal.
+
+| Yang dicek | Hasil |
+| --- | --- |
+| REST `/rest/v1` ke `letters`, `letter_assets`, `rate_limit_hits`, `letter_events`, `function_errors`, dan kedua view | Ditolak `42501`. Insert juga ditolak (dicek Kall) |
+| RPC ke semua fungsi di `public` (`create_letter`, `publish_letter`, `open_letter`, `take_rate_limit`, `run_cleanup`, `cleanup_token_valid`) | Ditolak `42501`. Tidak ada fungsi di `public` yang bisa dijalankan `anon` atau `authenticated` |
+| GraphQL `/graphql/v1` | `pg_graphql` tidak aktif |
+| Storage `letter-assets` | Listing kosong, termasuk untuk folder yang ada isinya (dicek Kall). Upload langsung ditolak RLS. Bucket membatasi 500 KB dan hanya JPEG/WebP/PNG |
+| Menimpa berkas lewat `signedUrl` setelah publish (lokal) | Ditolak `409 KeyAlreadyExists`, juga dengan `x-upsert: true`, karena URL-nya dibuat tanpa upsert. Jadi berkas yang sudah dicek dan dibersihkan saat publish tidak bisa diganti |
+| `X-Edit-Token` | 32 byte acak, server hanya menyimpan SHA-256-nya dan membandingkan tanpa bocor lewat waktu |
+| Slug | 10 karakter base62 acak (sekitar 8 × 10¹⁷ kemungkinan), jadi tidak bisa ditebak walau `GET /l/:slug` tanpa rate limit |
+| Fungsi `cleanup` | Tanpa token, dengan token salah, atau dengan publishable key: `401` |
+
+Yang diperbaiki di review ini:
+
+- CORS tidak lagi menerima `http://localhost:3000` di produksi (kontrak 0.2.3). Stack lokal tidak terpengaruh, karena gateway-nya menjawab `*`.
+- Body `POST /letters` dibaca bertahap dan dihentikan begitu lewat 100 KB, juga kalau `Content-Length` sudah lewat batas. Sebelumnya body dibaca utuh ke memori dulu, baru dicek.
+- Semua respons JSON membawa `X-Content-Type-Options: nosniff`.
+- Test pgTAP `security.test.sql` menjaga semua aturan akses di atas. Migrasi baru yang lupa `revoke`, lupa RLS, atau membuat view tanpa `security_invoker` akan gagal di CI.
+
+Risiko yang diterima untuk rilis 1:
+
+- `POST /letters/:id/publish` dan `DELETE` tidak dibatasi rate limit. Keduanya butuh edit token milik draf sendiri, dan pembuatan draf sudah dibatasi 10 per jam per IP. Publish yang gagal berulang tetap mengunduh berkasnya lagi (paling banyak 6 × 500 KB). Kalau terlihat di `function_errors` atau egress, tambahkan rate limit per surat.
+- `GET /l/:slug` dan `open` tidak dibatasi. Slug tidak bisa ditebak, dan `open` idempoten.
+- Rate limit per IP lemah di CGNAT (lihat Keputusan yang sudah diambil).
+- Berkas di bucket publik bisa dibuka siapa pun yang tahu URL lengkapnya. Itu memang dibutuhkan crawler WhatsApp, dan path-nya memuat dua UUID acak.
 
 ## Yang dibutuhkan frontend
 

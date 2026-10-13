@@ -242,6 +242,14 @@ Deno.test({
     await evil.body?.cancel()
     assertEquals(evil.headers.get('access-control-allow-origin'), null)
 
+    // localhost tidak diterima di produksi.
+    const local = await fetch(`${API}/functions/v1/l/AAAAAAAAAA`, {
+      headers: { apikey: KEY, origin: 'http://localhost:3000' },
+    })
+    await local.body?.cancel()
+    assertEquals(local.headers.get('access-control-allow-origin'), null)
+    assertEquals(local.headers.get('x-content-type-options'), 'nosniff')
+
     // Retry-After dari 429 harus bisa dibaca klien lintas origin.
     const allowed = await call('GET', '/l/AAAAAAAAAA')
     assertEquals(allowed.response.headers.get('access-control-allow-origin'), ORIGIN)
