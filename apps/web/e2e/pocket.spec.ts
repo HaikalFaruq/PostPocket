@@ -268,6 +268,8 @@ test('kantong juga bisa dibuka dengan keyboard', async ({ page }) => {
 test('ganti desain: foto lama bisa dikeluarkan, kantong bisa dihapus, latarnya kabur', async ({
   page,
 }) => {
+  // Dua kali membuka modal desain dengan belasan langkah; WebKit di CI butuh lebih dari 30 detik.
+  test.setTimeout(60_000)
   await page.goto('/pocket')
   await saveDay(page, TODAY, [20, 200])
   await openPocket(page)
