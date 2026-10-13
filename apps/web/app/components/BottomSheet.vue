@@ -2,7 +2,8 @@
 /**
  * Wadah panel opsi di HP: sheet putih bersudut besar yang bisa dilipat lewat tombol chevron.
  * Diletakkan di bagian bawah layout kolom (bukan fixed), jadi area di atasnya ikut membesar
- * saat sheet dilipat. Di desktop pakai <SidePanel>.
+ * saat sheet dilipat. Hanya isi opsi yang dilipat; `footer` (tombol utama) tetap terlihat.
+ * Di desktop pakai <SidePanel>.
  */
 defineProps<{ label: string }>()
 
@@ -26,24 +27,26 @@ const bodyId = useId()
         <Icon :name="expanded ? 'chevron-down' : 'chevron-up'" :size="20" />
       </IconButton>
     </div>
-    <div
-      :id="bodyId"
-      class="grid transition-[grid-template-rows] duration-300 ease-sheet"
-      :class="expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
-    >
+    <div class="flex min-h-0 flex-col overflow-hidden rounded-t-card bg-panel shadow-sheet">
       <section
+        :id="bodyId"
         :aria-label="label"
         :inert="!expanded"
-        class="flex min-h-0 flex-col overflow-hidden rounded-t-card bg-panel shadow-sheet"
+        class="grid transition-[grid-template-rows] duration-300 ease-sheet"
+        :class="expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
       >
-        <!-- Di layar pendek, sheet menyisakan sekitar 220 px untuk kartu supaya tidak tertimpa. -->
-        <div
-          class="max-h-[max(160px,min(56dvh,560px,calc(100dvh_-_368px)))] overflow-y-auto overscroll-contain"
-        >
-          <slot />
+        <div class="min-h-0 overflow-hidden">
+          <!-- Di layar pendek, sheet menyisakan sekitar 220 px untuk kartu supaya tidak tertimpa. -->
+          <div
+            class="max-h-[max(160px,min(56dvh,560px,calc(100dvh_-_368px)))] overflow-y-auto overscroll-contain"
+          >
+            <slot />
+          </div>
         </div>
-        <slot name="footer" />
       </section>
+      <!-- Tombol utama tidak ikut dilipat. Penguji di HP sempat tidak menemukan "Buat link"
+           karena tombolnya hilang bersama opsi. -->
+      <slot name="footer" />
     </div>
   </div>
 </template>

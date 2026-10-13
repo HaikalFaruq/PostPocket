@@ -76,7 +76,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 | `PillGroup` + `PillChip` | Semua | Pilihan teks tunggal (Reka UI RadioGroup); panah kiri/kanan pindah pilihan |
 | `SwatchGroup` + `Swatch` | Letter, Pocket, TV | Ukuran `sm` 30 px, `md` 40 px, `lg` 48 px dengan ikon di slot; `check` untuk centang gaya Day Pocket; `--swatch-gap` mengikuti warna latar |
 | `StickyCTA` | Letter, Booth | Tombol hitam selebar panel yang menempel di bawah; `loading` dan `disabled` |
-| `BottomSheet` | HP | Sheet yang bisa dilipat lewat chevron; slot `peek` untuk petunjuk dan `footer` untuk CTA |
+| `BottomSheet` | HP | Sheet yang opsinya bisa dilipat lewat chevron; slot `peek` untuk petunjuk dan `footer` untuk CTA, yang tetap terlihat saat sheet dilipat |
 | `SidePanel` | Desktop | Kolom kanan 400 px setinggi layar; slot `footer` |
 | `Modal` | Pocket | Dua kolom (slot `preview` dan isi), layar penuh di HP, Esc menutup, fokus terkunci, latar `scrim` yang kabur seperti semua popup (diredupkan saja di browser tanpa GPU) |
 | `IconButton` | Semua | Tombol bulat 32/40/44 px; `label` wajib |
