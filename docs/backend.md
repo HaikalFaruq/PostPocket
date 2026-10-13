@@ -68,7 +68,7 @@ Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karen
 | Supabase Free | Proyek di-pause setelah 7 hari tanpa request | Selama beta yang sepi, link surat bisa mati; pasang ping terjadwal |
 | Vercel Hobby | Body fungsi sekitar 4,5 MB, durasi pendek | Foto dan gambar OG selalu diunggah langsung ke storage lewat URL bertanda tangan, tidak lewat fungsi Vercel |
 | Vercel Hobby | Hanya untuk non-komersial | Kalau nanti ada monetisasi, pindah ke Pro atau host lain |
-| Vercel Hobby | Custom event analitik dan cron terbatas | Event analitik disimpan di tabel Postgres; job pembersihan memakai `pg_cron` di Supabase |
+| Vercel Hobby | Custom event analitik dan cron terbatas | Event analitik disimpan di tabel Postgres ([Analitik](#analitik-dan-monitoring-error)); job pembersihan memakai `pg_cron` di Supabase |
 
 ## Pembersihan file
 
@@ -92,6 +92,50 @@ docker exec supabase_db_postpocket psql -U postgres -c "select vault.create_secr
 Hasil panggilan terakhir ada di `net._http_response` (disimpan 6 jam) dan log Edge Function `cleanup`.
 
 File harus dihapus lewat Storage API (`storage.remove()`) di Edge Function. Menghapus baris `storage.objects` lewat SQL meninggalkan file yatim yang tetap memakan kuota ([Supabase: Delete Objects](https://supabase.com/docs/guides/storage/management/delete-objects)).
+
+## Analitik dan monitoring error
+
+Halaman `/privasi` sudah berjanji dua hal: fungsi server tidak mencatat alamat IP, dan tidak ada cookie pelacak atau analitik pihak ketiga. Rancangan di bawah menjaga dua janji itu. Kontrak API dan frontend tidak berubah.
+
+### Event analitik
+
+Tabel `letter_events` hanya berisi tiga kolom:
+
+| Kolom | Isi |
+| --- | --- |
+| `kind` | `created`, `opened`, atau `replied` |
+| `occurred_at` | Waktu kejadian |
+| `after_hours` | Jam penuh sejak surat (untuk `replied`: surat yang dibalas) di-publish. Kosong untuk `created` |
+
+Tabel ini tidak menyimpan `letter_id`, slug, IP, user agent, cookie, atau isi surat. Satu baris tidak bisa dikaitkan ke surat atau pengirimnya, dan event tetap ada setelah suratnya dihapus di hari ke-30. Akibatnya, analitiknya berupa jumlah per periode, bukan alur per surat. Misalnya: berapa surat dibuat minggu ini, berapa persen yang dibuka, dan berapa lama sampai dibuka.
+
+Event dicatat trigger di tabel `letters`, dalam transaksi yang sama dengan perubahannya. Jadi Edge Functions tidak berubah, dan event tidak hilang kalau fungsi gagal di tengah jalan.
+
+| Event | Kapan | Sumber |
+| --- | --- | --- |
+| `created` | Status draf jadi `sent` | `publish_letter()` |
+| `replied` | Sama dengan `created`, untuk surat yang punya `reply_to_id` | `publish_letter()` |
+| `opened` | `opened_at` pertama kali terisi | `open_letter()` (idempoten, jadi sekali per surat) |
+
+"Dibuat" dan "dibalas" dihitung saat publish, bukan saat `POST /letters`. Draf yang tidak pernah dikirim terhapus setelah 24 jam dan tidak dihitung. Balasan juga dihitung sebagai surat dibuat.
+
+Tabel ini memakai RLS tanpa policy, dan hak `anon`/`authenticated` dicabut. Datanya dibaca lewat SQL di dashboard, misalnya view `letter_stats_weekly` (jumlah per jenis per minggu, plus median `after_hours` untuk `opened`). Baris lebih tua dari 13 bulan dihapus `run_cleanup()`.
+
+### Monitoring error
+
+Untuk sekarang tidak ada layanan luar (Sentry dan sejenisnya), supaya tidak ada data yang keluar ke pihak ketiga dan `/privasi` tetap benar.
+
+- Setiap respons 5xx dari `letters`, `l`, dan `cleanup` dicatat ke tabel `function_errors`, dengan kolom:
+  - `function`, `route` (pola, misalnya `/l/:slug`, bukan path aslinya);
+  - `status`, `error` (nama dan pesan error, dipotong 200 karakter);
+  - `occurred_at`.
+
+  Header, body, IP, slug, dan token tidak dicatat. Barisnya disimpan 30 hari, lalu dihapus `run_cleanup()`.
+- Log Edge Function di dashboard Supabase tetap jadi tempat detail. Log itu dicatat penyedia, sesuai kalimat log teknis di `/privasi`.
+- Hasil panggilan job pembersihan dicek dari `net._http_response`.
+- View `function_errors_daily` merangkum error per fungsi per hari. Selama beta, view ini dicek tiap hari bareng pemantauan kuota storage dan egress.
+
+Error di browser (frontend) belum tercakup. Kalau nanti perlu, butuh endpoint baru, yang masuk kontrak dulu.
 
 ## Checklist per sprint
 
