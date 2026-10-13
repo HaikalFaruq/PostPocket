@@ -13,6 +13,8 @@ test('Beranda menautkan halaman privasi dan lisensi', async ({ page }) => {
   // Klaim yang dicek backend: lokasi server dan log IP di penyedia hosting.
   await expect(page.getByRole('main')).toContainText('Supabase (Sydney, Australia)')
   await expect(page.getByRole('main')).toContainText('log teknis mereka')
+  // Hitungan surat dari tabel letter_events di backend, tanpa kolom yang menunjuk ke surat.
+  await expect(page.getByRole('main')).toContainText('tanpa mencatat surat yang mana')
 
   await page.goto('/')
   await page.getByRole('contentinfo').getByRole('link', { name: 'Lisensi' }).click()

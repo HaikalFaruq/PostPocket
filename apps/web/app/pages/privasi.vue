@@ -73,7 +73,11 @@ useSeoMeta({
     </p>
 
     <h2>Tanpa iklan dan pelacak</h2>
-    <p>PostPocket tidak memakai iklan, cookie pelacak, atau analitik pihak ketiga.</p>
+    <p>
+      PostPocket tidak memakai iklan, cookie pelacak, atau analitik pihak ketiga. Server hanya
+      menghitung berapa surat dibuat, dibuka, dan dibalas, tanpa mencatat surat yang mana, alamat
+      IP, atau perangkat yang dipakai.
+    </p>
 
     <h2>Ada pertanyaan atau masalah?</h2>
     <p>
