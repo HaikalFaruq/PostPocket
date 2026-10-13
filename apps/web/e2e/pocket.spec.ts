@@ -4,6 +4,10 @@ import { expect, test, type Page } from '@playwright/test'
 // Hari ini dibuat tetap supaya kalender dan judul bulan bisa dicek pasti.
 const TODAY = '2026-10-10'
 
+// Simpan kantong memproses foto di thread utama. WebKit di CI (tanpa GPU) kadang butuh lebih dari
+// 5 detik sampai modalnya tertutup, jadi tunggu lebih lama dari batas bawaan expect.
+const SAVE_TIMEOUT = 15_000
+
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 10, 10, 0))
 })
@@ -38,7 +42,7 @@ async function saveDay(page: Page, day: string, hues: number[]) {
   await page.getByTestId('moment-upload').setInputFiles(await photos(page, hues))
   await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(hues.length)
   await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
-  await expect(dialog).toBeHidden()
+  await expect(dialog).toBeHidden({ timeout: SAVE_TIMEOUT })
 }
 
 /** Buka kantong hari ini dengan ketukan dan tunggu fotonya dijepit di tali. */
@@ -122,7 +126,7 @@ test('modal simpan hari: preview langsung berubah, sel dan penghitung langsung t
   await expect(dialog).toContainText('2 foto terselip')
 
   await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
-  await expect(dialog).toBeHidden()
+  await expect(dialog).toBeHidden({ timeout: SAVE_TIMEOUT })
   const cell = page.locator(`[data-day="${TODAY}"]`)
   await expect(cell).toHaveAttribute('data-saved', 'true')
   await expect(cell.locator('.packet')).toBeVisible()
@@ -474,7 +478,7 @@ test('foto HEIC bisa dipilih dan tampil, juga di browser yang tidak membuka HEIC
     })
     .toEqual([480, 360])
   await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
-  await expect(dialog).toBeHidden()
+  await expect(dialog).toBeHidden({ timeout: SAVE_TIMEOUT })
 
   await openPocket(page)
   await expect(page.getByTestId('line-photo')).toHaveCount(1)
