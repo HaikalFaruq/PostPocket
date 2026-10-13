@@ -165,6 +165,8 @@ test('draf berisi 4 foto tidak ditawari "Tambahkan ke draf"', async ({ page }) =
       .getByRole('button', { name: 'Tambahkan ke draf' })
       .click()
     await expect(page).toHaveURL(/\/letter\/new$/)
+    // Keterangannya muncul setelah draf tersimpan; baru kembali ke Pocket setelah itu.
+    await expect(page.getByText(/^Foto dari Pocket .* ditambahkan/)).toBeVisible()
   }
   await expect(page.getByText('4 foto', { exact: true })).toBeVisible()
 
