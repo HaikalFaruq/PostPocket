@@ -121,8 +121,10 @@ function elementBox(element: LetterElement, pageRatio: number) {
   if (element.kind === 'photo') height = (element.width / element.aspect) * pageRatio
   else if (element.kind === 'sticker') height = element.width * pageRatio
   else {
-    // Huruf Caveat rata-rata selebar setengah ukurannya, tinggi barisnya 1,25. Teks kosong (slot
-    // template) tetap dianggap dua baris, karena di situlah pesan user akan ditulis.
+    // Huruf isi surat (Delicious Handrawn, sebelumnya Caveat) rata-rata hanya selebar 0,34 kali
+    // ukurannya; perkiraan ini sengaja memakai setengah ukuran dan tinggi baris 1,25, supaya teks
+    // tidak pernah dianggap lebih kecil dari aslinya. Teks kosong (slot template) tetap dianggap dua
+    // baris, karena di situlah pesan user akan ditulis.
     const perLine = Math.max(1, Math.floor(element.width / (element.size * 0.5)))
     const lines = element.text.trim()
       ? element.text

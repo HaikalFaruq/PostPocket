@@ -110,7 +110,7 @@ Bahan kontrak `docs/api/openapi.yaml`: apa yang dikirim frontend saat "Buat link
 | `x`, `y` | Semua | Titik tengah elemen, pecahan lebar dan tinggi halaman | 0–1 |
 | `width` | Semua | Lebar, pecahan lebar halaman | 0,05–1 |
 | `rotation` | Semua | Derajat searah jarum jam | -180–180 |
-| `text` | `text` | Tulisan tangan Caveat, warnanya ikut kertas | Maksimal 600 karakter per blok |
+| `text` | `text` | Tulisan tangan (Delicious Handrawn), warnanya ikut kertas | Maksimal 600 karakter per blok |
 | `size` | `text` | Ukuran huruf, pecahan lebar halaman | 0,02–0,25 |
 | `align` | `text` | `left`, `center`, atau `right` | |
 | `photo` | `photo` | Kunci foto di daftar `photos` | Pola sama dengan `id` |
@@ -166,7 +166,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 2 (minggu 4–5)**
 
-- [x] Editor isi surat dengan 4 template, teks Caveat, foto (maksimal 4), dan stiker. Editornya DOM, bukan vue-konva ([keputusan](spikes/editor-isi-surat.md))
+- [x] Editor isi surat dengan 4 template, teks tulisan tangan, foto (maksimal 4), dan stiker. Editornya DOM, bukan vue-konva ([keputusan](spikes/editor-isi-surat.md))
 - [x] Alur "Buat link": kompres tiap foto sampai di bawah 500 KB (JPEG atau WebP), hapus EXIF lokasi, upload ke URL bertanda tangan, lalu publish (kontrak dari `docs/api/openapi.yaml`). Diuji lewat mock API; begitu Edge Function siap tinggal ganti `NUXT_PUBLIC_API_BASE`
 - [x] Gambar OG dirender di browser waktu "Buat link" dari kartu yang sama: JPEG 1200×630 maksimal 300.000 byte, diunggah lewat URL bertanda tangan seperti foto. Jangan pasang Nuxt OG Image
 - [x] Halaman penerima `/l/:slug` dengan animasi buka di bawah 600 ms dan tombol Bikin balasan; placeholder di slot foto kalau fotonya sudah dihapus (7 hari setelah surat pertama kali dibuka), dan sampul polos kalau cover dari foto user ikut dihapus

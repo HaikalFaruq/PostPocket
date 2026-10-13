@@ -77,7 +77,8 @@ export default defineNuxtConfig({
         subsets: ['latin'],
         preload: true,
       },
-      { name: 'Caveat', provider: 'google', weights: [400, 500, 600] },
+      // Isi surat: tulisan tangan Agung Rohmat (docs/desain.md). Satu ketebalan saja.
+      { name: 'Delicious Handrawn', provider: 'google', weights: [400] },
       { name: 'VT323', provider: 'google', weights: [400] },
     ],
   },

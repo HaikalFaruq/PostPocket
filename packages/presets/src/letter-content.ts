@@ -24,7 +24,7 @@ interface ElementBase {
   rotation: number
 }
 
-/** Blok teks tulisan tangan (Caveat). Warnanya mengikuti kertas. */
+/** Blok teks tulisan tangan (Delicious Handrawn). Warnanya mengikuti kertas. */
 export interface TextElement extends ElementBase {
   kind: 'text'
   text: string
