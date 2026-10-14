@@ -38,6 +38,8 @@ export interface CreateLetterRequest {
   photos: (FileMeta & { key: string })[]
   og: FileMeta
   replyTo?: string | null
+  /** Surat titipan kotak bareng (kontrak 0.3.0). */
+  box?: { invite: string; from: string } | null
 }
 
 const ajv = new Ajv2020({ allErrors: true, strict: false, verbose: true })
@@ -166,5 +168,10 @@ export function parseCreateRequest(raw: unknown): CreateLetterRequest {
   if ((body.design.illustration === 'upload') !== (body.cover != null)) {
     throw new ApiError(422, 'cover_mismatch', 'cover wajib hanya kalau illustration = upload')
   }
+  // Kontrak 0.3.0: `og` boleh kosong di skema, khusus surat titipan kotak bareng. Selama kotak
+  // bareng belum ada di backend, surat titipan ditolak seperti kotak yang tidak ada, dan surat
+  // biasa tetap wajib punya gambar OG.
+  if (body.box != null) throw new ApiError(422, 'box_not_found', 'kotak bareng belum tersedia')
+  if (body.og == null) throw new ApiError(422, 'og_mismatch', 'og wajib untuk surat biasa')
   return body
 }

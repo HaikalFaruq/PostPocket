@@ -138,3 +138,134 @@ test('upload, publish dua kali, buka, dan hapus', async ({ request }) => {
   expect(gone.status()).toBe(404)
   expect((await contract(gone, 'Error')).error.code).toBe('not_found')
 })
+
+test('og wajib untuk surat biasa dan harus kosong untuk surat titipan', async ({ request }) => {
+  const missing = await create(request, { og: null })
+  expect(missing.status()).toBe(422)
+  expect((await contract(missing, 'Error')).error.code).toBe('og_mismatch')
+})
+
+test('kotak bareng: buat, titip, buka, dan hapus sesuai kontrak 0.3.0', async ({ request }) => {
+  const soon = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  const invalid = await request.post('/mock-api/boxes', {
+    data: { title: 'Ultah', to: 'Rani', design: 'par-avion', opensAt: '2020-01-01T00:00:00Z' },
+  })
+  expect(invalid.status()).toBe(422)
+  expect((await contract(invalid, 'Error')).error.code).toBe('invalid_box')
+  const shapeless = await request.post('/mock-api/boxes', { data: { title: '', to: 'Rani' } })
+  expect(shapeless.status()).toBe(400)
+  expect((await contract(shapeless, 'Error')).error.code).toBe('invalid_request')
+
+  const createdResponse = await request.post('/mock-api/boxes', {
+    data: { title: '  Ultah ke-20 Rani  ', to: 'Rani', design: 'emas', opensAt: soon },
+  })
+  expect(createdResponse.status()).toBe(201)
+  const box = await contract(createdResponse, 'CreateBoxResponse')
+  expect(box).toMatchObject({ title: 'Ultah ke-20 Rani', scheduled: true, usage: { letters: 0 } })
+  const headers = { 'x-edit-token': box.editToken }
+  expect((await request.get(`/mock-api/boxes/${box.id}`)).status()).toBe(401)
+  await contract(await request.get(`/mock-api/boxes/${box.id}`, { headers }), 'OrganizerBox')
+  const invite = await contract(
+    await request.get(`/mock-api/boxes/invite/${box.invite}`),
+    'BoxInvite',
+  )
+  expect(invite).toMatchObject({ closed: false, to: 'Rani' })
+
+  // Surat titipan: tanpa OG, link-nya link titip, dan tidak bisa dibuka lewat /l/.
+  const titip = { invite: box.invite, from: 'Budi' }
+  const withOg = await create(request, { box: titip })
+  expect((await contract(withOg, 'Error')).error.code).toBe('og_mismatch')
+  const asReply = await create(request, { box: titip, og: null, replyTo: 'x7Kp2qLm9A' })
+  expect((await contract(asReply, 'Error')).error.code).toBe('invalid_box')
+  const created = await contract(
+    await create(request, { box: titip, og: null }),
+    'CreateLetterResponse',
+  )
+  expect(created.uploads.og).toBeNull()
+  await request.put(created.uploads.photos.f1.signedUrl, {
+    headers: { 'content-type': 'image/jpeg' },
+    data: Buffer.from('abc'),
+  })
+  const published = await contract(
+    await request.post(`/mock-api/letters/${created.id}/publish`, {
+      headers: { 'x-edit-token': created.editToken },
+    }),
+    'PublishLetterResponse',
+  )
+  expect(published.url).toBe(box.inviteUrl)
+  expect(published.box).toMatchObject({ title: 'Ultah ke-20 Rani', to: 'Rani', scheduled: true })
+  expect((await request.get(`/mock-api/l/${published.slug}`)).status()).toBe(404)
+
+  // Sebelum dibuka: isinya belum dikirim dan belum bisa ditandai dibuka.
+  const sealed = await contract(await request.get(`/mock-api/k/${box.slug}`), 'Box')
+  expect(sealed).toMatchObject({ openable: false, letterCount: 1, letters: [] })
+  const early = await request.post(`/mock-api/k/${box.slug}/open`)
+  expect(early.status()).toBe(409)
+  expect((await contract(early, 'Error')).error.code).toBe('box_not_open')
+
+  // Jadwal di masa lalu dan jadwal bersamaan dengan Buka sekarang ditolak.
+  const past = await request.patch(`/mock-api/boxes/${box.id}`, {
+    headers,
+    data: { opensAt: '2020-01-01T00:00:00.000Z' },
+  })
+  expect((await contract(past, 'Error')).error.code).toBe('invalid_box')
+  const both = await request.patch(`/mock-api/boxes/${box.id}`, {
+    headers,
+    data: { openNow: true, opensAt: soon },
+  })
+  expect((await contract(both, 'Error')).error.code).toBe('invalid_box')
+  // Draf titipan yang belum terbit tidak menghitung batas, dan ikut terhapus bersama kotaknya.
+  const draft = await contract(
+    await create(request, { box: { invite: box.invite, from: 'Sari' }, og: null }),
+    'CreateLetterResponse',
+  )
+
+  // Buka sekarang (jam server), lalu penerima membacanya.
+  const openNow = await contract(
+    await request.patch(`/mock-api/boxes/${box.id}`, { headers, data: { openNow: true } }),
+    'OrganizerBox',
+  )
+  expect(openNow).toMatchObject({ openable: true, scheduled: true })
+  expect(openNow.usage).toEqual({ letters: 1, photos: 1 })
+  const recipient = await contract(await request.get(`/mock-api/k/${box.slug}`), 'Box')
+  expect(recipient.openable).toBe(true)
+  expect(recipient.letters.map((item: { from: string }) => item.from)).toEqual(['Budi'])
+  await contract(await request.post(`/mock-api/k/${box.slug}/open`), 'OpenLetterResponse')
+  const closed = await request.patch(`/mock-api/boxes/${box.id}`, {
+    headers,
+    data: { title: 'Ganti' },
+  })
+  expect(closed.status()).toBe(409)
+  expect((await contract(closed, 'Error')).error.code).toBe('box_closed')
+  const late = await create(request, { box: titip, og: null })
+  expect((await contract(late, 'Error')).error.code).toBe('box_closed')
+
+  // Foto kotak dihapus job: placeholder, seperti surat biasa.
+  await request.post(`/mock-api/_test/k/${box.slug}/hapus-foto`)
+  const cleaned = await contract(await request.get(`/mock-api/k/${box.slug}`), 'Box')
+  expect(cleaned.photosDeletedAt).toBeTruthy()
+  expect(cleaned.letters[0].photos).toEqual({})
+  const organizer = await contract(
+    await request.get(`/mock-api/boxes/${box.id}`, { headers }),
+    'OrganizerBox',
+  )
+  expect(organizer.photosDeletedAt).toBe(cleaned.photosDeletedAt)
+
+  // Slug surat titipan tidak bisa dibalas, sama seperti tidak bisa dibuka lewat /l/.
+  const reply = await create(request, { replyTo: published.slug })
+  expect((await contract(reply, 'Error')).error.code).toBe('reply_not_found')
+
+  // Pembuat menghapus titipan, lalu kotaknya.
+  const entry = await request.delete(`/mock-api/boxes/${box.id}/letters/${created.id}`, {
+    headers,
+  })
+  expect(entry.status()).toBe(204)
+  expect((await request.delete(`/mock-api/boxes/${box.id}`, { headers })).status()).toBe(204)
+  const gone = await request.get(`/mock-api/k/${box.slug}`)
+  expect(gone.status()).toBe(404)
+  expect((await contract(gone, 'Error')).error.code).toBe('box_not_found')
+  const orphan = await request.post(`/mock-api/letters/${draft.id}/publish`, {
+    headers: { 'x-edit-token': draft.editToken },
+  })
+  expect(orphan.status()).toBe(404)
+})

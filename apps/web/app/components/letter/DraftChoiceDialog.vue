@@ -34,19 +34,29 @@ const text = computed(() =>
         fresh: 'Hapus draf, mulai balasan',
         keep: 'Jadikan draf ini balasan',
       }
-    : {
-        question: `Mulai surat baru dengan foto dari ${asking.value?.from ?? 'sini'}, atau tambahkan fotonya ke draf itu?`,
-        warning: 'Kalau mulai surat baru, draf itu dihapus.',
-        fresh: 'Hapus draf, mulai baru',
-        keep: 'Tambahkan ke draf',
-      },
+    : asking.value?.kind === 'titip'
+      ? {
+          question: `Tulis surat baru untuk kotak "${asking.value.box ?? 'ini'}", atau titipkan draf itu?`,
+          warning: 'Kalau tulis surat baru, draf itu dihapus.',
+          fresh: 'Hapus draf, tulis baru',
+          keep: 'Titipkan draf ini',
+        }
+      : {
+          question: `Mulai surat baru dengan foto dari ${asking.value?.from ?? 'sini'}, atau tambahkan fotonya ke draf itu?`,
+          warning: 'Kalau mulai surat baru, draf itu dihapus.',
+          fresh: 'Hapus draf, mulai baru',
+          keep: 'Tambahkan ke draf',
+        },
 )
 
 // Fokus awal di pilihan yang tidak menghapus apa pun, jadi Enter tidak membuang draf. Untuk
 // balasan, "Batal": memindahkan draf ke surat lain juga bisa salah alamat.
 function focusSafeChoice(event: Event) {
   event.preventDefault()
-  const safe = asking.value?.kind === 'reply' || asking.value?.full ? cancelButton : keepButton
+  const safe =
+    asking.value?.kind === 'reply' || asking.value?.kind === 'titip' || asking.value?.full
+      ? cancelButton
+      : keepButton
   safe.value?.focus()
 }
 </script>

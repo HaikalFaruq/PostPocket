@@ -45,6 +45,28 @@ export async function forgetSent(id: string): Promise<void> {
 /** Surat terkirim beserta potongan teksnya, supaya mudah dikenali di daftar "Surat terkirim". */
 export interface SentRecord extends SentLetter {
   preview?: string
+  /** Kotak bareng tempat surat ini dititip; `url` surat itu link titip kotaknya. */
+  titip?: { invite: string; title: string; to: string }
+}
+
+/** Masa hidup terlama surat titipan: kotak menerima titipan 30 hari, lalu berlaku 30 hari lagi. */
+const TITIP_LIFETIME = 60 * 24 * 60 * 60 * 1000
+
+/**
+ * Surat ini mungkin masih bisa dibuka. Untuk surat titipan, `expiresAt` dari publish hanya
+ * perkiraan selama kotaknya belum dibuka (ikut berubah kalau jadwal kotaknya berubah), jadi
+ * dipakai batas terlamanya.
+ */
+export function stillOpen(item: SentRecord, now = Date.now()): boolean {
+  const until = item.titip
+    ? Date.parse(item.publishedAt) + TITIP_LIFETIME
+    : Date.parse(item.expiresAt)
+  return until > now
+}
+
+/** Surat yang dititip dari browser ini ke kotak dengan kode titip `invite`. */
+export async function sentToBox(invite: string): Promise<SentRecord[]> {
+  return (await listSent()).filter((item) => item.titip?.invite === invite)
 }
 
 /** Semua surat yang dikirim dari browser ini, yang terbaru dulu. */

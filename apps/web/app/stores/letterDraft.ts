@@ -21,6 +21,7 @@ import type { SentLetter } from '~/utils/letter-api'
 import { uniqueId } from '~/utils/letter-gesture'
 import { requestPersistentStorage } from '~/utils/pwa'
 import {
+  INVITE_PATTERN,
   PHOTO_FRONT,
   SLUG_PATTERN,
   cardRatio,
@@ -28,6 +29,7 @@ import {
   normalizeDraft,
   toStoredPhoto,
   type DraftPhoto,
+  type TitipTarget,
 } from '~/utils/letter-draft'
 
 const DRAFT_KEY = 'postpocket:letter-draft'
@@ -53,6 +55,10 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   const photos = shallowRef<Record<string, DraftPhoto>>({})
   /** Slug surat yang sedang dibalas. */
   const replyTo = ref<string | null>(null)
+  /** Kotak bareng tujuan surat ini, kalau dititip (`/letter/new?titip=<kode>`). */
+  const box = ref<TitipTarget | null>(null)
+  /** Nama pengirim untuk surat titipan. */
+  const from = ref('')
   const ready = ref(false)
   const saveFailed = ref(false)
   let photoDirty = false
@@ -85,12 +91,14 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     return photoSlots.length >= contentLimits.photo && photoSlots.every((e) => e.photo)
   })
 
-  // Sidik draf: desain, isi, dan foto depan. Berubah begitu user mengubah apa pun.
+  // Sidik draf: desain, isi, foto depan, dan kotak tujuannya. Berubah begitu user mengubah apa
+  // pun, termasuk menitipkannya ke kotak lain atau mengganti nama pengirim.
   const signature = computed(() =>
     JSON.stringify([
       design.value,
       content.value,
       photo.value && [photo.value.blob.size, photo.value.width, photo.value.height],
+      ...(box.value ? [box.value.invite, from.value.trim()] : []),
     ]),
   )
   const sentMark = shallowRef<{ signature: string; letter: SentLetter } | null>(null)
@@ -138,6 +146,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       content.value = draft.content
       photos.value = draft.photos
       replyTo.value = draft.replyTo
+      box.value = draft.box
+      from.value = draft.from
       savedPhotoKeys = new Set(Object.keys(draft.photos))
       const mark = (await get(SENT_KEY)) as { signature?: unknown; letter?: SentLetter } | undefined
       sentMark.value =
@@ -168,6 +178,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
       // Salinan biasa: proxy Vue tidak bisa disimpan di IndexedDB.
       content: JSON.parse(JSON.stringify(content.value)) as LetterContent,
       replyTo: replyTo.value,
+      box: box.value ? { ...box.value } : null,
+      from: from.value,
       updatedAt: Date.now(),
     }
     try {
@@ -209,7 +221,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
 
   let timer: ReturnType<typeof setTimeout> | undefined
   watch(
-    [design, photo, content, photos, replyTo],
+    [design, photo, content, photos, replyTo, box, from],
     () => {
       if (!ready.value) return
       clearTimeout(timer)
@@ -416,6 +428,14 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   /** Tandai draf ini sebagai balasan untuk surat `slug`, atau `null` untuk batal membalas. */
   function setReplyTo(slug: string | null) {
     replyTo.value = slug && SLUG_PATTERN.test(slug) ? slug : null
+    // Surat titipan tidak bisa sekaligus jadi balasan (kontrak 0.3.0).
+    if (replyTo.value) box.value = null
+  }
+
+  /** Titip draf ini ke kotak bareng `target`, atau `null` untuk batal menitip. */
+  function setBox(target: TitipTarget | null) {
+    box.value = target && INVITE_PATTERN.test(target.invite) ? { ...target } : null
+    if (box.value) replyTo.value = null
   }
 
   /** Tandai draf ini sudah jadi link `letter`. Tanda hilang sendiri kalau drafnya diubah. */
@@ -449,6 +469,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     content.value = fresh.content
     photos.value = {}
     replyTo.value = null
+    box.value = null
     savedPhotoKeys = new Set()
     dirtyPhotos.clear()
     sentMark.value = null
@@ -480,6 +501,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     photos,
     photoUrls,
     replyTo,
+    box,
+    from,
     message,
     ready,
     saveFailed,
@@ -498,6 +521,7 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     addPhoto,
     setTemplate,
     setReplyTo,
+    setBox,
     surpriseMe,
     reset,
   }

@@ -4,6 +4,7 @@ import {
   FOLDER_HEADROOM,
   createArtJob,
   fanSlot,
+  folderSeed,
   hashString,
   openRoom,
   rng,
@@ -60,6 +61,14 @@ describe('alat bantu', () => {
     expect([first(), first(), first()]).toEqual([second(), second(), second()])
     expect(hashString('kotak-1')).toBe(hashString('kotak-1'))
     expect(hashString('kotak-1')).not.toBe(hashString('kotak-2'))
+  })
+
+  it('folderSeed sama untuk kunci yang sama dan masih dalam rentang semai', () => {
+    expect(folderSeed('x7Kp2qLm9A')).toBe(folderSeed('x7Kp2qLm9A'))
+    for (const key of ['surat', 'x7Kp2qLm9A', 'Ab3dE6gH9jKm']) {
+      expect(folderSeed(key)).toBeGreaterThanOrEqual(0)
+      expect(folderSeed(key)).toBeLessThan(997)
+    }
   })
 
   it('fanSlot menyebar dari kiri ke kanan', () => {

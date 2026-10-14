@@ -1,4 +1,4 @@
-import { createLetterApi, type LetterApi } from '~/utils/letter-api'
+import { createLetterApi, type ApiOptions, type LetterApi } from '~/utils/letter-api'
 
 /**
  * Region DB dan Storage Supabase (Sydney). Tanpa ini fungsi jalan di region terdekat dengan
@@ -7,16 +7,21 @@ import { createLetterApi, type LetterApi } from '~/utils/letter-api'
 const FUNCTION_REGION = 'ap-southeast-2'
 
 /**
- * Klien API surat. Alamatnya diambil dari `NUXT_PUBLIC_API_BASE` kalau diisi (misalnya `/mock-api`
- * untuk mock lokal); kalau kosong, fungsi Supabase di `<supabaseUrl>/functions/v1`, dipanggil di
- * region DB-nya. Berlaku juga untuk SSR halaman surat.
+ * Alamat dan kunci API. Alamatnya diambil dari `NUXT_PUBLIC_API_BASE` kalau diisi (misalnya
+ * `/mock-api` untuk mock lokal); kalau kosong, fungsi Supabase di `<supabaseUrl>/functions/v1`,
+ * dipanggil di region DB-nya. Berlaku juga untuk SSR halaman surat dan kotak bareng.
  */
-export function useLetterApi(): LetterApi {
+export function useApiOptions(): ApiOptions {
   const config = useRuntimeConfig().public
   const base = config.apiBase || `${config.supabaseUrl}/functions/v1`
-  return createLetterApi({
+  return {
     base: new URL(base, useRequestURL().origin).toString(),
     apiKey: config.supabasePublishableKey,
     region: config.apiBase ? undefined : FUNCTION_REGION,
-  })
+  }
+}
+
+/** Klien API surat. */
+export function useLetterApi(): LetterApi {
+  return createLetterApi(useApiOptions())
 }

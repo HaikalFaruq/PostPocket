@@ -25,13 +25,27 @@ export interface OgMeta {
   size: number
 }
 
+/** Kotak bareng tujuan surat titipan (kontrak 0.3.0). */
+export interface BoxEntry {
+  /** Kode titip, 12 karakter base62. */
+  invite: string
+  /** Nama pengirim. */
+  from: string
+}
+
 export interface CreateLetterRequest {
   design: LetterDesign
   content: LetterContent
   cover: ImageMeta | null
   photos: PhotoMeta[]
-  og: OgMeta
+  /** Gambar OG; `null` untuk surat titipan. */
+  og: OgMeta | null
   replyTo: string | null
+  /**
+   * Hanya ada untuk surat titipan. Surat biasa tidak mengirim field ini sama sekali, karena backend
+   * kontrak 0.2.3 menolak field yang tidak dikenalnya (`additionalProperties: false`).
+   */
+  box?: BoxEntry
 }
 
 export interface UploadTarget {
@@ -44,14 +58,28 @@ export interface CreateLetterResponse {
   id: string
   editToken: string
   draftExpiresAt: string
-  uploads: { cover: UploadTarget | null; photos: Record<string, UploadTarget>; og: UploadTarget }
+  uploads: {
+    cover: UploadTarget | null
+    photos: Record<string, UploadTarget>
+    og: UploadTarget | null
+  }
+}
+
+/** Ringkasan kotak untuk pengirim surat titipan. */
+export interface BoxReceipt {
+  title: string
+  to: string
+  opensAt: string
+  scheduled: boolean
 }
 
 export interface PublishLetterResponse {
   slug: string
+  /** Link surat, atau link titip kotaknya untuk surat titipan. */
   url: string
   publishedAt: string
   expiresAt: string
+  box?: BoxReceipt
 }
 
 export interface Asset {
@@ -93,6 +121,12 @@ export type ApiErrorCode =
   | 'not_found'
   | 'rate_limited'
   | 'internal'
+  | 'og_mismatch'
+  | 'invalid_box'
+  | 'box_not_found'
+  | 'box_closed'
+  | 'box_full'
+  | 'box_not_open'
 
 /** Berkas siap unggah: foto yang sudah dikompres atau gambar OG yang sudah dirender. */
 export interface UploadImage {
@@ -134,6 +168,16 @@ export function errorMessage(error: unknown): string {
       return 'Surat yang mau dibalas sudah tidak tersedia.'
     case 'not_found':
       return 'Surat ini sudah tidak tersedia.'
+    case 'box_not_found':
+      return 'Kotak ini sudah tidak ada.'
+    case 'box_closed':
+      return 'Kotak ini sudah ditutup, jadi tidak bisa menerima titipan lagi.'
+    case 'box_full':
+      return 'Kotak ini sudah penuh. Coba kurangi foto di suratmu, atau tanya pembuat kotaknya.'
+    case 'box_not_open':
+      return 'Kotak ini belum bisa dibuka.'
+    case 'invalid_box':
+      return 'Isian kotak ditolak server. Cek jadwal bukanya, lalu coba lagi.'
     case 'unauthorized':
       return 'Izin mengubah surat ini sudah tidak berlaku.'
     case 'internal':
@@ -150,8 +194,11 @@ export interface SendInput {
   cover: UploadImage | null
   /** Foto isi per kunci; hanya yang dipakai `content` yang dikirim. */
   photos: Record<string, UploadImage>
-  og: UploadImage
+  /** Gambar OG; `null` untuk surat titipan, yang tidak punya link sendiri. */
+  og: UploadImage | null
   replyTo?: string | null
+  /** Titip ke kotak bareng, bukan jadi link sendiri. */
+  box?: BoxEntry | null
 }
 
 function imageMeta(image: UploadImage): ImageMeta {
@@ -171,18 +218,25 @@ export function buildCreateRequest(input: SendInput): CreateLetterRequest {
     if (!image) throw new LetterApiError('photo_mismatch', `Foto ${key} tidak ada di draf`)
     return { key, ...imageMeta(image) }
   })
+  const box = input.box ?? null
+  if (!box && !input.og) throw new LetterApiError('og_mismatch', 'Gambar OG belum dibuat')
   return {
     design: input.design,
     content,
     cover: input.cover ? imageMeta(input.cover) : null,
     photos,
-    og: {
-      type: input.og.type === 'image/png' ? 'image/png' : 'image/jpeg',
-      width: input.og.width,
-      height: input.og.height,
-      size: input.og.size,
-    },
-    replyTo: input.replyTo ?? null,
+    og:
+      box || !input.og
+        ? null
+        : {
+            type: input.og.type === 'image/png' ? 'image/png' : 'image/jpeg',
+            width: input.og.width,
+            height: input.og.height,
+            size: input.og.size,
+          },
+    // Surat titipan tidak bisa sekaligus jadi balasan (kontrak 0.3.0).
+    replyTo: box ? null : (input.replyTo ?? null),
+    ...(box ? { box: { invite: box.invite, from: box.from.trim() } } : {}),
   }
 }
 
@@ -211,13 +265,13 @@ export async function sendLetter(
 ): Promise<SentLetter> {
   const request = buildCreateRequest(input)
   const created = await api.create(request)
-  const files: { target: UploadTarget | null | undefined; blob: Blob }[] = [
-    ...request.photos.map(({ key }) => ({
+  const files: { target: UploadTarget | null | undefined; blob: Blob }[] = request.photos.map(
+    ({ key }) => ({
       target: created.uploads.photos[key],
       blob: input.photos[key]!.blob,
-    })),
-    { target: created.uploads.og, blob: input.og.blob },
-  ]
+    }),
+  )
+  if (request.og && input.og) files.push({ target: created.uploads.og, blob: input.og.blob })
   if (input.cover) files.unshift({ target: created.uploads.cover, blob: input.cover.blob })
   let done = 0
   await Promise.all(
@@ -246,31 +300,38 @@ async function failure(response: Response): Promise<LetterApiError> {
 }
 
 /** Gangguan yang biasanya hilang sendiri: koneksi yang diputus atau error server (5xx). */
-const transient = (problem: unknown) =>
+export const transient = (problem: unknown) =>
   problem instanceof LetterApiError && (problem.code === 'network' || (problem.status ?? 0) >= 500)
 
-/**
- * Klien lima endpoint surat. `base` adalah URL absolut fungsi Supabase (atau mock), dan setiap
- * request membawa publishable key di header `apikey`. Unggahan memakai `signedUrl` apa adanya.
- */
-export function createLetterApi(options: {
+export interface ApiOptions {
   base: string
   apiKey: string
   fetch?: typeof globalThis.fetch
-  /** Jeda sebelum GET surat dicoba sekali lagi, dalam milidetik. */
+  /** Jeda sebelum GET dicoba sekali lagi, dalam milidetik. */
   retryDelay?: number
   /**
    * Region tempat fungsi dijalankan (kontrak 0.2.2, `forceFunctionRegion`). Tidak berlaku untuk
    * unggahan ke `signedUrl`, yang langsung ke Storage.
    */
   region?: string
-}): LetterApi {
+}
+
+export type ApiCall = <T>(
+  method: string,
+  path: string,
+  init?: { body?: unknown; editToken?: string; alsoOk?: number },
+) => Promise<T>
+
+/**
+ * Pemanggil fungsi Supabase (atau mock) sesuai kontrak: `base` adalah URL absolut fungsinya, dan
+ * setiap request membawa publishable key di header `apikey`. Dipakai klien surat dan kotak bareng.
+ * `alsoOk`: satu status selain 2xx yang di kontrak membawa body sukses.
+ */
+export function createApiCall(options: ApiOptions): ApiCall {
   const base = options.base.replace(/\/$/, '')
   const run = options.fetch ?? globalThis.fetch.bind(globalThis)
   const query = options.region ? `?forceFunctionRegion=${encodeURIComponent(options.region)}` : ''
-
-  /** `alsoOk`: satu status selain 2xx yang di kontrak membawa body sukses. */
-  async function call<T>(
+  return async function call<T>(
     method: string,
     path: string,
     init: { body?: unknown; editToken?: string; alsoOk?: number } = {},
@@ -291,6 +352,26 @@ export function createLetterApi(options: {
     if (!response.ok && response.status !== init.alsoOk) throw await failure(response)
     return (response.status === 204 ? undefined : await response.json()) as T
   }
+}
+
+/** GET yang aman diulang: dicoba sekali lagi setelah gangguan sesaat. */
+export async function getWithRetry<T>(call: ApiCall, path: string, delay = 400): Promise<T> {
+  try {
+    return await call<T>('GET', path)
+  } catch (problem) {
+    if (!transient(problem)) throw problem
+    await new Promise((resolve) => setTimeout(resolve, delay))
+    return call<T>('GET', path)
+  }
+}
+
+/**
+ * Klien lima endpoint surat. `base` adalah URL absolut fungsi Supabase (atau mock), dan setiap
+ * request membawa publishable key di header `apikey`. Unggahan memakai `signedUrl` apa adanya.
+ */
+export function createLetterApi(options: ApiOptions): LetterApi {
+  const run = options.fetch ?? globalThis.fetch.bind(globalThis)
+  const call = createApiCall(options)
 
   return {
     create: (body) => call('POST', '/letters', { body }),
@@ -301,16 +382,7 @@ export function createLetterApi(options: {
     // Penerima jangan sampai melihat "Surat belum bisa dimuat" (atau WhatsApp gagal membaca
     // preview) karena satu gangguan sesaat, misalnya koneksi lama yang sudah diputus server saat
     // halaman di-SSR. Membaca surat aman diulang, jadi GET dicoba sekali lagi.
-    async get(slug) {
-      const path = `/l/${encodeURIComponent(slug)}`
-      try {
-        return await call<Letter>('GET', path)
-      } catch (problem) {
-        if (!transient(problem)) throw problem
-        await new Promise((resolve) => setTimeout(resolve, options.retryDelay ?? 400))
-        return call<Letter>('GET', path)
-      }
-    },
+    get: (slug) => getWithRetry<Letter>(call, `/l/${encodeURIComponent(slug)}`, options.retryDelay),
     open: (slug) => call('POST', `/l/${encodeURIComponent(slug)}/open`),
     remove: (id, editToken) => call('DELETE', `/letters/${encodeURIComponent(id)}`, { editToken }),
     async upload(target, file) {

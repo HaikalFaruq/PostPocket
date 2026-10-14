@@ -257,6 +257,14 @@ export function createArtJob(
   return { width: w, height: h, pixels, step }
 }
 
+/**
+ * Semai seni folder dari kuncinya (slug kotak, atau id folder di Kotak surat), supaya folder yang
+ * sama selalu bercorak sama di setiap halaman, dan folder lain bercorak lain.
+ */
+export function folderSeed(key: string): number {
+  return hashString(key) % 997
+}
+
 /** Posisi berkas di kipas: -1 sampai 1 dari kiri ke kanan, 0 kalau cuma satu. */
 export function fanSlot(index: number, count: number): number {
   return count <= 1 ? 0 : (index / (count - 1)) * 2 - 1

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { contentPhotoKeys, publishableContent } from '@postpocket/presets'
-import { errorMessage, sendLetter, type SentLetter } from '~/utils/letter-api'
+import { deviceTimeZone, formatWhen } from '~/utils/box-time'
+import { LetterApiError, errorMessage, sendLetter, type SentLetter } from '~/utils/letter-api'
 import { forgetSent, rememberSent } from '~/utils/sent-letters'
 import { compressPhoto, renderOgImage, type OgCard } from '~/utils/upload-image'
 
@@ -8,6 +9,9 @@ import { compressPhoto, renderOgImage, type OgCard } from '~/utils/upload-image'
  * Alur "Buat link" (PRD: Kirim dan buka): kompres foto, render gambar OG dari sampul yang sama,
  * unggah, terbitkan, lalu tampilkan link yang siap disalin atau dibagikan. Mulai begitu dibuka.
  * Dengan `existing`, langsung menampilkan link surat yang sudah dibuat dari draf yang sama.
+ *
+ * Draf yang dititip ke kotak bareng (`draft.box`) tidak punya link sendiri: tanpa gambar OG, dan
+ * hasilnya "Suratmu sudah masuk kotak".
  */
 const props = defineProps<{ card: OgCard; existing?: SentLetter | null }>()
 const emit = defineEmits<{ close: [] }>()
@@ -25,13 +29,15 @@ const copied = ref(false)
 const dialog = ref<HTMLElement | null>(null)
 const canShare = import.meta.client && typeof navigator.share === 'function'
 
-const phases: { id: Phase; label: string }[] = [
+// Kotak tujuan dicatat saat mulai mengirim, supaya hasilnya tetap benar walau drafnya diubah.
+const titip = ref(draft.box ? { ...draft.box, from: draft.from.trim() } : null)
+const phases = computed<{ id: Phase; label: string }[]>(() => [
   { id: 'photos', label: 'Menyiapkan foto' },
-  { id: 'og', label: 'Membuat gambar pratinjau' },
+  ...(titip.value ? [] : [{ id: 'og' as const, label: 'Membuat gambar pratinjau' }]),
   { id: 'upload', label: 'Mengunggah' },
-  { id: 'publish', label: 'Menerbitkan' },
-]
-const phaseIndex = computed(() => phases.findIndex((item) => item.id === phase.value))
+  { id: 'publish', label: titip.value ? 'Memasukkan ke kotak' : 'Menerbitkan' },
+])
+const phaseIndex = computed(() => phases.value.findIndex((item) => item.id === phase.value))
 // Foto isi (dan cover dari foto user) dihapus 7 hari setelah surat pertama kali dibuka (kontrak).
 const hasPhotos = computed(
   () => draft.isPhotoFront || contentPhotoKeys(publishableContent(draft.content)).length > 0,
@@ -46,6 +52,16 @@ const expires = computed(() =>
     : '',
 )
 
+/** Kapan penerima kotak bisa membuka suratnya, dalam WIB seperti di halaman kotak. */
+const opensText = computed(() => {
+  const box = sent.value?.box
+  if (!box) return ''
+  const when = formatWhen(box.opensAt, deviceTimeZone())
+  return box.scheduled
+    ? `${box.to} bisa membukanya mulai ${when}.`
+    : `${box.to} bisa membukanya begitu pembuat kotak membukanya, paling lambat ${when}.`
+})
+
 async function send() {
   state.value = 'sending'
   error.value = ''
@@ -59,8 +75,11 @@ async function send() {
         keys.map(async (key) => [key, await compressPhoto(draft.photos[key]!)] as const),
       ),
     )
-    phase.value = 'og'
-    const og = await renderOgImage(props.card)
+    let og = null
+    if (!titip.value) {
+      phase.value = 'og'
+      og = await renderOgImage(props.card)
+    }
     phase.value = 'upload'
     const result = await sendLetter(
       api,
@@ -71,6 +90,7 @@ async function send() {
         photos,
         og,
         replyTo: draft.replyTo,
+        box: titip.value ? { invite: titip.value.invite, from: titip.value.from } : null,
       },
       (done, count) => {
         uploaded.value = done
@@ -78,12 +98,22 @@ async function send() {
         if (done === count) phase.value = 'publish'
       },
     )
-    await rememberSent({ ...result, preview: previewText() })
+    await rememberSent({
+      ...result,
+      preview: previewText(),
+      ...(titip.value
+        ? { titip: { invite: titip.value.invite, title: titip.value.title, to: titip.value.to } }
+        : {}),
+    })
     await draft.markSent(result)
     sent.value = result
     state.value = 'done'
   } catch (problem) {
-    error.value = errorMessage(problem)
+    // Draf titipan ikut terhapus kalau kotaknya dihapus pembuatnya (kontrak 0.3.0).
+    error.value =
+      titip.value && problem instanceof LetterApiError && problem.code === 'not_found'
+        ? 'Kotak ini sudah dihapus pembuatnya, jadi suratnya tidak bisa dititip.'
+        : errorMessage(problem)
     state.value = 'error'
   }
 }
@@ -120,15 +150,23 @@ async function share() {
 }
 
 async function remove() {
-  if (!sent.value || !window.confirm('Hapus surat ini? Link-nya tidak bisa dibuka lagi.')) return
+  const question = sent.value?.box
+    ? `Tarik suratmu dari kotak "${sent.value.box.title}"? Suratnya dihapus dan tidak bisa dibuka ${sent.value.box.to}.`
+    : 'Hapus surat ini? Link-nya tidak bisa dibuka lagi.'
+  if (!sent.value || !window.confirm(question)) return
   try {
     await api.remove(sent.value.id, sent.value.editToken)
-    await forgetSent(sent.value.id)
-    await draft.clearSent()
-    state.value = 'deleted'
   } catch (problem) {
-    error.value = errorMessage(problem)
+    // Sudah tidak ada di server (ditarik dari perangkat lain, dihapus pembuat kotak, atau
+    // kotaknya dihapus): cukup dilupakan di sini, sama seperti di daftar Surat terkirim.
+    if (!(problem instanceof LetterApiError && problem.code === 'not_found')) {
+      error.value = errorMessage(problem)
+      return
+    }
   }
+  await forgetSent(sent.value.id)
+  await draft.clearSent()
+  state.value = 'deleted'
 }
 
 function close() {
@@ -170,7 +208,9 @@ onMounted(() => {
       class="w-full rounded-t-[24px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:max-w-md sm:rounded-[24px]"
     >
       <template v-if="state === 'sending'">
-        <h2 id="send-title" class="text-title">Membuat link…</h2>
+        <h2 id="send-title" class="text-title">
+          {{ titip ? 'Menitipkan surat…' : 'Membuat link…' }}
+        </h2>
         <ol class="mt-4 space-y-2" aria-live="polite">
           <li
             v-for="(item, index) in phases"
@@ -194,6 +234,39 @@ onMounted(() => {
             >
           </li>
         </ol>
+      </template>
+
+      <template v-else-if="state === 'done' && sent?.box">
+        <h2 id="send-title" class="text-title">Suratmu sudah masuk kotak</h2>
+        <p class="mt-1 text-ink-muted" data-testid="titip-done">
+          Dititip ke kotak "{{ sent.box.title }}" untuk {{ sent.box.to }}. {{ opensText }} Isinya
+          tetap rahasia sampai kotaknya dibuka.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <a
+            :href="sent.url"
+            class="inline-flex h-10 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+            data-testid="titip-box-link"
+            >Lihat kotaknya</a
+          >
+        </div>
+        <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>
+        <div class="mt-6 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            class="text-caption text-ink-muted underline underline-offset-2"
+            @click="remove"
+          >
+            Tarik suratku dari kotak
+          </button>
+          <button
+            type="button"
+            class="h-10 rounded-control px-5 text-body font-semibold inset-ring inset-ring-line"
+            @click="close"
+          >
+            Selesai
+          </button>
+        </div>
       </template>
 
       <template v-else-if="state === 'done' && sent">
@@ -260,8 +333,12 @@ onMounted(() => {
       </template>
 
       <template v-else-if="state === 'deleted'">
-        <h2 id="send-title" class="text-title">Surat dihapus</h2>
-        <p class="mt-1 text-ink-muted">Link-nya sudah tidak bisa dibuka.</p>
+        <h2 id="send-title" class="text-title">
+          {{ titip ? 'Surat ditarik dari kotak' : 'Surat dihapus' }}
+        </h2>
+        <p class="mt-1 text-ink-muted">
+          {{ titip ? 'Suratnya sudah tidak ada di kotak.' : 'Link-nya sudah tidak bisa dibuka.' }}
+        </p>
         <button
           type="button"
           class="mt-6 h-10 w-full rounded-control bg-ink text-body font-semibold text-white"
@@ -272,7 +349,9 @@ onMounted(() => {
       </template>
 
       <template v-else>
-        <h2 id="send-title" class="text-title">Link belum jadi</h2>
+        <h2 id="send-title" class="text-title">
+          {{ titip ? 'Surat belum masuk kotak' : 'Link belum jadi' }}
+        </h2>
         <p role="alert" class="mt-1 text-ink-muted">{{ error }}</p>
         <div class="mt-6 flex gap-2">
           <button

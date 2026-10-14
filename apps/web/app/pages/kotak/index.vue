@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { byId, letter as letterPresets } from '@postpocket/presets'
 import type { FolderFile } from '~/components/kotak/GlassFolder.vue'
-import { hashString } from '~/utils/folder-art'
-import { PHOTO_FRONT } from '~/utils/letter-draft'
-import type { ShownLetter } from '~/utils/letter-view'
+import { folderSeed } from '~/utils/folder-art'
+import { formatDay } from '~/utils/box-time'
+import { letterFront, type ShownLetter } from '~/utils/letter-view'
+import { listBoxes, type MyBox } from '~/utils/my-boxes'
 import type { SavedLetter } from '~/utils/saved-letters'
 
 /**
@@ -16,8 +17,12 @@ useSeoMeta({ title: 'Kotak surat · PostPocket', robots: 'noindex' })
 const saved = useSavedLetters()
 const memories = useMemories()
 const ready = ref(false)
+// Kotak bareng yang dibuat dari browser ini (kontrak 0.3.0), kalau fiturnya sudah dinyalakan.
+const kotakBareng = !!useRuntimeConfig().public.kotakBareng
+const myBoxes = ref<MyBox[]>([])
 onMounted(async () => {
   await Promise.all([saved.load(), memories.load()])
+  if (kotakBareng) myBoxes.value = await listBoxes()
   ready.value = true
 })
 
@@ -70,17 +75,11 @@ function snippet(item: SavedLetter): string | null {
 
 /** Lembar surat di folder: gambar depannya, nama pengirim (atau potongan tulisan), dan tanggal. */
 function file(item: SavedLetter): FolderFile {
-  const art =
-    item.design.illustration === PHOTO_FRONT
-      ? item.cover
-        ? urls.value[item.cover.moment]
-        : null
-      : byId(letterPresets.illustrations, item.design.illustration)?.art
   return {
     id: item.id,
     name: item.from ? `Dari ${item.from}` : (snippet(item) ?? 'Surat untukmu'),
     meta: date(item.publishedAt),
-    image: art ?? null,
+    image: letterFront(item.design, item.cover ? urls.value[item.cover.moment] : null),
     paper: byId(letterPresets.papers, item.design.paper)?.color,
   }
 }
@@ -203,7 +202,7 @@ async function removeFolder(id: string, title: string) {
             :open="openFolder === folder.id"
             :label="folder.title"
             :art="folder.art"
-            :seed="hashString(folder.id) % 997"
+            :seed="folderSeed(folder.id.replace(/^kotak-/, ''))"
             :files="folder.items.map(file)"
             :width="folderWidth"
             :appear-delay="Math.min(position, 2) * 120"
@@ -283,6 +282,46 @@ async function removeFolder(id: string, title: string) {
           Tulis surat
         </NuxtLink>
       </div>
+      <section
+        v-if="kotakBareng && ready"
+        class="mt-14 max-w-xl border-t border-line-soft pt-8"
+        aria-labelledby="bareng-title"
+        data-testid="kotak-bareng"
+      >
+        <h2 id="bareng-title" class="text-[24px] font-bold tracking-[-0.03em]">Kotak bareng</h2>
+        <p class="mt-1 text-pretty text-ink-muted">
+          Kumpulkan surat dan foto Booth dari teman-teman untuk satu orang, misalnya untuk ulang
+          tahunnya. Dia membuka semuanya dari satu link.
+        </p>
+        <NuxtLink
+          to="/kotak/baru"
+          class="mt-4 inline-flex h-11 items-center gap-2 rounded-control bg-ink px-5 text-body font-semibold text-white hover:bg-ink/90"
+          data-testid="kotak-baru"
+        >
+          <Icon name="plus" :size="15" /> Bikin kotak bareng
+        </NuxtLink>
+        <ul
+          v-if="myBoxes.length"
+          class="mt-5 divide-y divide-line-soft rounded-[16px] bg-surface shadow-raised"
+          aria-label="Kotak bareng buatanmu"
+        >
+          <li v-for="item in myBoxes" :key="item.id">
+            <NuxtLink
+              :to="`/kotak/${item.id}`"
+              class="flex items-center gap-3 px-4 py-3 hover:bg-panel"
+              data-testid="my-box"
+            >
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-body font-semibold">{{ item.title }}</span>
+                <span class="block text-caption text-ink-muted">
+                  Untuk {{ item.to }}, dibuat {{ formatDay(item.createdAt) }}
+                </span>
+              </span>
+              <Icon name="chevron-right" :size="16" class="shrink-0 text-ink-subtle" />
+            </NuxtLink>
+          </li>
+        </ul>
+      </section>
     </main>
 
     <LetterViewer

@@ -131,6 +131,12 @@ Deno.test('parseCreateRequest: isi yang ditolak jadi 422', () => {
     [{ ...body, photos: [{ ...body.photos[0], key: 'p2' }] }, 'photo_mismatch'],
     [{ ...body, design: { ...design, illustration: 'upload' } }, 'cover_mismatch'],
     [{ ...body, cover: { type: 'image/jpeg', width: 10, height: 10, size: 10 } }, 'cover_mismatch'],
+    // Kontrak 0.3.0: `og` boleh kosong di skema, tapi tetap wajib untuk surat biasa, dan surat
+    // titipan kotak bareng ditolak sampai backend kotak bareng ada.
+    [{ ...body, og: null }, 'og_mismatch'],
+    [{ ...body, og: undefined }, 'og_mismatch'],
+    [{ ...body, og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }, 'box_not_found'],
+    [{ ...body, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }, 'box_not_found'],
   ]
   for (const [input, code] of cases) {
     const error = rejects(input)

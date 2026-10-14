@@ -3,9 +3,10 @@ import { byId, isFilledElement, letter, templateForPhotos } from '@postpocket/pr
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { looksLikeImage } from '~/utils/heic'
-import { MESSAGE_LIMIT } from '~/utils/letter-draft'
+import { errorMessage } from '~/utils/letter-api'
+import { BOX_TEXT_LIMIT, INVITE_PATTERN, MESSAGE_LIMIT } from '~/utils/letter-draft'
 import { takePendingPhoto, type PendingPhoto } from '~/utils/pending-photo'
-import { listSent } from '~/utils/sent-letters'
+import { listSent, stillOpen } from '~/utils/sent-letters'
 
 useSeoMeta({ title: 'Buat surat · PostPocket', robots: 'noindex' })
 
@@ -19,6 +20,12 @@ onMounted(async () => {
   if (typeof reply === 'string') {
     router.replace({ query: {} })
     await startReply(reply)
+  }
+  // Dibuka dari halaman titip kotak bareng: /letter/new?titip=<kode>.
+  const titip = route.query.titip
+  if (typeof titip === 'string') {
+    router.replace({ query: {} })
+    await startTitip(titip)
   }
   // Foto dari "Kirim sebagai surat" (Pocket) atau "Pakai di surat" (Booth): /letter/new?foto=1.
   // Pilihan untuk draf yang belum dikirim sudah ditanyakan di sana; kalau belum, ditanya di sini.
@@ -69,19 +76,77 @@ async function startReply(slug: string) {
   else await router.replace(letterPath)
 }
 
+/**
+ * Titip surat ini ke kotak bareng dengan kode `invite`. Seperti balasan, draf yang belum dikirim
+ * tidak diam-diam ikut dititip; kalau dibatalkan, kembali ke halaman titip.
+ */
+async function startTitip(invite: string) {
+  if (!INVITE_PATTERN.test(invite)) return
+  // Draf untuk kotak yang sama: lanjutkan, kecuali sudah dititip, maka mulai surat baru.
+  if (draft.box?.invite === invite) {
+    if (draft.sent) await keepTitipThrough(() => draft.reset())
+    return
+  }
+  let info
+  try {
+    info = await useBoxApi().invite(invite)
+  } catch (problem) {
+    notice.value = errorMessage(problem)
+    return
+  }
+  if (info.closed) {
+    notice.value = `Kotak "${info.title}" sudah ditutup, jadi tidak bisa menerima titipan lagi.`
+    return
+  }
+  const target = { invite, title: info.title, to: info.to }
+  if (draft.blank || draft.sent) {
+    if (draft.sent) await draft.reset()
+    draft.setBox(target)
+    return
+  }
+  const choice = await askDraftChoice({ kind: 'titip', draft: draft.summary, box: info.title })
+  if (choice === 'new') await draft.reset()
+  if (choice) {
+    draft.setBox(target)
+    return
+  }
+  const titipPath = `/titip/${encodeURIComponent(invite)}`
+  if (window.history.state?.back === titipPath) router.back()
+  else await router.replace(titipPath)
+}
+
 const notice = ref('')
 
 /**
+ * Jalankan `reset` sambil mempertahankan kotak tujuan dan nama pengirim, misalnya saat mulai
+ * dari awal atau menulis surat berikutnya untuk kotak yang sama.
+ */
+async function keepTitipThrough(reset: () => Promise<void>) {
+  const titipTo = draft.box ? { box: draft.box, from: draft.from } : null
+  await reset()
+  if (titipTo) {
+    draft.setBox(titipTo.box)
+    draft.from = titipTo.from
+  }
+}
+
+/**
  * Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. Bingkainya
- * mengikuti bentuk foto, jadi strip Booth dan foto tegak tampil utuh.
+ * mengikuti bentuk foto, jadi strip Booth dan foto tegak tampil utuh. Kotak tujuan titipan dan
+ * nama pengirimnya tetap, karena fotonya diambil untuk surat titipan itu.
  */
 async function startWithPhoto(pending: PendingPhoto) {
-  await draft.reset()
+  // Foto untuk surat titipan yang belum dikirim tetap ke kotak itu. Kalau titipannya sudah
+  // dikirim, surat berfoto ini surat baru yang tidak otomatis ke kotak lama.
+  if (draft.box && !draft.sent) await keepTitipThrough(() => draft.reset())
+  else await draft.reset()
   draft.setTemplate('photo-1')
   draft.addPhoto(pending.photo)
   draft.fitPhotos({ grow: 1.4 })
   await draft.save()
-  notice.value = `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu buat link.`
+  notice.value = draft.box
+    ? `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu titip ke kotak.`
+    : `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu buat link.`
   open.value = true
 }
 
@@ -232,9 +297,25 @@ watch(
   },
 )
 
+// Surat titipan butuh nama pengirim, supaya penerima tahu surat itu dari siapa.
+const fromField = ref<HTMLInputElement | null>(null)
+const fromWarning = ref(false)
+watch(
+  () => draft.from,
+  (name) => {
+    if (name.trim()) fromWarning.value = false
+  },
+)
+
 function startSending() {
   if (draft.sent) {
     sending.value = true
+    return
+  }
+  if (draft.box && !draft.from.trim()) {
+    fromWarning.value = true
+    expanded.value = true
+    nextTick(() => fromField.value?.focus())
     return
   }
   if (!filled.value.length) {
@@ -250,9 +331,7 @@ function startSending() {
 const sentCount = ref(0)
 const showSent = ref(false)
 async function refreshSent() {
-  sentCount.value = (await listSent()).filter(
-    (item) => Date.parse(item.expiresAt) > Date.now(),
-  ).length
+  sentCount.value = (await listSent()).filter((item) => stillOpen(item)).length
 }
 onMounted(refreshSent)
 watch(() => draft.sent, refreshSent)
@@ -265,8 +344,12 @@ const sentUntil = computed(() =>
 
 async function newLetter() {
   open.value = false
-  await draft.reset()
-  notice.value = 'Surat tadi tetap bisa dibuka. Link-nya ada di "Surat terkirim".'
+  const titip = draft.box
+  // Surat berikutnya tetap untuk kotak yang sama; "Batal titip" kalau mau jadi link biasa.
+  await keepTitipThrough(() => draft.reset())
+  notice.value = titip
+    ? `Suratmu tadi tetap di kotak "${titip.title}". Surat baru ini juga untuk kotak itu.`
+    : 'Surat tadi tetap bisa dibuka. Link-nya ada di "Surat terkirim".'
   void refreshSent()
 }
 const ogCard = computed(() => ({
@@ -299,7 +382,8 @@ async function startOver() {
   if (!window.confirm('Mulai dari awal? Draf surat ini akan dihapus.')) return
   open.value = false
   error.value = ''
-  await draft.reset()
+  // Kotak tujuan titipan tetap; yang dihapus hanya isi draf.
+  await keepTitipThrough(() => draft.reset())
 }
 </script>
 
@@ -373,6 +457,57 @@ async function startOver() {
           Surat terkirim ({{ sentCount }})
         </button>
         <div
+          v-if="draft.box"
+          class="mt-3 rounded-control bg-fill px-3 py-2.5 text-caption"
+          data-testid="titip-banner"
+        >
+          <p class="font-semibold text-ink">Untuk kotak "{{ draft.box.title }}"</p>
+          <p class="mt-0.5 text-ink-muted">
+            Suratmu masuk ke kotak bareng untuk {{ draft.box.to }}, bukan jadi link sendiri. Isinya
+            rahasia sampai kotaknya dibuka.
+          </p>
+          <label for="titip-from" class="mt-2.5 block font-semibold text-ink">Nama kamu</label>
+          <input
+            id="titip-from"
+            ref="fromField"
+            v-model="draft.from"
+            :maxlength="BOX_TEXT_LIMIT"
+            autocomplete="nickname"
+            :placeholder="`Biar ${draft.box.to} tahu ini dari siapa`"
+            :aria-invalid="fromWarning || undefined"
+            aria-describedby="titip-from-hint"
+            class="mt-1 h-10 w-full rounded-control bg-surface px-3 text-body inset-ring inset-ring-line placeholder:text-ink-subtle focus:outline-2 focus:outline-ink"
+            data-testid="titip-from"
+          />
+          <p
+            id="titip-from-hint"
+            :role="fromWarning ? 'alert' : undefined"
+            class="mt-1"
+            :class="fromWarning ? 'font-semibold text-[#7a5a14]' : 'text-ink-muted'"
+          >
+            {{
+              fromWarning
+                ? 'Tulis namamu dulu, ya.'
+                : 'Ditulis di balik sampul kartu dan di daftar titipan.'
+            }}
+          </p>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            <NuxtLink
+              to="/tv?booth=1"
+              class="font-medium underline underline-offset-2"
+              data-testid="titip-booth"
+              >Ambil foto di Booth</NuxtLink
+            >
+            <button
+              type="button"
+              class="font-medium underline underline-offset-2"
+              @click="draft.setBox(null)"
+            >
+              Batal titip
+            </button>
+          </div>
+        </div>
+        <div
           v-if="draft.replyTo"
           class="mt-3 flex items-center justify-between gap-3 rounded-control bg-fill px-3 py-2 text-caption"
           data-testid="reply-banner"
@@ -406,17 +541,25 @@ async function startOver() {
           class="mt-3 rounded-control bg-fill px-3 py-2.5 text-caption"
           data-testid="sent-banner"
         >
-          <p class="font-semibold text-ink">Surat ini sudah jadi link.</p>
-          <p class="mt-0.5 text-ink-muted">
-            Bisa dibuka sampai {{ sentUntil }}. Kalau kamu mengubahnya, nanti dibuat link baru.
-          </p>
+          <template v-if="draft.sent.box">
+            <p class="font-semibold text-ink">Surat ini sudah masuk kotak.</p>
+            <p class="mt-0.5 text-ink-muted">
+              Kalau kamu mengubahnya, nanti dititip sebagai surat baru.
+            </p>
+          </template>
+          <template v-else>
+            <p class="font-semibold text-ink">Surat ini sudah jadi link.</p>
+            <p class="mt-0.5 text-ink-muted">
+              Bisa dibuka sampai {{ sentUntil }}. Kalau kamu mengubahnya, nanti dibuat link baru.
+            </p>
+          </template>
           <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
             <button
               type="button"
               class="font-semibold underline underline-offset-2"
               @click="sending = true"
             >
-              Lihat link
+              {{ draft.sent.box ? 'Lihat titipanmu' : 'Lihat link' }}
             </button>
             <button
               type="button"
@@ -546,7 +689,13 @@ async function startOver() {
 
       <template #footer>
         <StickyCTA :disabled="!draft.ready || maskBusy" @click="startSending">{{
-          draft.sent ? 'Lihat link surat' : 'Buat link untuk dikirim'
+          draft.box
+            ? draft.sent
+              ? 'Lihat titipanmu'
+              : 'Titip ke kotak'
+            : draft.sent
+              ? 'Lihat link surat'
+              : 'Buat link untuk dikirim'
         }}</StickyCTA>
       </template>
     </component>

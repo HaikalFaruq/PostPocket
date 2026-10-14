@@ -126,10 +126,11 @@ export default defineNuxtConfig({
       globIgnores: ['samples/**', '**/heic.worker-*.js'],
       runtimeCaching: [
         {
-          // Halaman: jaringan dulu, salinan terakhir kalau offline. Surat penerima (/l/…)
-          // isinya pribadi, jadi tidak pernah disimpan.
+          // Halaman: jaringan dulu, salinan terakhir kalau offline. Surat penerima (/l/…),
+          // kotak bareng penerima (/k/…), dan halaman titip (/titip/…) isinya pribadi, jadi tidak
+          // pernah disimpan.
           urlPattern: ({ request, url }) =>
-            request.mode === 'navigate' && !/^\/l(\/|$)/.test(url.pathname),
+            request.mode === 'navigate' && !/^\/(l|k|titip)(\/|$)/.test(url.pathname),
           handler: 'NetworkFirst',
           options: {
             cacheName: 'pages',
@@ -182,6 +183,10 @@ export default defineNuxtConfig({
       feedbackUrl: '',
       // Versi yang ditulis di laporan: commit yang di-deploy Vercel, atau "lokal".
       appVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'lokal',
+      // Kotak bareng (kontrak 0.3.0) baru dinyalakan setelah Edge Function `boxes` dan `k`
+      // ter-deploy. Mati: halamannya 404 dan pintu masuknya disembunyikan. E2E dan mock
+      // menyalakannya dengan NUXT_PUBLIC_KOTAK_BARENG=1.
+      kotakBareng: false,
     },
   },
 
@@ -199,5 +204,8 @@ export default defineNuxtConfig({
     '/kotak/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // Surat penerima di-SSR supaya meta OG terbaca crawler WhatsApp, tapi tidak boleh diindeks.
     '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
+    // Sama untuk kotak bareng: link buka penerima dan link titip teman-teman.
+    '/k/**': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/titip/**': { headers: { 'X-Robots-Tag': 'noindex' } },
   },
 })

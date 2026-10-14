@@ -14,7 +14,7 @@ pnpm dev       # http://localhost:3000
 
 Frontend hanya memakai URL proyek dan **publishable key** Supabase (aman dipakai di browser). Secret key tidak pernah masuk frontend, `.env`, atau commit.
 
-Edge Functions produksi tidak menerima origin `http://localhost:3000` (kontrak 0.2.3). Jadi untuk `pnpm dev`, aktifkan mock API di `.env` (`NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api`), atau arahkan URL dan publishable key di `.env` ke stack Supabase lokal (`http://127.0.0.1:54321`, key dari `supabase status`), yang gateway-nya menjawab CORS dengan `*`. Kalau `.env` menunjuk ke Supabase produksi tanpa mock, halaman surat masih bisa dibuka karena SSR, tapi "Buat link" dan menandai surat dibuka gagal karena CORS. Untuk menguji backend asli, pakai tes live ke domain produksi ([Gerbang Sprint 2](#gerbang-sprint-2)).
+Edge Functions produksi tidak menerima origin `http://localhost:3000` (kontrak 0.2.3). Jadi untuk `pnpm dev`, aktifkan mock API di `.env` (`NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api`), atau arahkan URL dan publishable key di `.env` ke stack Supabase lokal (`http://127.0.0.1:54321`, key dari `supabase status`), yang gateway-nya menjawab CORS dengan `*`. Kalau `.env` menunjuk ke Supabase produksi tanpa mock, halaman surat masih bisa dibuka karena SSR, tapi "Buat link" dan menandai surat dibuka gagal karena CORS. Untuk menguji backend asli, pakai tes live ke domain produksi ([Gerbang Sprint 2](#gerbang-sprint-2)). Kotak bareng hanya tampil dengan `NUXT_PUBLIC_KOTAK_BARENG=1`, jadi nyalakan bersama mock API ([Kotak bareng](#kotak-bareng)).
 
 | Perintah | Fungsi |
 | --- | --- |
@@ -43,7 +43,8 @@ apps/web/
   app/components/tv/        TvSet, CdShelf, CdDisc, TvSlideshow, BoothCamera, BoothLayoutPreview, BoothResult
   app/components/pocket/    SnackPacket (kantong foil SVG), TearablePacket (ketuk atau gores untuk menyobek),
                             PhotoLine (foto dijepit di tali), SaveDayModal (modal simpan hari), MonthPicker
-  app/components/kotak/     GlassFolder (folder kaca), LetterViewer (baca surat satu per satu), FolderMini
+  app/components/kotak/     GlassFolder (folder kaca), LetterViewer (baca surat satu per satu), FolderMini,
+                            KeepBox (Simpan semua di kotak bareng)
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/workers/              heic.worker.ts: HEIC ke JPEG dengan libheif, dimuat hanya saat ada foto HEIC
   app/stores/               useLetterDraft (draf surat), useMemories (momen, hari Pocket, album CD), dan
@@ -51,10 +52,10 @@ apps/web/
   app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
                             color, foil, icons, packet-art, packet-tear, photo-line) dan util browser
                             (front-image, photo-filter), diuji di test/
-  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /kotak (Kotak surat), /lab, /lab/foil, /lab/safari, /lab/kirim
+  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /kotak (Kotak surat), /kotak/baru dan /kotak/:id (bikin dan kelola kotak bareng), /titip/:kode (titip surat), /k/:slug (kotak bareng untuk penerima), /lab, /lab/foil, /lab/safari, /lab/kirim
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
-  server/routes/mock-api/   mock API surat untuk development dan E2E (NUXT_MOCK_API=1)
+  server/routes/mock-api/   mock API surat dan kotak bareng untuk development dan E2E (NUXT_MOCK_API=1)
   test/                     unit test Vitest
 packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, isAllowed, surprise)
 ```
@@ -144,7 +145,7 @@ Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `
 
 **Region fungsi.** Semua panggilan ke fungsi Supabase membawa `?forceFunctionRegion=ap-southeast-2` (kontrak 0.2.2, `useLetterApi`), termasuk SSR halaman surat dari Vercel `sin1`. DB dan Storage ada di Sydney; tanpa query ini fungsi jalan di Singapura dan setiap query bolak-balik ke Sydney (`GET /l/:slug` median sekitar 1,0 detik, dengan query sekitar 0,55 detik). Unggahan ke `signedUrl` dan mock lokal tidak memakainya.
 
-**Mock API.** `apps/web/server/routes/mock-api/` meniru kelima endpoint di atas (validasi, kode error, upload ke URL bertanda tangan) dengan data di memori, supaya alur "Buat link" dan halaman penerima bisa dibangun sebelum backend siap. Body `POST /letters` diperiksa langsung dengan skema di `docs/api/openapi.yaml` (ajv, `server/utils/contract.ts`): yang tidak sesuai skema dijawab `400` beserta `details` berisi lokasi field-nya, sedangkan isi yang ditolak (preset tidak dikenal, kunci foto tidak cocok, cover, `replyTo`, batas per jenis elemen) dijawab `422`. Jadi kalau kontraknya berubah, mock ikut berubah. `test/contract.test.ts` memastikan body dari klien lolos skema, dan E2E `mock-api.spec.ts` mencocokkan setiap respons mock dengan skemanya. Nyalakan dengan `NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api` (contohnya di `apps/web/.env.example`); E2E selalu memakainya, produksi tidak. `/lab/kirim` menjalankan alur kirim dari ujung ke ujung: kompres foto, render gambar OG, kirim, baca, buka, lalu hapus.
+**Mock API.** `apps/web/server/routes/mock-api/` meniru kelima endpoint di atas dan endpoint kotak bareng (kontrak 0.3.0, `server/utils/mock-boxes.ts`) (validasi, kode error, upload ke URL bertanda tangan) dengan data di memori, supaya alur "Buat link" dan halaman penerima bisa dibangun sebelum backend siap. Body `POST /letters` diperiksa langsung dengan skema di `docs/api/openapi.yaml` (ajv, `server/utils/contract.ts`): yang tidak sesuai skema dijawab `400` beserta `details` berisi lokasi field-nya, sedangkan isi yang ditolak (preset tidak dikenal, kunci foto tidak cocok, cover, `replyTo`, batas per jenis elemen) dijawab `422`. Jadi kalau kontraknya berubah, mock ikut berubah. `test/contract.test.ts` memastikan body dari klien lolos skema, dan E2E `mock-api.spec.ts` mencocokkan setiap respons mock dengan skemanya. Nyalakan dengan `NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api` (contohnya di `apps/web/.env.example`); E2E selalu memakainya, produksi tidak. `/lab/kirim` menjalankan alur kirim dari ujung ke ujung: kompres foto, render gambar OG, kirim, baca, buka, lalu hapus.
 
 ## Kotak surat
 
@@ -155,6 +156,19 @@ Surat dari link hilang 30 hari setelah dikirim dan fotonya 7 hari setelah dibuka
 - **Unduh foto** (`utils/letter-photos.ts`): di iPhone dan iPad lewat lembar Bagikan (`navigator.share({ files })`), karena unduhan biasa masuk app File, bukan Foto. Di tempat lain unduhan biasa berjeda 350 ms. Fotonya diunduh lebih dulu begitu bagian Simpan tampil, karena Safari menolak lembar Bagikan kalau ketukannya sudah lama berlalu. Kalau belum selesai saat diketuk, ketukan itu memakai unduhan yang sedang berjalan, dan di iPhone ketukan berikutnya yang membuka lembar Bagikan.
 - **Folder kaca** (`GlassFolder`): panggung 340 × 272 yang diskalakan ke lebar folder. Seninya dilukis di kanvas dari resep `kotak.folders` (`utils/folder-art.ts`), bertahap paling lama 6 ms per frame lewat satu antrean (`utils/folder-paint.ts`) dan disimpan per resep dan ukuran. Tanpa GPU (`data-render="cpu"`) dan dengan `prefers-reduced-transparency`, kacanya tidak dikaburkan tapi lapisan warnanya lebih pekat. Lembar yang menyembul di atas kaca bisa diketuk; bagian di balik kaca menutup folder. Nama dan tanggal di lembar ada di label putih, jadi terbaca di atas gambar depan apa pun. Saat terbuka, ruang di atas folder membesar sesuai jumlah lembar di kipas (`openRoom()`), jadi kipasnya tidak menutupi judul di atasnya; halaman yang memuat folder memakai `overflow-x-clip`, jadi kipas yang melewati tepi layar HP tidak membuat halaman bisa digeser. Folder condong hanya saat disorot mouse (`@media (hover: hover)`) atau difokus keyboard (`:focus-visible`), karena di HP `:hover` dan fokus menempel setelah diketuk. Folder `sealed` tidak bisa dibuka, memakai cap tanggal, dan bergoyang saat diketuk.
 - **Penampil** (`LetterViewer`): kartu tumbuh dari lembar yang diketuk (`origin`), lalu Sebelumnya dan Berikutnya menggeser kartu. Kartu yang sedang keluar dibuat `inert` dan `aria-hidden`, jadi hanya satu surat yang aktif. Setiap kali penampil dibuka, kartunya mulai tertutup. Tanpa lembar asal (dibuka dari daftar, atau lembarnya di luar layar), kartunya naik dari bawah, dan selama bergerak kartunya tidak bisa diketuk. "Baca lebih besar" (`LetterReader`, z-60) menutupi penampil. Di surat pertama dan terakhir fokus keyboard pindah ke tombol arah sebaliknya, dan kalau lembar yang membuka penampil ikut terhapus, fokus kembali ke `fallbackFocus` (judul halaman Kotak surat). Aksi tambahan, misalnya Hapus di Kotak surat, ada di kepala penampil, jadi tinggi kakinya tetap. Tanpa GPU atau dengan `prefers-reduced-motion`, animasinya langsung ke keadaan akhir (`calmMotion()`).
+
+## Kotak bareng
+
+Banyak pengirim, satu penerima ([PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat), kontrak 0.3.0, [rancangan backend](backend.md#rancangan-kotak-bareng)). Selama Edge Function `boxes` dan `k` belum ter-deploy, frontend memakai mock, dan semua halamannya 404 kecuali `NUXT_PUBLIC_KOTAK_BARENG=1` (E2E selalu menyalakannya; produksi menyala setelah backend siap).
+
+- **Pembuat**: `/kotak/baru` memanggil `POST /boxes`, lalu menyimpan `editToken` di IndexedDB (`utils/my-boxes.ts`) seperti surat terkirim. Kalau browser menolak menyimpannya, kedua link langsung ditampilkan di halaman itu. Hanya browser itu yang bisa membuka `/kotak/:id`, dan tokennya hanya dilupakan kalau server menjawab `box_not_found`. Halaman kelola memuat ulang saat dibuka lagi tanpa menimpa hasil aksi yang lebih baru, dan "Buka sekarang" mengirim `openNow`, jadi jam HP tidak dipakai; status terbukanya dari `openable`.
+- **Teman yang menitip**: `/titip/:kode` (SSR, `noindex`, OG `og-titip.jpg`) membuka editor dengan `?titip=<kode>`. Draf menyimpan kotak tujuan dan nama pengirim (`draft.box`, `draft.from`); kotaknya tetap saat strip Booth masuk lewat Pakai di surat. Surat titipan dikirim tanpa gambar OG, dan dicatat di Surat terkirim dengan `titip`, jadi bisa ditarik lagi dari halaman titip.
+- **Penerima**: `/k/:slug` (SSR, `noindex`, OG `og-kotak.jpg`). Sebelum `openable`, folder tersegel; halaman memuat ulang sendiri saat jadwalnya tiba, atau sekali semenit untuk kotak manual, selama tab terlihat. Membuka surat pertama memanggil `POST /k/:slug/open`, kecuali di browser pembuatnya. Surat yang sudah dibuka dicatat di `localStorage` (`utils/box-read.ts`) untuk titik "belum dibuka". "Simpan semua" (`KeepBox`) menyimpan semua titipan ke folder `kotak-<slug>` di Kotak surat dengan satu CD.
+- **Seni folder** satu kotak sama di halaman penerima, halaman kelola, dan Kotak surat (`folderSeed(slug)`); halaman titip memakai kode titipnya.
+- **Waktu** (`utils/box-time.ts`): halaman yang di-SSR menulis WIB dulu, lalu zona waktu HP setelah dimuat (WIB, WITA, WIT, atau singkatan browser di luar Indonesia). Halaman yang hanya dirender di browser langsung memakai zona HP, sama dengan jam yang dipilih di input jadwal.
+- **Unduh semua foto** (`KeepBox`): fotonya baru diunduh saat diminta, karena bisa puluhan. Di iPhone ketukan pertama menyiapkannya dan ketukan kedua membuka lembar Bagikan, karena Safari menolak lembar Bagikan kalau ketukannya sudah lama berlalu.
+- **Halaman pribadi**: `/k/…` dan `/titip/…` tidak pernah disimpan service worker (`isPrivatePath()`).
+- Gambar OG kotak dibuat ulang dengan `node scripts/og-images.mjs og-kotak.jpg og-titip.jpg`.
 
 ## Checklist per sprint
 
@@ -220,6 +234,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Simpan surat dan Unduh foto di halaman penerima; fotonya masuk CD "Surat untukmu" di TV
 - [x] Halaman `/kotak` dengan folder kaca, baca surat satu per satu, hapus surat dan folder
 - [ ] Animasi folder kaca dan penampil dicek di iPhone dan Android sungguhan ([langkah 9](#uji-di-hp-sungguhan))
+- [x] Kotak bareng di atas mock (kontrak 0.3.0): bikin dan kelola kotak, titip dari editor dan Booth, kotak tersegel, baca satu per satu, Simpan semua
+- [ ] Kotak bareng menyala di produksi (`NUXT_PUBLIC_KOTAK_BARENG=1` di Vercel) setelah Edge Function `boxes` dan `k` dari Bintang ter-deploy, lalu dicek dengan langkah 10
 
 ## PWA
 
@@ -230,7 +246,7 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 | JS, CSS, ilustrasi, ikon, stiker, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
 | Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, Pocket, TV, Kotak surat, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat, kenangan, dan surat tersimpan memang ada di IndexedDB, dan Pocket, TV, serta Kotak surat hanya dirender di browser, jadi salinan halamannya tidak memuat data pribadi |
 | Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
-| Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
+| Surat penerima (`/l/…`), kotak bareng (`/k/…`), dan halaman titip (`/titip/…`) | Tidak pernah disimpan | Isinya pribadi |
 
 - Halaman yang belum pernah tersimpan menampilkan `offline.html` saat offline.
 - Versi baru tidak langsung dipakai. Toast "Versi baru PostPocket siap" muncul dan user memilih kapan memuat ulang, supaya tulisan yang sedang diketik tidak hilang.
@@ -260,6 +276,7 @@ Pakai tiga HP: iPhone (Safari), Android kelas menengah (Chrome), dan satu Androi
 | 7 | Booth: ambil strip 1×4, simpan ke Pocket dan CD, lalu Pakai di surat | Hitung mundur jalan, strip sesuai pratinjau, dan muncul di surat |
 | 8 | Pasang ke layar utama, nyalakan mode pesawat, buka Pocket dan TV | Keduanya tetap terbuka offline, lengkap dengan foto |
 | 9 | Buka surat berfoto dari link WhatsApp, Simpan surat, lalu Unduh foto. Buka Kotak surat, buka foldernya, ketuk salah satu surat, geser ke surat berikutnya, lalu nyalakan mode pesawat dan buka lagi | Foto masuk app Foto (iPhone) atau galeri (Android). Folder condong dan menyebar tanpa patah-patah, kartu keluar dari lembarnya, dan surat tetap terbuka offline |
+| 10 | Setelah kotak bareng menyala: bikin kotak, bagikan link titip ke grup, titip dari dua HP (satu dengan strip Booth), lalu buka link penerima di HP ketiga sebelum dan sesudah Buka sekarang | Preview WhatsApp tampil untuk kedua link, kotak tersegel lalu terbuka sendiri, surat dibaca satu per satu, dan Simpan semua masuk Kotak surat |
 
 Laporan per HP berisi:
 - model HP, versi OS, dan browser;

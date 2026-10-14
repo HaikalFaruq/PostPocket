@@ -50,6 +50,18 @@ describe('buildCreateRequest', () => {
     expect(request.replyTo).toBeNull()
   })
 
+  it('surat biasa hanya memakai field kontrak 0.2.3, jadi backend lama tetap menerimanya', () => {
+    // Backend 0.2.3 menolak field yang tidak dikenalnya, termasuk `box: null`.
+    expect(Object.keys(buildCreateRequest(input)).sort()).toEqual([
+      'content',
+      'cover',
+      'design',
+      'og',
+      'photos',
+      'replyTo',
+    ])
+  })
+
   it('menyertakan cover dan replyTo kalau ada', () => {
     const request = buildCreateRequest({ ...input, cover: image(50), replyTo: 'x7Kp2qLm9A' })
     expect(request.cover).toMatchObject({ type: 'image/jpeg', size: 50 })
@@ -68,6 +80,9 @@ describe('errorMessage', () => {
     expect(errorMessage(new LetterApiError('network', 'x'))).toContain('Koneksi')
     expect(errorMessage(new LetterApiError('rate_limited', 'x', 429, 125))).toContain('3 menit')
     expect(errorMessage(new LetterApiError('upload_invalid', 'x'))).toContain('Foto gagal')
+    expect(errorMessage(new LetterApiError('box_closed', 'x'))).toContain('sudah ditutup')
+    expect(errorMessage(new LetterApiError('box_full', 'x'))).toContain('penuh')
+    expect(errorMessage(new LetterApiError('box_not_found', 'x'))).toContain('tidak ada')
     expect(errorMessage(new LetterApiError('invalid_content', 'detail teknis'))).not.toContain(
       'detail teknis',
     )
@@ -256,6 +271,23 @@ describe('sendLetter', () => {
     expect(progress).toEqual([1, 2, 3, 4])
     expect(api.publish).toHaveBeenCalledWith('id', 'token')
     expect(sent).toMatchObject({ id: 'id', editToken: 'token', slug: 'x7Kp2qLm9A' })
+  })
+
+  it('surat titipan tanpa gambar OG: hanya foto yang diunggah', async () => {
+    const { api, uploaded } = fakeApi({ og: null })
+    await sendLetter(api, { ...input, og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } })
+    expect(uploaded.sort()).toEqual(['f1', 'f2'])
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({ og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }),
+    )
+  })
+
+  it('surat biasa tanpa gambar OG tidak dikirim', async () => {
+    const { api } = fakeApi()
+    await expect(sendLetter(api, { ...input, og: null })).rejects.toMatchObject({
+      code: 'og_mismatch',
+    })
+    expect(api.create).not.toHaveBeenCalled()
   })
 
   it('berhenti kalau server tidak memberi tujuan upload', async () => {
