@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from 'reka-ui'
 import { LetterApiError, errorMessage } from '~/utils/letter-api'
-import { forgetSent, listSent, type SentRecord } from '~/utils/sent-letters'
+import { forgetSent, listSent, stillOpen, type SentRecord } from '~/utils/sent-letters'
 
 /**
  * Surat yang dibuat linknya dari browser ini. Link lama tetap bisa disalin, dilihat, atau dihapus
@@ -36,7 +36,7 @@ watch(
     if (!isOpen) return
     error.value = ''
     const now = Date.now()
-    letters.value = (await listSent()).filter((item) => Date.parse(item.expiresAt) > now)
+    letters.value = (await listSent()).filter((item) => stillOpen(item, now))
   },
   { immediate: true },
 )
@@ -64,7 +64,10 @@ async function forget(item: SentRecord) {
 }
 
 async function remove(item: SentRecord) {
-  if (!window.confirm('Hapus surat ini? Link-nya tidak bisa dibuka lagi.')) return
+  const question = item.titip
+    ? `Tarik surat ini dari kotak "${item.titip.title}"?`
+    : 'Hapus surat ini? Link-nya tidak bisa dibuka lagi.'
+  if (!window.confirm(question)) return
   busy.value = item.id
   error.value = ''
   try {
@@ -110,31 +113,44 @@ async function remove(item: SentRecord) {
             <p class="truncate font-letter text-[19px] leading-snug">
               {{ item.preview || 'Surat tanpa teks' }}
             </p>
-            <p class="mt-0.5 text-caption text-ink-muted">
+            <p v-if="item.titip" class="mt-0.5 text-caption text-ink-muted">
+              Dititip {{ date(item.publishedAt) }} ke kotak "{{ item.titip.title }}" untuk
+              {{ item.titip.to }}
+            </p>
+            <p v-else class="mt-0.5 text-caption text-ink-muted">
               Dibuat {{ date(item.publishedAt) }}, bisa dibuka sampai {{ date(item.expiresAt) }}
             </p>
             <div class="mt-2.5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="h-9 rounded-control bg-ink px-3.5 text-body font-semibold text-white"
-                @click="copy(item)"
-              >
-                {{ copied === item.id ? 'Tersalin' : 'Salin link' }}
-              </button>
+              <!-- Surat titipan tidak punya link sendiri; yang ada link titip kotaknya. -->
               <a
+                v-if="item.titip"
                 :href="item.url"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex h-9 items-center rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
-                >Pratinjau</a
+                class="inline-flex h-9 items-center rounded-control bg-ink px-3.5 text-body font-semibold text-white"
+                >Lihat kotaknya</a
               >
+              <template v-else>
+                <button
+                  type="button"
+                  class="h-9 rounded-control bg-ink px-3.5 text-body font-semibold text-white"
+                  @click="copy(item)"
+                >
+                  {{ copied === item.id ? 'Tersalin' : 'Salin link' }}
+                </button>
+                <a
+                  :href="item.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex h-9 items-center rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
+                  >Pratinjau</a
+                >
+              </template>
               <button
                 type="button"
                 class="h-9 rounded-control px-3.5 text-body font-semibold text-ink-muted underline underline-offset-2 disabled:opacity-50"
                 :disabled="busy === item.id"
                 @click="remove(item)"
               >
-                Hapus
+                {{ item.titip ? 'Tarik' : 'Hapus' }}
               </button>
             </div>
           </li>

@@ -59,6 +59,8 @@ export default defineConfig({
         env: {
           NITRO_PORT: String(port),
           NITRO_HOST: '127.0.0.1',
+          // Kotak bareng diuji lewat mock, walau produksi belum menyalakannya.
+          NUXT_PUBLIC_KOTAK_BARENG: '1',
           NUXT_MOCK_API: '1',
           NUXT_PUBLIC_API_BASE: '/mock-api',
           NUXT_PUBLIC_SUPABASE_URL: syncE2E ? (process.env.API_URL ?? '') : '',

@@ -34,6 +34,13 @@ export interface StoredPhoto {
   height: number
 }
 
+/** Kotak bareng tujuan draf ini (`/letter/new?titip=<kode>`), dari `GET /boxes/invite/:kode`. */
+export interface TitipTarget {
+  invite: string
+  title: string
+  to: string
+}
+
 /** Draf surat yang disimpan di IndexedDB. Tetap di browser sampai user membuat link. */
 export interface LetterDraft {
   version: 2
@@ -46,11 +53,32 @@ export interface LetterDraft {
   photos: Record<string, DraftPhoto>
   /** Slug surat yang sedang dibalas lewat "Bikin balasan". */
   replyTo: string | null
+  /** Kotak bareng tujuan surat ini, kalau dititip, bukan dijadikan link. */
+  box: TitipTarget | null
+  /** Nama pengirim untuk surat titipan. */
+  from: string
   updatedAt: number
 }
 
 /** Pola slug surat: 10 karakter base62. */
 export const SLUG_PATTERN = /^[A-Za-z0-9]{10}$/
+
+/** Pola kode titip kotak bareng: 12 karakter base62. */
+export const INVITE_PATTERN = /^[A-Za-z0-9]{12}$/
+
+/** Panjang nama pengirim, judul kotak, dan nama penerima (`BoxText` di kontrak). */
+export const BOX_TEXT_LIMIT = 40
+
+/**
+ * Teks pendek yang aman dikirim sebagai `BoxText`: satu baris tanpa NUL, maksimal 40 code point.
+ * Spasi di ujungnya dipangkas pemanggil saat mengirim, supaya tetap bisa diketik di kolom isian.
+ */
+export function boxText(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return Array.from(value.replaceAll('\u0000', '').replace(/[\r\n]+/g, ' '))
+    .slice(0, BOX_TEXT_LIMIT)
+    .join('')
+}
 
 /** Rasio kartu (lebar dibagi tinggi): dari bentuk yang dipilih, atau dari gambar depannya. */
 export function cardRatio(
@@ -85,8 +113,20 @@ export function emptyDraft(): LetterDraft {
     content: startingContent(design, null),
     photos: {},
     replyTo: null,
+    box: null,
+    from: '',
     updatedAt: 0,
   }
+}
+
+/** Kotak tujuan dari IndexedDB, atau `null` kalau rusak. */
+export function toTitipTarget(value: unknown): TitipTarget | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  if (typeof item.invite !== 'string' || !INVITE_PATTERN.test(item.invite)) return null
+  const title = boxText(item.title).trim()
+  const to = boxText(item.to).trim()
+  return title && to ? { invite: item.invite, title, to } : null
 }
 
 /** Pulihkan foto dari bentuk tersimpan (byte mentah) atau Blob. */
@@ -169,6 +209,7 @@ export function normalizeDraft(raw: unknown): LetterDraft {
     ),
   }
   const used = new Set(contentPhotoKeys(content))
+  const box = toTitipTarget(stored.box)
   return {
     version: 2,
     design: next,
@@ -176,9 +217,11 @@ export function normalizeDraft(raw: unknown): LetterDraft {
     content,
     photos: Object.fromEntries(Object.entries(photos).filter(([key]) => used.has(key))),
     replyTo:
-      typeof stored.replyTo === 'string' && SLUG_PATTERN.test(stored.replyTo)
+      typeof stored.replyTo === 'string' && SLUG_PATTERN.test(stored.replyTo) && !box
         ? stored.replyTo
         : null,
+    box,
+    from: boxText(stored.from),
     updatedAt: typeof stored.updatedAt === 'number' ? stored.updatedAt : 0,
   }
 }

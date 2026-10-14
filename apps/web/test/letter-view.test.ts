@@ -1,7 +1,7 @@
 import { defaultLetterDesign, normalizeContent } from '@postpocket/presets'
 import { describe, expect, it } from 'vitest'
 import type { Letter } from '../app/utils/letter-api'
-import { shownFromApi } from '../app/utils/letter-view'
+import { letterFront, shownFromApi, shownFromBox } from '../app/utils/letter-view'
 
 const letter: Letter = {
   slug: 'x7Kp2qLm9A',
@@ -40,5 +40,37 @@ describe('shownFromApi', () => {
     })
     expect(shown.photoPlaceholder).toBe('Foto sudah dihapus')
     expect(shown.photoUrls).toEqual({})
+  })
+})
+
+describe('shownFromBox', () => {
+  const titipan = {
+    id: '00000000-0000-4000-8000-000000000001',
+    from: 'Budi',
+    design: letter.design,
+    content: letter.content,
+    cover: letter.cover,
+    photos: letter.photos,
+    publishedAt: letter.publishedAt,
+  }
+
+  it('membawa nama pengirim, dan placeholder setelah foto kotak dihapus', () => {
+    expect(shownFromBox(titipan, false)).toMatchObject({
+      id: titipan.id,
+      from: 'Budi',
+      photoUrls: { f1: 'https://contoh.test/1.jpg' },
+      photoPlaceholder: undefined,
+    })
+    expect(shownFromBox({ ...titipan, photos: {} }, true).photoPlaceholder).toBe(
+      'Foto sudah dihapus',
+    )
+  })
+})
+
+describe('letterFront', () => {
+  it('ilustrasi dari preset, atau foto depan dari user', () => {
+    expect(letterFront(defaultLetterDesign, null)).toMatch(/^\/illustrations\//)
+    expect(letterFront({ ...defaultLetterDesign, illustration: 'upload' }, 'blob:x')).toBe('blob:x')
+    expect(letterFront({ ...defaultLetterDesign, illustration: 'upload' }, null)).toBeNull()
   })
 })

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Tanpa NUXT_PUBLIC_FEEDBACK_URL, "Lapor masalah" membuka GitHub Issues yang publik.
 const publicReports = !useRuntimeConfig().public.feedbackUrl
+// Kotak bareng baru dijelaskan begitu fiturnya menyala.
+const kotakBareng = !!useRuntimeConfig().public.kotakBareng
 
 useSeoMeta({
   title: 'Privasi · PostPocket',
@@ -93,10 +95,36 @@ useSeoMeta({
       </li>
     </ul>
 
+    <template v-if="kotakBareng">
+      <h2>Kotak bareng</h2>
+      <p>Kalau kamu membuat kotak bareng atau menitip surat ke kotak:</p>
+      <ul>
+        <li>
+          selain isi surat dan fotonya, server menyimpan judul kotak, nama penerima, dan nama
+          pengirim tiap titipan;
+        </li>
+        <li>
+          pembuat kotak hanya melihat nama pengirim dan jumlah fotonya, bukan isi suratnya. Isinya
+          terlihat oleh pemegang link buka setelah kotaknya terbuka;
+        </li>
+        <li>
+          kotak menerima titipan paling lama 30 hari. Kotak dan semua titipannya dihapus 30 hari
+          setelah kotaknya terbuka, dan fotonya 7 hari setelah penerima membuka surat pertama;
+        </li>
+        <li>
+          pengirim bisa menarik suratnya, dan pembuat kotak bisa menghapus titipan atau kotaknya
+          kapan saja, dari browser yang dipakai untuk mengirim atau membuatnya.
+        </li>
+      </ul>
+    </template>
+
     <h2>Alamat IP dan pembatasan spam</h2>
     <p>
-      Satu jaringan bisa membuat paling banyak 10 surat per jam. Untuk menghitungnya, server
-      menyimpan versi tersandi (hash berkunci) dari alamat IP pengirim, bukan alamat
+      Satu jaringan bisa membuat paling banyak 10 surat<template v-if="kotakBareng">
+        dan 5 kotak bareng</template
+      >
+      per jam. Untuk menghitungnya, server menyimpan versi tersandi (hash berkunci) dari alamat IP
+      pengirim, bukan alamat
       <span class="whitespace-nowrap">IP-nya</span>, dan menghapusnya paling lambat 2 jam kemudian.
       Fungsi server PostPocket tidak mencatat alamat IP.
     </p>

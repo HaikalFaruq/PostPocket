@@ -1,8 +1,10 @@
 import { byId, defaultLetterDesign, letter } from '@postpocket/presets'
 import { describe, expect, it } from 'vitest'
 import {
+  BOX_TEXT_LIMIT,
   MESSAGE_LIMIT,
   PHOTO_FRONT,
+  boxText,
   cardRatio,
   emptyDraft,
   normalizeDraft,
@@ -129,6 +131,35 @@ describe('replyTo', () => {
     expect(normalizeDraft({ replyTo: '../rahasia' }).replyTo).toBeNull()
     expect(normalizeDraft({}).replyTo).toBeNull()
     expect(emptyDraft().replyTo).toBeNull()
+  })
+})
+
+describe('titip ke kotak bareng', () => {
+  const box = { invite: 'Ab3dE6gH9jKm', title: 'Ultah ke-20 Rani', to: 'Rani' }
+
+  it('kotak tujuan dan nama pengirim dipulihkan', () => {
+    const draft = normalizeDraft({ box, from: 'Budi' })
+    expect(draft.box).toEqual(box)
+    expect(draft.from).toBe('Budi')
+    expect(emptyDraft()).toMatchObject({ box: null, from: '' })
+  })
+
+  it('kode titip yang salah atau judul kosong membuang kotaknya', () => {
+    expect(normalizeDraft({ box: { ...box, invite: 'pendek' } }).box).toBeNull()
+    expect(normalizeDraft({ box: { ...box, title: '   ' } }).box).toBeNull()
+    expect(normalizeDraft({ box: 'rusak' }).box).toBeNull()
+  })
+
+  it('surat titipan tidak bisa sekaligus jadi balasan', () => {
+    expect(normalizeDraft({ box, replyTo: 'x7Kp2qLm9A' }).replyTo).toBeNull()
+    // Kotak yang rusak tidak ikut membuang balasannya.
+    expect(normalizeDraft({ box: 'rusak', replyTo: 'x7Kp2qLm9A' }).replyTo).toBe('x7Kp2qLm9A')
+  })
+
+  it('teks pendek dipotong 40 code point dan dibersihkan dari NUL', () => {
+    expect(boxText(`Bu\u0000di ${'🎂'.repeat(50)}`)).toBe(`Budi ${'🎂'.repeat(35)}`)
+    expect(boxText(42)).toBe('')
+    expect(normalizeDraft({ box, from: 'x'.repeat(60) }).from).toHaveLength(BOX_TEXT_LIMIT)
   })
 })
 

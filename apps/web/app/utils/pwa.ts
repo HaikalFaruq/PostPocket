@@ -4,9 +4,12 @@ export const INSTALL_HIDDEN_KEY = 'postpocket:install-hidden'
 /** Nama cache halaman di service worker, sama dengan `pwa.workbox.runtimeCaching` di nuxt.config. */
 export const PAGES_CACHE = 'pages'
 
-/** Halaman surat untuk penerima isinya pribadi, jadi tidak pernah disimpan service worker. */
+/**
+ * Halaman surat penerima, kotak bareng penerima, dan halaman titip isinya pribadi, jadi tidak
+ * pernah disimpan service worker.
+ */
 export function isPrivatePath(path: string): boolean {
-  return path === '/l' || path.startsWith('/l/')
+  return /^\/(l|k|titip)(\/|$)/.test(path)
 }
 
 export function isIos(userAgent: string, maxTouchPoints = 0): boolean {

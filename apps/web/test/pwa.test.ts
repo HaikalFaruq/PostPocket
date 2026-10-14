@@ -46,11 +46,19 @@ describe('isInAppBrowser', () => {
 })
 
 describe('isPrivatePath', () => {
-  it('hanya surat penerima yang pribadi', () => {
+  it('surat penerima, kotak bareng penerima, dan halaman titip pribadi', () => {
     expect(isPrivatePath('/l/x7Kp2qLm9A')).toBe(true)
     expect(isPrivatePath('/l')).toBe(true)
+    expect(isPrivatePath('/k/x7Kp2qLm9A')).toBe(true)
+    expect(isPrivatePath('/titip/Ab3dE6gH9jKm')).toBe(true)
+  })
+
+  it('halaman lain boleh disimpan, termasuk Kotak surat yang isinya di IndexedDB', () => {
     expect(isPrivatePath('/lab/foil')).toBe(false)
     expect(isPrivatePath('/letter/new')).toBe(false)
+    expect(isPrivatePath('/kotak')).toBe(false)
+    expect(isPrivatePath('/kotak/baru')).toBe(false)
+    expect(isPrivatePath('/titipan')).toBe(false)
   })
 })
 

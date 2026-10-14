@@ -27,11 +27,13 @@ interface CreateBody {
   content: LetterContent
   cover?: FileMeta | null
   photos: (FileMeta & { key: string })[]
-  og: FileMeta
+  og?: FileMeta | null
   replyTo?: string | null
+  /** Surat titipan kotak bareng (kontrak 0.3.0). */
+  box?: { invite: string; from: string } | null
 }
 
-interface MockFile {
+export interface MockFile {
   kind: 'cover' | 'photo' | 'og'
   key?: string
   path: string
@@ -42,13 +44,16 @@ interface MockFile {
   size: number
 }
 
-interface MockLetter {
+export interface MockLetter {
   id: string
   editToken: string
   slug: string | null
   design: LetterDesign
   content: LetterContent
   replyTo: string | null
+  /** Kotak bareng tempat surat ini dititip, dan nama pengirimnya. */
+  boxId: string | null
+  from: string | null
   files: MockFile[]
   draftExpiresAt: number
   publishedAt: number | null
@@ -117,6 +122,11 @@ function validContent(content: LetterContent): boolean {
   )
 }
 
+/** Foto dan cover di surat, yang dihitung ke batas foto kotak bareng. */
+export function photoCount(item: { cover?: unknown; photos: unknown[] }): number {
+  return item.photos.length + (item.cover ? 1 : 0)
+}
+
 /** Body yang bentuknya sudah sesuai skema tapi isinya ditolak (422). */
 function unprocessable(body: CreateBody): [string, string] | null {
   if (!validDesign(body.design)) return ['invalid_design', 'design tidak sesuai preset']
@@ -131,7 +141,14 @@ function unprocessable(body: CreateBody): [string, string] | null {
   if ((body.design.illustration === 'upload') !== (body.cover != null)) {
     return ['cover_mismatch', 'cover wajib hanya kalau illustration = upload']
   }
-  if (body.replyTo != null && !slugs.has(body.replyTo)) {
+  if (body.box) {
+    if (body.og != null) return ['og_mismatch', 'surat titipan tidak punya og']
+    if (body.replyTo != null) return ['invalid_box', 'surat titipan tidak bisa jadi balasan']
+    return boxEntryProblem(body.box.invite, photoCount(body))
+  }
+  if (body.og == null) return ['og_mismatch', 'og wajib untuk surat biasa']
+  // Slug surat titipan dianggap tidak ada, sama seperti di GET /l/{slug}.
+  if (body.replyTo != null && !sentLetter(body.replyTo)) {
     return ['reply_not_found', 'replyTo tidak ditemukan']
   }
   return null
@@ -162,7 +179,7 @@ export async function createMockLetter(event: H3Event, raw: unknown) {
   const files: MockFile[] = []
   if (body.cover) files.push(target({ kind: 'cover', ...body.cover }))
   for (const photo of body.photos) files.push(target({ kind: 'photo', ...photo }))
-  files.push(target({ kind: 'og', ...body.og }))
+  if (body.og) files.push(target({ kind: 'og', ...body.og }))
   const draft: MockLetter = {
     id,
     editToken: randomBytes(24).toString('base64url'),
@@ -170,6 +187,8 @@ export async function createMockLetter(event: H3Event, raw: unknown) {
     design: body.design,
     content: body.content,
     replyTo: body.replyTo ?? null,
+    boxId: body.box ? boxIdForInvite(body.box.invite) : null,
+    from: body.box ? body.box.from.trim() : null,
     files,
     draftExpiresAt: Date.now() + DAY,
     publishedAt: null,
@@ -183,6 +202,7 @@ export async function createMockLetter(event: H3Event, raw: unknown) {
     signedUrl: `${origin}/mock-api/upload/${file.path}?token=${file.token}`,
   })
   const cover = files.find((file) => file.kind === 'cover')
+  const og = files.find((file) => file.kind === 'og')
   setResponseStatus(event, 201)
   return {
     id,
@@ -193,7 +213,7 @@ export async function createMockLetter(event: H3Event, raw: unknown) {
       photos: Object.fromEntries(
         files.filter((file) => file.kind === 'photo').map((file) => [file.key, uploadTarget(file)]),
       ),
-      og: uploadTarget(files.find((file) => file.kind === 'og')!),
+      og: og ? uploadTarget(og) : null,
     },
   }
 }
@@ -219,6 +239,17 @@ function editable(event: H3Event, id: string): MockLetter | { error: unknown } {
 }
 
 function published(item: MockLetter, origin: string) {
+  if (item.boxId) {
+    // Surat titipan: link-nya link titip kotak, dan masa berlakunya ikut kotak.
+    const box = boxReceipt(item.boxId, origin)
+    return {
+      slug: item.slug,
+      url: box.inviteUrl,
+      publishedAt: iso(item.publishedAt),
+      expiresAt: box.expiresAt,
+      box: box.receipt,
+    }
+  }
   return {
     slug: item.slug,
     url: `${origin}/l/${item.slug}`,
@@ -242,6 +273,10 @@ export function publishMockLetter(event: H3Event, id: string) {
       return fail(event, 422, 'upload_invalid', `${file.kind} tidak sesuai metadata`)
     }
   }
+  if (found.boxId) {
+    const problem = boxPublishProblem(found.boxId, photoCount(filesAsBody(found)))
+    if (problem) return fail(event, 422, problem[0], problem[1])
+  }
   found.slug = slugOf()
   found.publishedAt = Date.now()
   slugs.set(found.slug, found.id)
@@ -251,16 +286,66 @@ export function publishMockLetter(event: H3Event, id: string) {
 export function deleteMockLetter(event: H3Event, id: string) {
   const found = editable(event, id)
   if ('error' in found) return found.error
-  for (const file of found.files) blobs.delete(file.path)
-  if (found.slug) slugs.delete(found.slug)
-  letters.delete(id)
+  removeMockLetter(id)
   setResponseStatus(event, 204)
   return null
 }
 
+/** Hapus surat beserta berkasnya, tanpa cek token. Dipakai juga kotak bareng. */
+export function removeMockLetter(id: string) {
+  const found = letters.get(id)
+  if (!found) return
+  for (const file of found.files) blobs.delete(file.path)
+  if (found.slug) slugs.delete(found.slug)
+  letters.delete(id)
+}
+
+/** Berkas surat dalam bentuk yang dihitung `photoCount()`. */
+function filesAsBody(item: MockLetter) {
+  return {
+    cover: item.files.find((file) => file.kind === 'cover'),
+    photos: item.files.filter((file) => file.kind === 'photo'),
+  }
+}
+
+/** Semua surat titipan kotak bareng, termasuk draf yang belum terbit. */
+export function boxLettersWithDrafts(boxId: string): MockLetter[] {
+  return [...letters.values()].filter((item) => item.boxId === boxId)
+}
+
+/** Surat titipan kotak bareng yang sudah terbit, urut waktu terbit. */
+export function boxLetters(boxId: string): MockLetter[] {
+  return [...letters.values()]
+    .filter((item) => item.boxId === boxId && item.publishedAt)
+    .sort((a, b) => a.publishedAt! - b.publishedAt!)
+}
+
+/** Foto dan cover di surat titipan yang sudah terbit. */
+export function boxLetterPhotos(item: MockLetter): number {
+  return photoCount(filesAsBody(item))
+}
+
+/** URL publik berkas yang masih ada, seperti URL publik bucket `letter-assets`. */
+export function mockAsset(file: MockFile | undefined, origin: string) {
+  return file && blobs.has(file.path)
+    ? { url: `${origin}/mock-api/assets/${file.path}`, width: file.width, height: file.height }
+    : null
+}
+
+/** Hapus foto dan cover dari foto user, seperti job pembersihan 7 hari setelah dibuka. */
+export function dropMockPhotos(item: MockLetter) {
+  const withCover = item.design.illustration === 'upload'
+  for (const file of item.files) {
+    if (file.kind === 'photo' || withCover) blobs.delete(file.path)
+  }
+}
+
+// Surat titipan hanya dibaca lewat kotaknya (GET /k/{slug}), jadi 404 di /l/{slug}.
 function sentLetter(slug: string): MockLetter | undefined {
   const found = letters.get(slugs.get(slug) ?? '')
-  if (!found?.publishedAt || Date.now() > found.publishedAt + 30 * DAY) return undefined
+  if (!found?.publishedAt || found.boxId || Date.now() > found.publishedAt + 30 * DAY) {
+    return undefined
+  }
   return found
 }
 
@@ -268,10 +353,7 @@ export function getMockLetter(event: H3Event, slug: string) {
   const found = sentLetter(slug)
   if (!found) return fail(event, 404, 'not_found', 'surat tidak ada atau sudah kedaluwarsa')
   const origin = getRequestURL(event).origin
-  const asset = (file?: MockFile) =>
-    file && blobs.has(file.path)
-      ? { url: `${origin}/mock-api/assets/${file.path}`, width: file.width, height: file.height }
-      : null
+  const asset = (file?: MockFile) => mockAsset(file, origin)
   const photos = found.files.filter((file) => file.kind === 'photo' && blobs.has(file.path))
   const expireAt = found.openedAt
     ? Math.min(found.openedAt + 7 * DAY, found.publishedAt! + 30 * DAY)
@@ -283,7 +365,7 @@ export function getMockLetter(event: H3Event, slug: string) {
     cover: asset(found.files.find((file) => file.kind === 'cover')),
     photos: Object.fromEntries(photos.map((file) => [file.key, asset(file)])),
     og: asset(found.files.find((file) => file.kind === 'og')),
-    replyTo: found.replyTo && slugs.has(found.replyTo) ? found.replyTo : null,
+    replyTo: found.replyTo && sentLetter(found.replyTo) ? found.replyTo : null,
     publishedAt: iso(found.publishedAt),
     expiresAt: iso(found.publishedAt! + 30 * DAY),
     openedAt: iso(found.openedAt),
@@ -307,10 +389,7 @@ export function openMockLetter(event: H3Event, slug: string) {
 export function deleteMockPhotos(event: H3Event, slug: string) {
   const found = sentLetter(slug)
   if (!found) return fail(event, 404, 'not_found', 'surat tidak ada atau sudah kedaluwarsa')
-  const withCover = found.design.illustration === 'upload'
-  for (const file of found.files) {
-    if (file.kind === 'photo' || withCover) blobs.delete(file.path)
-  }
+  dropMockPhotos(found)
   found.photosDeletedAt = Date.now()
   return { photosDeletedAt: iso(found.photosDeletedAt) }
 }

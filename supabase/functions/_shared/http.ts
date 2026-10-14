@@ -16,6 +16,13 @@ export type ErrorCode =
   | 'not_found'
   | 'rate_limited'
   | 'internal'
+  // Kontrak 0.3.0 (kotak bareng).
+  | 'og_mismatch'
+  | 'invalid_box'
+  | 'box_not_found'
+  | 'box_closed'
+  | 'box_full'
+  | 'box_not_open'
 
 export interface ErrorDetail {
   path: string

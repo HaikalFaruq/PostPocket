@@ -108,9 +108,72 @@ describe('kontrak POST /letters', () => {
       { path: 'content.elements[0]', message: 'must match exactly one schema in oneOf' },
       { path: 'photos[0].exif', message: 'must NOT have unevaluated properties' },
       { path: 'og.type', message: 'must be equal to one of the allowed values' },
+      // Sejak 0.3.0 `og` boleh `null` (surat titipan), jadi cabang `null`-nya ikut dilaporkan,
+      // sama seperti `cover`. Lokasi pertama tetap field yang salah.
+      { path: 'og', message: 'must be null' },
+      { path: 'og', message: 'must match exactly one schema in oneOf' },
     ])
 
     const png = buildCreateRequest({ ...input, og: image(1200, 630, 290_000, 'image/png') })
     expectValid(png)
+  })
+
+  it('surat titipan kotak bareng lolos tanpa gambar OG, dengan nama pengirim dipangkas', () => {
+    const body = buildCreateRequest({
+      ...input,
+      og: null,
+      replyTo: 'x7Kp2qLm9A',
+      box: { invite: 'Ab3dE6gH9jKm', from: '  Budi  ' },
+    })
+    expect(body).toMatchObject({
+      og: null,
+      replyTo: null,
+      box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' },
+    })
+    expectValid(body)
+  })
+
+  it('nama pengirim kosong atau kode titip yang salah ditolak skema', () => {
+    const body = JSON.parse(
+      JSON.stringify(
+        buildCreateRequest({ ...input, og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }),
+      ),
+    )
+    body.box = { invite: 'pendek', from: '   ' }
+    expect(createRequest(body)).toBe(false)
+    expect(contractDetails(createRequest.errors).map((detail) => detail.path)).toEqual(
+      expect.arrayContaining(['box.invite', 'box.from']),
+    )
+  })
+})
+
+describe('kontrak kotak bareng', () => {
+  const createBox = schemas('CreateBoxRequest')
+  const updateBox = schemas('UpdateBoxRequest')
+
+  it('kotak baru dengan jadwal atau dibuka manual lolos skema', () => {
+    for (const opensAt of ['2026-10-20T12:00:00.000Z', null]) {
+      const valid = createBox({
+        title: 'Ultah ke-20 Rani',
+        to: 'Rani',
+        design: 'par-avion',
+        opensAt,
+      })
+      expect(contractDetails(createBox.errors)).toEqual([])
+      expect(valid).toBe(true)
+    }
+  })
+
+  it('judul lebih dari 40 huruf, field asing, dan ubahan kosong ditolak', () => {
+    expect(
+      createBox({ title: 'a'.repeat(41), to: 'Rani', design: 'par-avion', opensAt: null }),
+    ).toBe(false)
+    expect(
+      createBox({ title: 'Ultah', to: 'Rani', design: 'par-avion', opensAt: null, warna: 'merah' }),
+    ).toBe(false)
+    expect(updateBox({})).toBe(false)
+    expect(updateBox({ opensAt: null })).toBe(true)
+    // 40 code point, bukan 40 unit UTF-16: emoji dihitung satu.
+    expect(updateBox({ title: '🎂'.repeat(40) })).toBe(true)
   })
 })

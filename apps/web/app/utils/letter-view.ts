@@ -1,5 +1,7 @@
-import type { LetterContent, LetterDesign } from '@postpocket/presets'
+import { byId, letter, type LetterContent, type LetterDesign } from '@postpocket/presets'
+import type { BoxLetter } from './box-api'
 import type { Letter } from './letter-api'
+import { PHOTO_FRONT } from './letter-draft'
 
 /**
  * Surat yang siap ditampilkan sebagai kartu: dari link (`GET /l/:slug`), dari kotak bareng, atau
@@ -19,16 +21,37 @@ export interface ShownLetter {
 }
 
 /** Surat dari `GET /l/:slug`. */
-export function shownFromApi(letter: Letter): ShownLetter {
+export function shownFromApi(sent: Letter): ShownLetter {
   return {
-    id: letter.slug,
+    id: sent.slug,
     from: null,
-    design: letter.design,
-    content: letter.content,
-    cover: letter.cover,
+    design: sent.design,
+    content: sent.content,
+    cover: sent.cover,
     photoUrls: Object.fromEntries(
-      Object.entries(letter.photos).map(([key, asset]) => [key, asset.url]),
+      Object.entries(sent.photos).map(([key, asset]) => [key, asset.url]),
     ),
-    photoPlaceholder: letter.photosDeletedAt ? 'Foto sudah dihapus' : undefined,
+    photoPlaceholder: sent.photosDeletedAt ? 'Foto sudah dihapus' : undefined,
   }
+}
+
+/** Surat titipan dari `GET /k/:slug`. Nama pengirimnya ditulis tangan di balik sampul. */
+export function shownFromBox(titipan: BoxLetter, photosDeleted: boolean): ShownLetter {
+  return {
+    id: titipan.id,
+    from: titipan.from,
+    design: titipan.design,
+    content: titipan.content,
+    cover: titipan.cover,
+    photoUrls: Object.fromEntries(
+      Object.entries(titipan.photos).map(([key, asset]) => [key, asset.url]),
+    ),
+    photoPlaceholder: photosDeleted ? 'Foto sudah dihapus' : undefined,
+  }
+}
+
+/** Gambar depan surat untuk lembarnya di folder kaca: ilustrasi, atau foto depan dari user. */
+export function letterFront(design: LetterDesign, coverUrl: string | null | undefined) {
+  if (design.illustration === PHOTO_FRONT) return coverUrl ?? null
+  return byId(letter.illustrations, design.illustration)?.art ?? null
 }

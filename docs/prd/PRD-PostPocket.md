@@ -78,7 +78,10 @@ Putaran balasan adalah mesin pertumbuhan: setiap penerima surat diajak membuat s
 | `/pocket` | Kalender bulanan + modal simpan hari |
 | `/pocket/:date` | Isi satu hari |
 | `/tv` | TV, arsip CD, dan Booth |
-| `/kotak` | Kotak surat: surat yang disimpan penerima, per folder kaca |
+| `/kotak` | Kotak surat: surat yang disimpan penerima, per folder kaca, dan kotak bareng buatanmu |
+| `/kotak/baru`, `/kotak/:id` | Bikin dan kelola kotak bareng |
+| `/titip/:kode` | Halaman titip kotak bareng untuk teman-teman |
+| `/k/:slug` | Kotak bareng untuk penerimanya |
 
 ## Modul 1: Letter (referensi Foil Studio)
 
@@ -242,6 +245,30 @@ Surat dari link hilang 30 hari setelah dikirim, dan fotonya 7 hari setelah dibuk
 - [x] Lembar surat bisa dipilih dengan sentuhan, mouse, dan keyboard.
 - [ ] Animasi folder dan penampil mulus di iPhone dan Android kelas menengah sungguhan.
 
+**Kotak bareng: banyak pengirim, satu penerima**
+
+Untuk ulang tahun, perpisahan, wisuda, atau kejutan lain: teman-teman menitip surat (dan strip Booth) ke satu kotak, lalu penerimanya membuka semuanya dari satu link, bukan dua puluh link yang berserakan di WhatsApp. Kontraknya di `docs/api/openapi.yaml` 0.3.0; frontend memakai mock sampai Edge Function `boxes` dan `k` ter-deploy, dengan saklar `NUXT_PUBLIC_KOTAK_BARENG`.
+
+1. **Pembuat kotak** (`/kotak/baru`) mengisi nama penerima, judul, seni folder, dan kapan dibuka: saat dia menekan Buka sekarang, atau tanggal tertentu (paling lambat 30 hari). Dia dapat dua link: link titip untuk grup teman-teman dan link buka untuk penerima.
+2. **Teman-teman** membuka link titip (`/titip/:kode`), menulis surat di editor biasa dengan nama pengirim, lalu "Titip ke kotak". Strip Booth masuk lewat Ambil foto di Booth, lalu Pakai di surat. Surat titipan tidak punya link sendiri dan isinya rahasia sampai kotak dibuka; pengirimnya bisa menariknya lagi.
+3. **Pembuat** (`/kotak/:id`) melihat nama pengirim dan jumlah foto (bukan isinya), bisa menghapus titipan yang tidak pantas, mengubah jadwal, Buka sekarang, atau menghapus kotak.
+4. **Penerima** (`/k/:slug`) melihat kotak tersegel dengan jumlah suratnya sebelum waktunya, dan halaman itu terbuka sendiri begitu kotaknya bisa dibuka. Setelah itu folder kaca dibuka, suratnya dibaca satu per satu (nama pengirim ditulis tangan di balik sampul), titik menandai surat yang belum dibuka, lalu "Simpan semua" menyimpan semuanya ke Kotak surat sebagai satu folder, dan fotonya jadi satu CD di TV.
+
+**Masa berlaku dan batas** (hemat storage dan egress free tier):
+
+- Kotak menerima titipan sampai `opensAt`, paling lama 30 hari setelah dibuat.
+- Kotak beserta semua titipannya dihapus 30 hari setelah `opensAt`, bukan 30 hari setelah tiap surat dikirim, jadi titipan yang dikumpulkan lama tidak memotong jatah penerima.
+- Foto semua titipan dihapus 7 hari setelah penerima membuka surat pertama, sama seperti surat biasa.
+- Paling banyak 20 surat dan 40 foto (termasuk foto depan) per kotak. Kotak penuh sekitar 20 MB sekali dibuka, jadi egress gratis 5 GB cukup untuk sekitar 250 kotak penuh per bulan.
+- Surat titipan tidak punya gambar OG; link kotak dan link titip memakai gambar OG bawaan.
+
+**Kriteria diterima**
+
+- [x] Kotak dibuat, dititip dua teman, dibuka penerima, dibaca satu per satu, dan disimpan semua, lewat mock (`e2e/kotak-bareng.spec.ts`).
+- [x] Titipan ditolak setelah kotak dibuka atau penuh, dan bisa ditarik pengirimnya atau dihapus pembuatnya.
+- [x] Membuka surat pertama menandai kotak dibuka; pembuat yang melihat link penerima tidak menandainya.
+- [ ] Edge Function `boxes` dan `k` sesuai kontrak 0.3.0 (Bintang), lalu saklar dinyalakan di produksi.
+
 ## Design system dan aset
 
 Satu dasar netral dipakai di semua halaman, dan tiap modul membawa aksennya sendiri seperti referensinya, supaya terasa satu produk tanpa kehilangan karakter.
@@ -365,6 +392,8 @@ Rilis 1 hanya butuh server untuk surat yang dikirim; Pocket, TV, dan Booth berja
 | GET | `/l/:slug` | Ambil surat untuk halaman penerima (design, content, URL foto) | Publik |
 | POST | `/l/:slug/open` | Catat waktu pertama kali dibuka | Publik, sekali per surat |
 | DELETE | `/letters/:id` | Hapus surat dan fotonya | `edit_token` atau pemilik |
+
+Kotak bareng (kontrak 0.3.0) menambah `POST /boxes`, `GET`/`PATCH`/`DELETE /boxes/:id`, `DELETE /boxes/:id/letters/:letterId`, `GET /boxes/invite/:kode`, `GET /k/:slug`, dan `POST /k/:slug/open`; surat titipan memakai `POST /letters` dengan `box`. Rancangan tabelnya di [backend.md](../backend.md#rancangan-kotak-bareng).
 
 CRUD Pocket dan album di fase 2 memakai klien Supabase langsung dengan Row Level Security (user hanya bisa membaca dan menulis barisnya sendiri).
 

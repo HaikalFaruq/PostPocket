@@ -2,8 +2,13 @@
 export type DraftChoice = 'new' | 'add'
 
 export interface DraftQuestion {
-  /** `photo`: foto dari Pocket atau Booth mau dipakai di surat. `reply`: mulai membalas surat. */
-  kind: 'photo' | 'reply'
+  /**
+   * `photo`: foto dari Pocket atau Booth mau dipakai di surat. `reply`: mulai membalas surat.
+   * `titip`: mulai menulis untuk kotak bareng.
+   */
+  kind: 'photo' | 'reply' | 'titip'
+  /** Judul kotak bareng untuk `titip`. */
+  box?: string
   /** Potongan isi draf yang belum dikirim, supaya user tahu draf yang mana. */
   draft: string
   /** Asal foto untuk keterangan, misalnya "Booth". */

@@ -22,6 +22,7 @@ const paper = byId(letter.papers, 'cream')!
 const open = ref(false)
 // Versi untuk tester saat melapor masalah: commit yang sedang di-deploy.
 const version = useRuntimeConfig().public.appVersion
+const kotakBareng = !!useRuntimeConfig().public.kotakBareng
 
 // Modul lain ditampilkan sebagai bendanya: kantong jajan Pocket dan strip foto Booth.
 const packet = pocket.packetColors[0]!
@@ -146,7 +147,11 @@ const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(
               <span class="min-w-0 flex-1">
                 <span class="block text-[17px] font-bold tracking-[-0.02em]">Kotak surat</span>
                 <span class="mt-0.5 block text-ink-muted">
-                  Surat yang kamu simpan dari link, tetap bisa dibuka walau link-nya sudah mati.
+                  {{
+                    kotakBareng
+                      ? 'Simpan surat yang kamu terima, atau kumpulkan surat dari teman-teman untuk satu orang.'
+                      : 'Surat yang kamu simpan dari link, tetap bisa dibuka walau link-nya sudah mati.'
+                  }}
                 </span>
               </span>
               <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
