@@ -82,8 +82,18 @@ test('gerbang Sprint 2: surat terbuka di HP lain tanpa login dan preview-nya sia
     const response = await reader.goto(url)
     expect(response?.status()).toBe(200)
     const card = reader.getByRole('button', { name: /Surat untukmu/ })
+    // Kartu yang dibuka dicatat lewat POST /l/:slug/open (dan event `opened` di analitik).
+    // Jawabannya ditunggu sebelum konteks ini ditutup. Kalau tidak, request-nya bisa terputus
+    // di tengah preflight CORS, dan surat uji tidak pernah tercatat dibuka.
+    const opened = reader.waitForResponse(
+      (r) => r.url().includes('/open') && r.request().method() === 'POST',
+    )
     await card.click()
     await expect(card).toHaveAttribute('aria-pressed', 'true')
+    const openResponse = await opened
+    expect(openResponse.status()).toBe(200)
+    expect(openResponse.url()).toContain('forceFunctionRegion=ap-southeast-2')
+    expect(openResponse.headers()['x-sb-edge-region']).toBe('ap-southeast-2')
     const letterPage = reader.getByTestId('letter-page')
     await expect(letterPage).toContainText(message)
     // Foto isi datang dari Storage publik dan harus bisa dimuat (termasuk untuk kanvas).
