@@ -190,6 +190,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 4 dan beta (minggu 8–10)**
 
 - [x] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS: [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi `phase2` dan test `phase2.test.sql`
+- [ ] Login Google: OAuth client dan provider di dashboard, dipasang bareng Kall ([Login Google](#login-google))
+- [ ] Edge Function hapus akun
 - [ ] Lingkungan beta
 - [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
 
@@ -281,6 +283,38 @@ Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql
 1. **Login: Google OAuth dulu.** Tidak perlu mengirim email. Magic link menyusul kalau ada yang minta, dengan SMTP sendiri, karena SMTP bawaan Supabase hanya mengirim beberapa email per jam dan hanya ke anggota tim proyek.
 2. **Kuota: 100 momen per user selama beta.** Sebelum dibuka untuk umum, bandingkan Supabase Pro dengan Cloudflare R2. R2 lebih murah, tapi berada di luar RLS Supabase, jadi butuh Edge Function untuk signed URL unggah dan baca.
 3. **Masuk produksi begitu merge.** Tabelnya terkunci RLS dan belum dipakai, dan `main` tetap sama dengan produksi. Kalau ditahan, `supabase db push` untuk hotfix surat berikutnya ikut menerapkan migrasi fase 2 juga.
+
+## Login Google
+
+Login fase 2 hanya lewat Google (keputusan #47). Kall membuat OAuth client di Google Cloud dan menempelkan client secret sendiri di dashboard Supabase, setelah diundang Bintang ke organisasi Supabase. Jadi secret-nya tidak pernah pindah tangan, dan tidak pernah lewat chat, commit, atau PR.
+
+**1. Google Cloud (Google Auth Platform), oleh Kall**
+
+- Branding: nama aplikasi PostPocket, email dukungan, domain `postpocket.vercel.app`, link ke `/privasi`.
+- Audience: External. Selama beta cukup mode Testing dengan tester didaftarkan (maksimal 100). Scope hanya `openid`, `email`, `profile`, jadi tidak perlu verifikasi Google kalau nanti dipublikasikan.
+- Client: Web application.
+  - Authorized JavaScript origins: `https://postpocket.vercel.app`.
+  - Authorized redirect URI: `https://rmyfkdtqcltawmssollb.supabase.co/auth/v1/callback`. Untuk stack lokal tambahkan `http://127.0.0.1:54321/auth/v1/callback`.
+
+**2. Dashboard Supabase (Authentication)**
+
+Bintang mengundang email Kall ke organisasi Supabase dulu (Organization → Team), lalu:
+
+- Sign In / Providers → Google: aktifkan, isi Client ID dan Client Secret (Kall).
+- Sign In / Providers → Email: matikan provider Email ("Enable Email provider"). Jangan pakai "Allow new users to sign up" di pengaturan umum, karena itu ikut menutup pendaftaran lewat Google. Sampai sekarang provider email di produksi masih nyala (dicek lewat `/auth/v1/settings`), dan PostPocket tidak memakainya.
+- URL Configuration: Site URL `https://postpocket.vercel.app`, Redirect URLs `https://postpocket.vercel.app/**`. Preview Vercel dan localhost tidak didaftarkan, sama seperti CORS: REST Supabase menerima origin mana pun, jadi redirect ke localhost membuat `pnpm dev` bisa login dan menulis tabel fase 2 di produksi. Login saat development lewat stack lokal, yang Site URL-nya sudah `http://localhost:3000` di `config.toml` dan callback-nya `http://127.0.0.1:54321/auth/v1/callback` (sudah didaftarkan di Google).
+
+**3. Cek setelah setup**
+
+```sh
+curl -s https://rmyfkdtqcltawmssollb.supabase.co/auth/v1/settings -H "apikey: <publishable key>"
+```
+
+Hasilnya harus `external.google: true` dan `external.email: false`.
+
+**Lokal.** `supabase/config.toml` sudah mengaktifkan Google dengan client ID dan secret dari env (`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`, `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` di `supabase/.env`, yang di-ignore git). Tanpa env itu stack tetap jalan, hanya tombol Google yang gagal. Provider email tetap nyala di lokal, karena test integrasi membuat user lewat `auth.admin.createUser` lalu login dengan password; `[auth.email] enable_signup = false` mematikan provider-nya, bukan cuma pendaftaran.
+
+**Data dari Google.** Supabase menyimpan nama, email, dan foto profil Google di `auth.users` (`raw_user_meta_data`). `profiles.display_name` sengaja tidak diisi dari situ. `/privasi` perlu menjelaskan ini sebelum login dibuka (checklist Kall).
 
 ## Endpoint rilis 1
 
