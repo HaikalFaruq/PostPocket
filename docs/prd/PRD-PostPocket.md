@@ -394,7 +394,7 @@ Risiko terbesar ada di performa kartu 3D di HP murah dan di Safari iOS yang bisa
 - [x] Surat yang dikirim berlaku selamanya atau kedaluwarsa? **Diputuskan: surat 30 hari setelah dikirim; foto 7 hari setelah surat pertama kali dibuka.** Dievaluasi lagi setelah beta.
 - [x] Maksimal foto per surat dan ukuran file. **Diputuskan: 4 foto, maksimal 500 KB per foto setelah kompres; gambar OG maksimal 300 KB.**
 - [ ] Bahasa UI: Indonesia, Inggris, atau keduanya.
-- [ ] Login masuk rilis 1 atau fase 2.
+- [x] Login masuk rilis 1 atau fase 2. **Diputuskan: fase 2, dengan Google OAuth dulu.** Login hanya untuk sinkron Pocket; surat tetap bisa dibuat dan dibuka tanpa login. Magic link email menyusul kalau ada yang minta.
 - [ ] Model bisnis (gratis, premium preset, atau cetak kartu fisik) setelah ada data pemakaian.
 
 **Langkah berikutnya: repo GitHub**
