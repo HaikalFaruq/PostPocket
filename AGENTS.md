@@ -110,6 +110,7 @@ Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
 | `pnpm test` | Unit test Vitest semua package |
 | `pnpm test:e2e` | E2E Playwright di build production (Android, iPhone, desktop) |
 | `pnpm check` | `lint`, `typecheck`, dan `test` sekaligus |
+| `SYNC_E2E=1 pnpm --filter @postpocket/web exec playwright test --project=android --project=iphone` | E2E sinkron Pocket ke stack Supabase lokal, butuh `API_URL`, `PUBLISHABLE_KEY`, dan `SECRET_KEY` dari `supabase status -o env` ([caranya](docs/frontend.md#sinkron-pocket)) |
 | `scripts/check-no-ai.sh --revs origin/main..HEAD` | Cek atribusi AI di commit yang belum masuk `main` |
 | `scripts/test-check-no-ai.sh` | Uji pola cek atribusi AI, wajib lolos setelah polanya diubah |
 | `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`) |

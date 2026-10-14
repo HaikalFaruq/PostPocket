@@ -193,14 +193,48 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Id momen dan album jadi UUID, data lama diganti saat dimuat (#48)
 - [ ] OAuth client Google (Google Cloud) dan provider Google di Supabase Auth
-- [ ] Login Google dan halaman akun. Surat tetap bisa dibuat dan dibuka tanpa login
-- [ ] Sinkron dua arah sesuai catatan Sinkron di rancangan:
+- [x] Login Google dan kartu Cadangan di Pocket ([Sinkron Pocket](#sinkron-pocket)). Surat tetap bisa dibuat dan dibuka tanpa login
+- [x] Sinkron dua arah sesuai catatan Sinkron di rancangan:
   - tarik dengan jendela 5 menit, penerapannya idempoten;
   - momen yang hilang dari `moment_ids` kantong ditempel lagi;
-  - unggah versi kompres ke `<owner_id>/<id>.jpg`.
-- [ ] Pesan saat kuota penuh (`23514`, 100 foto) dan saat unggah ditolak policy (Storage menjawab `400`)
-- [ ] `/privasi` menjelaskan akun Google dan cadangan foto, sebelum login dibuka
-- [ ] Sinkron baru dinyalakan di produksi setelah job pembersihan berkas dan baris berstatus hapus dari Bintang ada
+  - unggah versi kompres ke `<owner_id>/<id>.jpg`, dan berkas yang hilang diunggah ulang.
+- [x] Pesan saat kuota penuh (`23514`, 100 foto). Unggah yang ditolak policy menggagalkan sinkron itu dan dicoba lagi, kecuali unggah ulang berkas yang hilang, yang dilewati per foto
+- [x] `/privasi` menjelaskan akun Google dan cadangan foto, sebelum login dibuka
+- [x] Sinkron baru dinyalakan di produksi setelah job pembersihan berkas dan baris berstatus hapus dari Bintang ada (#52). Kartu Cadangan baru muncul kalau provider Google sudah aktif
+- [ ] Hapus akun dari aplikasi, setelah Edge Function hapus akun dari Bintang ada. Sampai itu, `/privasi` mengarahkan ke Lapor masalah
+
+## Sinkron Pocket
+
+Login Google mencadangkan dan menyinkronkan Pocket, TV, dan Booth antar perangkat (fase 2). IndexedDB tetap sumber utama dan tetap jalan offline; server hanya cadangan. Skema dan aturannya ada di [Rancangan skema fase 2](backend.md#rancangan-skema-fase-2).
+
+| Bagian | Isi |
+| --- | --- |
+| `app/stores/sync.ts` (`useSync`) | Klien Supabase dimuat lazy saat halaman Pocket atau TV memanggil `start()`, jadi halaman surat tidak memuat `@supabase/supabase-js`. Login PKCE kembali ke `/pocket?masuk=1`. Sinkron dijadwalkan 2 detik setelah setiap perubahan, saat online lagi, dan saat aplikasi dibuka lagi |
+| `app/utils/sync-run.ts` (`runSync`) | Satu putaran: tarik, unduh foto baru dulu, gabungkan, kirim perubahan, lalu unggah ulang berkas yang hilang dari cadangan |
+| `app/utils/sync.ts` | Bentuk baris tabel dan aturan gabung (`mergeRemote`), fungsi murni |
+| `app/utils/sync-supabase.ts` | `SyncBackend` di atas PostgREST dan bucket `moments` |
+| `app/components/pocket/BackupCard.vue` | Kartu Cadangan di bawah kalender: tombol Google, status, kuota, keluar |
+
+Aturannya:
+- **Catatan perubahan.** Setiap perubahan kenangan dicatat di `MemoryData.pending` dalam tulisan yang sama dengan datanya, dengan nomor urut. Baris yang tercatat tapi sudah tidak ada berarti dihapus. Nomor urut menjaga perubahan yang terjadi selama sinkron supaya tidak ikut dianggap terkirim. Semua perubahan data store dibaca dan ditulis tanpa jeda `await`, supaya sinkron di belakang tidak menimpa perubahan user.
+- **Tulisan terakhir menang** dihitung saat kirim. Baris yang masih menunggu dikirim menang dari server, tapi momen yang hanya ada di server tetap ditambahkan ke urutan kantong dan album. Baris lain mengikuti server, dan momen yang hanya ada di perangkat ditempel lagi lalu dikirim ulang.
+- **Sinkron pertama** akun di perangkat (dicatat per akun di `postpocket:sync`): server menang untuk baris yang ada di kedua tempat, data yang hanya ada di perangkat dikirim, dan tanda hapus lama tidak pernah menghapus apa pun.
+- **Ganti akun.** Perangkat yang sebelumnya tersinkron ke akun lain bertanya dulu. Kalau user setuju, semua momen dan album mendapat id baru (`withNewIds`), karena id di cadangan unik untuk semua akun. Fotonya tetap di kunci lamanya (`photoKey`).
+- **Foto.** Foto dari cadangan diunduh sebelum momennya ditampilkan. Yang gagal diunduh ditarik lagi di sinkron berikutnya. Yang naik selalu versi kompres JPEG ≤ 500.000 byte.
+- **Kartu Cadangan** hanya muncul kalau URL Supabase diisi dan provider Google aktif (`/auth/v1/settings`), atau user sudah login. Tanpa itu, isinya tetap pengingat bahwa kenangan hanya ada di perangkat ini.
+
+**Uji.**
+- `test/sync.test.ts` menguji aturan gabung dan `runSync` dengan server palsu.
+- `e2e/sinkron.spec.ts` menguji dua perangkat, hapus, kuota, unggah ulang, ganti akun, dan tombol Google ke stack Supabase lokal. Butuh Docker:
+
+```sh
+npx supabase@2.120.0 start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta,edge-runtime
+eval "$(npx supabase@2.120.0 status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY)=')"
+export API_URL PUBLISHABLE_KEY SECRET_KEY
+SYNC_E2E=1 pnpm --filter @postpocket/web exec playwright test --project=android --project=iphone
+```
+
+Login Google sendiri tidak bisa diuji otomatis. Tesnya memakai user yang dibuat lewat admin API, dan provider email tetap nyala di stack lokal untuk itu. Tes tombol Google memastikan alamat `/auth/v1/authorize` yang dibuka sudah benar. E2E biasa tidak menyentuh Supabase, karena URL-nya dikosongkan.
 
 ## PWA
 
