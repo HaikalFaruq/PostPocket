@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PostPocket API
-  version: 0.2.2
+  version: 0.2.3
   description: |
     Kontrak API rilis 1 antara frontend (`apps/web`) dan backend (Supabase Edge Functions).
     Rilis 1 hanya melayani surat yang dikirim; Pocket, TV, dan Booth tetap di browser.
@@ -55,11 +55,14 @@ info:
 
     **CORS**
 
-    - Origin yang diizinkan: `https://postpocket.vercel.app`, `http://localhost:3000`, dan
-      preview yang cocok dengan regex
-      `^https://postpocket-[a-z0-9-]+-haikalfaruqs-projects\.vercel\.app$`. Origin yang cocok
-      dikembalikan apa adanya di `Access-Control-Allow-Origin` (bukan `*`), ditambah
-      `Vary: Origin`.
+    - Origin yang diizinkan hanya `https://postpocket.vercel.app`, dikembalikan apa adanya di
+      `Access-Control-Allow-Origin` (bukan `*`), ditambah `Vary: Origin`.
+    - Preview deploy Vercel tidak diterima (sejak 0.2.3): nama `<proyek>.vercel.app` bisa
+      didaftarkan siapa saja, jadi pola preview bisa diklaim orang lain. Preview memakai mock API.
+    - `http://localhost:3000` tidak diterima di produksi (sejak 0.2.3). Untuk `pnpm dev`, pakai
+      mock API atau stack Supabase lokal, yang gateway-nya menjawab
+      `Access-Control-Allow-Origin: *`.
+    - Semua respons JSON membawa `X-Content-Type-Options: nosniff`.
     - Preflight `OPTIONS` dijawab `204` dengan `Access-Control-Allow-Methods: GET, POST,
       DELETE, OPTIONS` dan `Access-Control-Allow-Headers: apikey, authorization,
       content-type, x-client-info, x-edit-token`.

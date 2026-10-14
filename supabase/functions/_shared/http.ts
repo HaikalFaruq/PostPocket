@@ -22,14 +22,17 @@ export interface ErrorDetail {
   message: string
 }
 
-const ORIGINS = new Set(['https://postpocket.vercel.app', 'http://localhost:3000'])
-const PREVIEW = /^https:\/\/postpocket-[a-z0-9-]+-haikalfaruqs-projects\.vercel\.app$/
+// Hanya domain produksi. Tanpa localhost: stack lokal (Kong) sudah menjawab
+// `access-control-allow-origin: *`, jadi `pnpm dev` ke stack lokal tetap jalan. Tanpa preview
+// Vercel: nama <proyek>.vercel.app bisa didaftarkan siapa saja, jadi pola preview bisa diklaim
+// orang lain, dan preview cukup memakai mock API.
+const ORIGINS = new Set(['https://postpocket.vercel.app'])
 
 /** Origin frontend yang diizinkan, atau `null`. */
 export function allowedOrigin(request: Request): string | null {
   const origin = request.headers.get('origin')
   if (!origin) return null
-  return ORIGINS.has(origin) || PREVIEW.test(origin) ? origin : null
+  return ORIGINS.has(origin) ? origin : null
 }
 
 function corsHeaders(request: Request): Headers {
@@ -70,6 +73,7 @@ export function json(request: Request, status: number, body: unknown, extra?: He
   const headers = corsHeaders(request)
   headers.set('content-type', 'application/json; charset=utf-8')
   headers.set('cache-control', 'no-store')
+  headers.set('x-content-type-options', 'nosniff')
   new Headers(extra).forEach((value, name) => headers.set(name, value))
   return new Response(JSON.stringify(body), { status, headers })
 }
@@ -127,10 +131,27 @@ export function notFound(message = 'surat tidak ada'): ApiError {
   return new ApiError(404, 'not_found', message)
 }
 
-/** Body JSON dengan batas ukuran. Isi surat paling banyak sekitar 25 KB. */
+/**
+ * Body JSON dengan batas ukuran. Isi surat paling banyak sekitar 25 KB. Body dibaca bertahap dan
+ * dihentikan begitu lewat batas, supaya body raksasa tidak dimuat utuh ke memori worker.
+ */
 export async function readJson(request: Request, limit = 100_000): Promise<unknown> {
-  const text = await request.text()
-  if (text.length > limit) throw new ApiError(400, 'invalid_request', 'body terlalu besar')
+  const tooLarge = () => new ApiError(400, 'invalid_request', 'body terlalu besar')
+  if (Number(request.headers.get('content-length') ?? 0) > limit) throw tooLarge()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for await (const chunk of request.body ?? []) {
+    size += chunk.length
+    if (size > limit) throw tooLarge()
+    chunks.push(chunk)
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
+  const text = new TextDecoder().decode(bytes)
   try {
     return JSON.parse(text)
   } catch {
