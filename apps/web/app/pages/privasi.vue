@@ -13,12 +13,12 @@ useSeoMeta({
     <h2>Yang tersimpan di perangkatmu</h2>
     <ul>
       <li>
-        Draf surat, kantong Pocket, album TV, dan hasil Booth disimpan di browser ini saja, bukan di
-        server. Kami tidak bisa melihatnya.
+        Draf surat, kantong Pocket, album TV, dan hasil Booth disimpan di browser ini. Tanpa login,
+        semuanya hanya ada di sini, dan kami tidak bisa melihatnya.
       </li>
       <li>
-        Semua itu hilang kalau data browser dihapus, atau kalau kamu pindah HP atau browser. Belum
-        ada akun untuk menyimpannya di tempat lain.
+        Tanpa login, semua itu hilang kalau data browser dihapus, atau kalau kamu pindah HP atau
+        browser.
       </li>
       <li>
         Supaya tidak dihapus browser diam-diam, PostPocket meminta izin penyimpanan permanen. Paling
@@ -27,7 +27,7 @@ useSeoMeta({
     </ul>
 
     <h2>Yang dikirim ke server</h2>
-    <p>Hanya saat kamu menekan "Buat link untuk dikirim":</p>
+    <p>Untuk surat, hanya saat kamu menekan "Buat link untuk dikirim":</p>
     <ul>
       <li>desain kartu dan isi surat: tulisan, foto, dan stiker beserta posisinya;</li>
       <li>
@@ -38,6 +38,34 @@ useSeoMeta({
       <li>waktu surat diterbitkan dan pertama kali dibuka.</li>
     </ul>
     <p>Surat dan fotonya disimpan di Supabase (Sydney, Australia); halamannya dilayani Vercel.</p>
+
+    <h2>Cadangan Pocket dengan akun Google</h2>
+    <p>
+      Masuk dengan Google di Pocket tidak wajib. Surat tetap bisa dibuat dan dibuka tanpa akun.
+      Kalau kamu masuk:
+    </p>
+    <ul>
+      <li>
+        kantong Pocket, album CD, foto, dan tanggal fotonya dicadangkan ke Supabase (Sydney,
+        Australia) supaya bisa dibuka di HP lain. Fotonya diperkecil (paling besar 500 KB per foto),
+        dibersihkan dari data lokasi, dan hanya bisa dibuka akunmu;
+      </li>
+      <li>
+        untuk login, Supabase menyimpan email, nama, dan foto profil akun Googlemu. PostPocket hanya
+        menampilkan emailnya di kartu Cadangan;
+      </li>
+      <li>selama beta, cadangan paling banyak 100 foto per akun;</li>
+      <li>
+        foto yang kamu hapus di Pocket ikut dihapus dari cadangan. Sisa berkasnya dibersihkan paling
+        lama sekitar satu jam kemudian;
+      </li>
+      <li>keluar dari akun tidak menghapus cadangan maupun kenangan di perangkat ini.</li>
+    </ul>
+    <p>
+      Menghapus akun dari aplikasi menyusul. Selama beta, minta penghapusan akun lewat
+      <FeedbackLink>Lapor masalah</FeedbackLink>; semua cadangannya ikut terhapus, fotonya paling
+      lama sekitar satu jam setelah akunnya dihapus.
+    </p>
 
     <h2>Siapa yang bisa membuka suratmu</h2>
     <p>

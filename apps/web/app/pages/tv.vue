@@ -19,6 +19,9 @@ usePageTint('bg-tv-page', '#f1f4f8')
 const memories = useMemories()
 const route = useRoute()
 onMounted(() => memories.load())
+// Setelah login, kenangan juga tersinkron dari halaman ini (stores/sync.ts).
+const sync = useSync()
+onMounted(() => sync.start())
 
 const CLAY_KEY = 'postpocket:tv-clay'
 const clay = ref(tv.clayColors[0]!.id)

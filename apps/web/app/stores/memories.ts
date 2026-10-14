@@ -1,13 +1,16 @@
-import { del, get, set } from 'idb-keyval'
+import { del, get, keys, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
 import { toStoredPhoto, type DraftPhoto, type StoredPhoto } from '~/utils/letter-draft'
 import { requestPersistentStorage } from '~/utils/pwa'
+import type { UploadImage } from '~/utils/letter-api'
+import { compressPhoto } from '~/utils/upload-image'
 import {
   SPINE_COLORS,
   albumShelf,
   emptyMemories,
   hasLegacyIds,
   normalizeMemories,
+  withPending,
   withUuids,
   withoutMoments,
   type Album,
@@ -22,7 +25,10 @@ const PHOTO_PREFIX = 'postpocket:moment:'
 
 /**
  * Kenangan di perangkat ini: momen (foto), hari Pocket, dan album CD. Dipakai Pocket, TV, dan
- * Booth. Rilis 1 hanya di IndexedDB (PRD), jadi data tidak pindah ke perangkat lain.
+ * Booth. Sumber utamanya tetap IndexedDB; setelah login, `useSync` mencadangkan dan
+ * menyinkronkannya ke akun (fase 2). Setiap perubahan dicatat di `data.pending` dalam tulisan yang
+ * sama, dan setiap perubahan data dibaca lalu ditulis tanpa jeda `await`, supaya sinkron yang
+ * berjalan di belakang tidak menimpa perubahan user.
  */
 export const useMemories = defineStore('memories', () => {
   const data = shallowRef<MemoryData>(emptyMemories())
@@ -88,22 +94,24 @@ export const useMemories = defineStore('memories', () => {
     photos: { photo: DraftPhoto; takenAt?: string }[],
     options: { day: string; source: Moment['source'] },
   ): Promise<string[]> {
-    const moments = { ...data.value.moments }
-    const ids: string[] = []
+    // Foto ditulis dulu, baru datanya, supaya momen tidak pernah menunjuk foto yang belum ada.
+    const added: Moment[] = []
     for (const item of photos) {
       const id = crypto.randomUUID()
       await set(PHOTO_PREFIX + id, await toStoredPhoto(item.photo))
-      moments[id] = {
+      added.push({
         id,
         day: options.day,
         takenAt: item.takenAt ?? new Date().toISOString(),
         source: options.source,
         width: item.photo.width,
         height: item.photo.height,
-      }
-      ids.push(id)
+      })
     }
-    await persist({ ...data.value, moments })
+    const ids = added.map((moment) => moment.id)
+    const moments = { ...data.value.moments }
+    for (const moment of added) moments[moment.id] = moment
+    await persist(withPending({ ...data.value, moments }, { moments: ids }))
     // Foto kenangan tidak boleh ikut terhapus saat browser membersihkan penyimpanan (PRD Risiko).
     void requestPersistentStorage()
     return ids
@@ -111,7 +119,12 @@ export const useMemories = defineStore('memories', () => {
 
   /** Simpan atau ganti desain kantong satu hari. */
   async function saveDay(day: PocketDay) {
-    await persist({ ...data.value, days: { ...data.value.days, [day.day]: day } })
+    await persist(
+      withPending(
+        { ...data.value, days: { ...data.value.days, [day.day]: day } },
+        { days: [day.day] },
+      ),
+    )
   }
 
   async function createAlbum(title: string, emoji = '📀', moments: string[] = []): Promise<Album> {
@@ -123,51 +136,121 @@ export const useMemories = defineStore('memories', () => {
       moments,
       createdAt: new Date().toISOString(),
     }
-    await persist({ ...data.value, albums: [...data.value.albums, album] })
+    await persist(
+      withPending({ ...data.value, albums: [...data.value.albums, album] }, { albums: [album.id] }),
+    )
     return album
   }
 
   async function updateAlbum(id: string, patch: Partial<Pick<Album, 'title' | 'emoji' | 'color'>>) {
-    await persist({
-      ...data.value,
-      albums: data.value.albums.map((album) => (album.id === id ? { ...album, ...patch } : album)),
-    })
+    await persist(
+      withPending(
+        {
+          ...data.value,
+          albums: data.value.albums.map((album) =>
+            album.id === id ? { ...album, ...patch } : album,
+          ),
+        },
+        { albums: [id] },
+      ),
+    )
   }
 
   async function addToAlbum(id: string, moments: string[]) {
-    await persist({
-      ...data.value,
-      albums: data.value.albums.map((album) =>
-        album.id === id
-          ? {
-              ...album,
-              moments: [...album.moments, ...moments.filter((m) => !album.moments.includes(m))],
-            }
-          : album,
+    await persist(
+      withPending(
+        {
+          ...data.value,
+          albums: data.value.albums.map((album) =>
+            album.id === id
+              ? {
+                  ...album,
+                  moments: [...album.moments, ...moments.filter((m) => !album.moments.includes(m))],
+                }
+              : album,
+          ),
+        },
+        { albums: [id] },
       ),
-    })
+    )
   }
 
   async function deleteAlbum(id: string) {
-    await persist({ ...data.value, albums: data.value.albums.filter((album) => album.id !== id) })
+    await persist(
+      withPending(
+        { ...data.value, albums: data.value.albums.filter((album) => album.id !== id) },
+        { albums: [id] },
+      ),
+    )
   }
 
-  /** Hapus momen dari semua hari dan album, beserta fotonya. */
   /** Hapus momen-momen ini beserta fotonya, dari kantong dan album CD. */
   async function deleteMoments(ids: string[], dropDay?: string) {
+    const gone = new Set(ids)
+    const touches = (list: string[]) => list.some((id) => gone.has(id))
+    const current = data.value
+    // Kantong dan album yang isinya berubah ikut dicatat, supaya urutan barunya ikut tersinkron.
+    const days = Object.values(current.days)
+      .filter((day) => day.day === dropDay || touches(day.moments))
+      .map((day) => day.day)
+    const albums = current.albums.filter((album) => touches(album.moments)).map((album) => album.id)
     // Kunci fotonya diambil sebelum momennya hilang dari data (momen lama memakai `photoKey`).
-    const keys = ids.map(photoKey)
-    await persist(withoutMoments(data.value, ids, dropDay))
+    const photoKeys = ids.map(photoKey)
+    await persist(
+      withPending(withoutMoments(current, ids, dropDay), { moments: ids, days, albums }),
+    )
+    await forgetPhotos(ids, photoKeys)
+  }
+
+  async function forgetPhotos(ids: string[], photoKeys: string[]) {
     for (const [index, id] of ids.entries()) {
       const url = urls.get(id)
       urls.delete(id)
       url?.then((value) => value && URL.revokeObjectURL(value))
       try {
-        await del(keys[index]!)
+        await del(photoKeys[index]!)
       } catch {
         // Tidak ada yang perlu dihapus.
       }
     }
+  }
+
+  /**
+   * Terapkan perubahan dari sinkron ke data terbaru. `update` dijalankan tanpa jeda `await`
+   * terhadap data saat itu, jadi perubahan user yang terjadi selama sinkron tidak tertimpa. Foto
+   * momen yang hilang dari data ikut dihapus.
+   */
+  async function applyRemote(update: (current: MemoryData) => MemoryData) {
+    const current = data.value
+    const next = update(current)
+    // Dibandingkan per kunci foto, bukan per id: momen yang hanya berganti id (withNewIds) tetap
+    // memakai fotonya.
+    const keyOf = (moment: Moment) => moment.photoKey ?? moment.id
+    const kept = new Set(Object.values(next.moments).map(keyOf))
+    const removed = Object.values(current.moments).filter((moment) => !kept.has(keyOf(moment)))
+    await persist(next)
+    await forgetPhotos(
+      removed.map((moment) => moment.id),
+      removed.map((moment) => PHOTO_PREFIX + keyOf(moment)),
+    )
+  }
+
+  /** Id momen yang fotonya ada di perangkat ini. */
+  async function photosHere(): Promise<Set<string>> {
+    const stored = new Set((await keys()).map(String))
+    return new Set(Object.keys(data.value.moments).filter((id) => stored.has(photoKey(id))))
+  }
+
+  /** Simpan foto momen yang datang dari cadangan. */
+  async function savePhoto(id: string, blob: Blob, width: number, height: number) {
+    await set(PHOTO_PREFIX + id, await toStoredPhoto({ blob, width, height }))
+    urls.delete(id)
+  }
+
+  /** Versi foto yang diunggah ke cadangan: JPEG ≤ 500.000 byte, sisi panjang ≤ 2048 px. */
+  async function uploadVersion(id: string): Promise<UploadImage | null> {
+    const item = await photo(id)
+    return item ? compressPhoto(item) : null
   }
 
   function deleteMoment(id: string) {
@@ -202,5 +285,9 @@ export const useMemories = defineStore('memories', () => {
     deleteMoment,
     deleteMoments,
     deleteDay,
+    applyRemote,
+    photosHere,
+    savePhoto,
+    uploadVersion,
   }
 })

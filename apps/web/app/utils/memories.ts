@@ -62,6 +62,62 @@ export interface MemoryData {
   moments: Record<string, Moment>
   days: Record<string, PocketDay>
   albums: Album[]
+  /** Perubahan yang belum terkirim ke cadangan (fase 2). Hanya di perangkat ini. */
+  pending?: PendingChanges
+}
+
+/** Jenis baris yang disinkronkan: id momen, tanggal kantong, dan id album CD. */
+export type PendingKind = 'moments' | 'days' | 'albums'
+
+/**
+ * Baris yang berubah sejak sinkron terakhir, dengan nomor urut perubahannya. Baris yang tercatat
+ * di sini tapi sudah tidak ada di data berarti dihapus. Nomor urut menjaga perubahan yang terjadi
+ * selama sinkron berjalan supaya tidak ikut dianggap terkirim.
+ */
+export interface PendingChanges {
+  seq: number
+  moments: Record<string, number>
+  days: Record<string, number>
+  albums: Record<string, number>
+}
+
+/** Tandai baris-baris ini berubah atau dihapus, dalam data yang sama dengan perubahannya. */
+export function withPending(
+  data: MemoryData,
+  changes: Partial<Record<PendingKind, string[]>>,
+): MemoryData {
+  const pending = data.pending ?? { seq: 0, moments: {}, days: {}, albums: {} }
+  const seq = pending.seq + 1
+  const next: PendingChanges = {
+    seq,
+    moments: { ...pending.moments },
+    days: { ...pending.days },
+    albums: { ...pending.albums },
+  }
+  for (const kind of ['moments', 'days', 'albums'] as const) {
+    for (const key of changes[kind] ?? []) next[kind][key] = seq
+  }
+  return { ...data, pending: next }
+}
+
+/**
+ * Data tanpa catatan perubahan yang sudah terkirim: hanya entri yang nomor urutnya masih sama
+ * dengan `sent`. Baris yang berubah lagi selama sinkron tetap tercatat.
+ */
+export function withoutSent(
+  data: MemoryData,
+  sent: Partial<Record<PendingKind, Record<string, number>>>,
+): MemoryData {
+  if (!data.pending) return data
+  const pending = data.pending
+  const keep = (kind: PendingKind) =>
+    Object.fromEntries(
+      Object.entries(pending[kind]).filter(([key, seq]) => sent[kind]?.[key] !== seq),
+    )
+  return {
+    ...data,
+    pending: { ...pending, moments: keep('moments'), days: keep('days'), albums: keep('albums') },
+  }
 }
 
 /**
@@ -222,7 +278,29 @@ export function normalizeMemories(raw: unknown): MemoryData {
       })
     }
   }
+  const pending = toPending(stored.pending)
+  if (pending) data.pending = pending
   return data
+}
+
+/** Catatan perubahan yang tersimpan, tanpa entri rusak. Baris yang dihapus tetap dicatat. */
+function toPending(value: unknown): PendingChanges | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  const seq = Number(item.seq)
+  if (!Number.isInteger(seq) || seq < 0) return null
+  const entries = (raw: unknown, key: RegExp) =>
+    Object.fromEntries(
+      Object.entries(raw && typeof raw === 'object' ? raw : {}).filter(
+        ([name, value]) => key.test(name) && Number.isInteger(value),
+      ),
+    ) as Record<string, number>
+  return {
+    seq,
+    moments: entries(item.moments, ID),
+    days: entries(item.days, DAY),
+    albums: entries(item.albums, ID),
+  }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -267,6 +345,41 @@ export function withUuids(
     albums: data.albums.map((album) => ({
       ...album,
       id: UUID.test(album.id) ? album.id : newId(),
+      moments: album.moments.map(rename),
+    })),
+  }
+}
+
+/**
+ * Data yang sama dengan id baru untuk semua momen dan album, untuk perangkat yang dipakai akun
+ * lain. Id di cadangan unik untuk semua akun, jadi momen yang sudah tercadang ke akun lama tidak
+ * bisa dikirim lagi dengan id yang sama. Fotonya tetap di kuncinya (`photoKey`). Catatan
+ * perubahan dikosongkan, karena sinkron pertama akun baru mengirim semuanya.
+ */
+export function withNewIds(
+  data: MemoryData,
+  newId: () => string = () => crypto.randomUUID(),
+): MemoryData {
+  const renamed = new Map(Object.keys(data.moments).map((id) => [id, newId()]))
+  const rename = (id: string) => renamed.get(id) ?? id
+  const { pending: _sent, ...rest } = data
+  return {
+    ...rest,
+    moments: Object.fromEntries(
+      Object.values(data.moments).map((moment) => {
+        const id = rename(moment.id)
+        return [id, { ...moment, id, photoKey: moment.photoKey ?? moment.id }]
+      }),
+    ),
+    days: Object.fromEntries(
+      Object.entries(data.days).map(([key, day]) => [
+        key,
+        { ...day, moments: day.moments.map(rename) },
+      ]),
+    ),
+    albums: data.albums.map((album) => ({
+      ...album,
+      id: newId(),
       moments: album.moments.map(rename),
     })),
   }

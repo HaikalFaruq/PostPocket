@@ -15,6 +15,9 @@ test('Beranda menautkan halaman privasi dan lisensi', async ({ page }) => {
   await expect(page.getByRole('main')).toContainText('log teknis mereka')
   // Hitungan surat dari tabel letter_events di backend, tanpa kolom yang menunjuk ke surat.
   await expect(page.getByRole('main')).toContainText('tanpa mencatat surat yang mana')
+  // Cadangan Pocket (fase 2): kuota beta dan data Google yang disimpan Supabase Auth.
+  await expect(page.getByRole('main')).toContainText('paling banyak 100 foto per akun')
+  await expect(page.getByRole('main')).toContainText('email, nama, dan foto profil')
 
   await page.goto('/')
   await page.getByRole('contentinfo').getByRole('link', { name: 'Lisensi' }).click()

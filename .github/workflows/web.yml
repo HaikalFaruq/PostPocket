@@ -53,3 +53,47 @@ jobs:
           name: playwright-traces
           path: apps/web/test-results
           retention-days: 7
+
+  # Sinkron Pocket (fase 2) ke stack Supabase lokal: login, tabel fase 2 dengan RLS, dan bucket
+  # moments sungguhan. Lihat docs/frontend.md bagian Sinkron Pocket.
+  sinkron:
+    name: sinkron
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Jalankan stack Supabase lokal
+        run: supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta,edge-runtime
+
+      - name: Pasang browser Playwright
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      # SECRET_KEY di sini key bawaan stack lokal, bukan secret proyek.
+      - name: E2E sinkron Pocket (Android, iPhone)
+        working-directory: apps/web
+        run: |
+          eval "$(supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY)=')"
+          export API_URL PUBLISHABLE_KEY SECRET_KEY
+          SYNC_E2E=1 pnpm exec playwright test --project=android --project=iphone
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces-sinkron
+          path: apps/web/test-results
+          retention-days: 7

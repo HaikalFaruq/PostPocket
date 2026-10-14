@@ -17,6 +17,7 @@
   "dependencies": {
     "@pinia/nuxt": "^1.0.2",
     "@postpocket/presets": "workspace:^",
+    "@supabase/supabase-js": "^2.117.2",
     "@vueuse/core": "^15.0.0",
     "@vueuse/nuxt": "^15.0.0",
     "idb-keyval": "^6.3.0",
