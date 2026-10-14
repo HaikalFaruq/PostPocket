@@ -78,6 +78,7 @@ Putaran balasan adalah mesin pertumbuhan: setiap penerima surat diajak membuat s
 | `/pocket` | Kalender bulanan + modal simpan hari |
 | `/pocket/:date` | Isi satu hari |
 | `/tv` | TV, arsip CD, dan Booth |
+| `/kotak` | Kotak surat: surat yang disimpan penerima, per folder kaca |
 
 ## Modul 1: Letter (referensi Foil Studio)
 
@@ -121,6 +122,7 @@ Letter mengubah gambar jadi kartu lipat bercetak foil 3D yang bisa diputar, dibu
 5. Surat berlaku 30 hari setelah dikirim. Foto di dalamnya dihapus 7 hari setelah surat pertama kali dibuka; setelah itu kartu dan teks tetap tampil, dengan placeholder di slot foto.
 3. Halaman penerima menampilkan kartu tertutup. Tap untuk membuka; isi surat muncul dengan animasi.
 4. Di bawah kartu ada tombol "Bikin balasan" yang membawa penerima ke editor Letter.
+6. Setelah kartu dibuka, penerima bisa "Simpan surat" ke Kotak surat di perangkatnya (Modul 4) atau "Unduh foto" ke galeri, karena surat dari link tidak disimpan selamanya.
 
 **Kriteria diterima**
 
@@ -212,6 +214,33 @@ TV adalah televisi jadul bergaya clay yang memutar album foto berbentuk CD denga
 - [ ] Booth jalan di Chrome Android dan Safari iOS terbaru, kamera depan default, bisa ganti ke kamera belakang.
 - [ ] Strip hasil Booth yang diunduh memuat filter yang sama dengan yang terlihat di layar.
 - [ ] Bila izin kamera ditolak, muncul pesan jelas dan opsi upload foto sebagai gantinya.
+
+## Modul 4: Kotak surat
+
+Surat dari link hilang 30 hari setelah dikirim, dan fotonya 7 hari setelah dibuka. Kotak surat adalah tempat penerima menyimpan surat itu di perangkatnya sendiri, supaya tetap bisa dibuka kapan saja, juga tanpa sinyal dan setelah link-nya mati. Bendanya folder kaca: panel belakang bercorak cairan, surat-surat di dalamnya, dan kaca buram di depan.
+
+**Simpan surat (halaman penerima)**
+
+- Muncul setelah kartu dibuka, tidak untuk pengirim yang melihat suratnya sendiri.
+- "Simpan surat" mengunduh foto depan dan foto isi, menyimpannya sebagai momen, lalu mencatat suratnya di folder "Surat untukmu". Foto-fotonya sekalian masuk CD "Surat untukmu" di TV, dan ikut cadangan kalau login Google (fase 2) menyala.
+- Foto yang sudah dihapus server tetap jadi placeholder; tulisannya tetap tersimpan.
+- "Unduh foto" mengirim fotonya ke galeri: lewat lembar Bagikan di iPhone (Simpan Gambar), unduhan biasa di Android dan komputer.
+- Kalau link-nya terbuka di browser bawaan aplikasi lain (Instagram, LINE), penerima diingatkan membukanya di Chrome atau Safari dulu, karena penyimpanannya terpisah.
+
+**Halaman Kotak surat (`/kotak`)**
+
+- Satu folder kaca per kelompok surat. Folder tersusun sendiri saat pertama kali terlihat.
+- Disorot (hover atau fokus): kaca condong ke depan dan surat sedikit terangkat.
+- Diketuk: kaca jatuh ke depan, surat naik dan menyebar seperti kipas (paling banyak 4 terlihat; sisanya di daftar di bawah folder). Tiap lembar menampilkan gambar depan surat dan nama pengirim atau potongan tulisannya.
+- Lembar diketuk: kartunya keluar dari lembar itu ke tengah layar di atas latar kabur, lalu dibuka dengan ketukan seperti di halaman penerima. Sebelumnya dan Berikutnya menggeser kartu ke samping, jadi surat dibaca satu per satu.
+- Aksi folder: Baca dari awal, Putar fotonya di TV (CD folder itu langsung diputar), Hapus folder ini dari HP. Di penampil: Baca lebih besar dan Hapus. Menghapus surat tidak menghapus fotonya dari CD.
+
+**Kriteria diterima**
+
+- [x] Surat yang disimpan tetap terbuka lengkap dengan fotonya setelah foto dan suratnya dihapus server.
+- [x] Surat dibaca satu per satu dengan animasi keluar dari folder dan bergeser antarsurat, dan `prefers-reduced-motion` langsung ke keadaan akhir.
+- [x] Lembar surat bisa dipilih dengan sentuhan, mouse, dan keyboard.
+- [ ] Animasi folder dan penampil mulus di iPhone dan Android kelas menengah sungguhan.
 
 ## Design system dan aset
 
@@ -310,7 +339,7 @@ Rilis 1 hanya butuh server untuk surat yang dikirim; Pocket, TV, dan Booth berja
 
 **Pembagian data**
 
-- Di browser (IndexedDB): draf surat, semua hari Pocket, foto, album CD, hasil Booth.
+- Di browser (IndexedDB): draf surat, semua hari Pocket, foto, album CD, hasil Booth, dan surat yang disimpan penerima (Kotak surat).
 - Di server (Supabase): surat yang sudah dikirim beserta fotonya, gambar OG, dan (fase 2) akun serta cadangan Pocket.
 
 **Tabel**

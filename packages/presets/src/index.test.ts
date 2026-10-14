@@ -3,6 +3,7 @@ import {
   byId,
   defaultLetterDesign,
   isAllowed,
+  kotak,
   letter,
   pocket,
   surprise,
@@ -37,6 +38,7 @@ const lists: Record<string, readonly Option[]> = {
   'pocket.frameColors': pocket.frameColors,
   'tv.filters': tv.filters,
   'tv.clayColors': tv.clayColors,
+  'kotak.folders': kotak.folders,
 }
 
 describe('data preset', () => {
@@ -78,8 +80,23 @@ describe('data preset', () => {
       ...pocket.packetColors.map((packet) => packet.color),
       ...pocket.frameColors.map((frame) => frame.color),
       ...tv.clayColors.map((clay) => clay.color),
+      ...kotak.folders.flatMap((folder) => folder.colors),
     ]
     for (const color of colors) expect(color).toMatch(hex)
+  })
+
+  it('resep seni folder kaca lengkap dan dalam rentangnya', () => {
+    for (const folder of kotak.folders) {
+      expect(['marble', 'streak']).toContain(folder.style)
+      expect(folder.colors.length).toBeGreaterThanOrEqual(2)
+      expect(folder.scale).toBeGreaterThan(0)
+      expect(folder.warp).toBeGreaterThanOrEqual(0)
+      expect(Number.isFinite(folder.angle)).toBe(true)
+      for (const value of [folder.gloss, folder.veins]) {
+        expect(value).toBeGreaterThanOrEqual(0)
+        expect(value).toBeLessThanOrEqual(1)
+      }
+    }
   })
 
   it('aturan surprise hanya menyebut kertas dan foil yang ada', () => {

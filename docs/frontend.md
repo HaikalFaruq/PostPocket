@@ -43,13 +43,15 @@ apps/web/
   app/components/tv/        TvSet, CdShelf, CdDisc, TvSlideshow, BoothCamera, BoothLayoutPreview, BoothResult
   app/components/pocket/    SnackPacket (kantong foil SVG), TearablePacket (ketuk atau gores untuk menyobek),
                             PhotoLine (foto dijepit di tali), SaveDayModal (modal simpan hari), MonthPicker
+  app/components/kotak/     GlassFolder (folder kaca), LetterViewer (baca surat satu per satu), FolderMini
   app/composables/          useCardMotion (gerak kartu), useFoilMask (peta foil), usePrintArt (gambar cetak)
   app/workers/              heic.worker.ts: HEIC ke JPEG dengan libheif, dimuat hanya saat ada foto HEIC
-  app/stores/               useLetterDraft (draf surat) dan useMemories (momen, hari Pocket, album CD) di IndexedDB
+  app/stores/               useLetterDraft (draf surat), useMemories (momen, hari Pocket, album CD), dan
+                            useSavedLetters (surat tersimpan di Kotak surat) di IndexedDB
   app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
                             color, foil, icons, packet-art, packet-tear, photo-line) dan util browser
                             (front-image, photo-filter), diuji di test/
-  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /lab, /lab/foil, /lab/safari, /lab/kirim
+  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /kotak (Kotak surat), /lab, /lab/foil, /lab/safari, /lab/kirim
   public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
   server/routes/mock-api/   mock API surat untuk development dan E2E (NUXT_MOCK_API=1)
@@ -69,6 +71,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 - **Draf di IndexedDB menyimpan foto sebagai byte (`ArrayBuffer`), bukan `Blob`**: Safari Private Browsing menolak Blob di IndexedDB. Foto disimpan di key terpisah supaya mengetik isi surat tidak menulis ulang foto.
 - **Id momen dan album Pocket adalah UUID (`crypto.randomUUID()`)**, karena sinkron fase 2 memakai id dari browser ([Rancangan skema fase 2](backend.md#rancangan-skema-fase-2)). Data lama, dengan id `m`/`a` + 6 karakter, diganti sekali saat dimuat. Fotonya tetap di kunci lama lewat `Moment.photoKey`, jadi penggantiannya cukup satu tulisan dan aman kalau terputus. Baca dan hapus foto selalu lewat store, jangan pakai `PHOTO_PREFIX + id` langsung.
 - **Isi surat hanya dirender `LetterElementView`**, di editor, kartu, maupun halaman penerima. Jangan bikin renderer kedua, supaya yang dilihat penerima sama dengan yang disusun pengirim ([keputusan](spikes/editor-isi-surat.md)).
+- **Surat yang sudah dikirim dirender `ReceivedLetter`** dari bentuk `ShownLetter` (`utils/letter-view.ts`), entah datangnya dari `GET /l/:slug` atau dari Kotak surat. Jangan bikin kartu penerima kedua.
 - **Ekspor foto berfilter lewat `drawFiltered()`**, jangan `ctx.filter` langsung: Safari tidak mendukung `ctx.filter` dan filternya hilang diam-diam ([hasil spike](spikes/safari.md)).
 
 ## Komponen bersama
@@ -142,6 +145,16 @@ Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `
 **Region fungsi.** Semua panggilan ke fungsi Supabase membawa `?forceFunctionRegion=ap-southeast-2` (kontrak 0.2.2, `useLetterApi`), termasuk SSR halaman surat dari Vercel `sin1`. DB dan Storage ada di Sydney; tanpa query ini fungsi jalan di Singapura dan setiap query bolak-balik ke Sydney (`GET /l/:slug` median sekitar 1,0 detik, dengan query sekitar 0,55 detik). Unggahan ke `signedUrl` dan mock lokal tidak memakainya.
 
 **Mock API.** `apps/web/server/routes/mock-api/` meniru kelima endpoint di atas (validasi, kode error, upload ke URL bertanda tangan) dengan data di memori, supaya alur "Buat link" dan halaman penerima bisa dibangun sebelum backend siap. Body `POST /letters` diperiksa langsung dengan skema di `docs/api/openapi.yaml` (ajv, `server/utils/contract.ts`): yang tidak sesuai skema dijawab `400` beserta `details` berisi lokasi field-nya, sedangkan isi yang ditolak (preset tidak dikenal, kunci foto tidak cocok, cover, `replyTo`, batas per jenis elemen) dijawab `422`. Jadi kalau kontraknya berubah, mock ikut berubah. `test/contract.test.ts` memastikan body dari klien lolos skema, dan E2E `mock-api.spec.ts` mencocokkan setiap respons mock dengan skemanya. Nyalakan dengan `NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api` (contohnya di `apps/web/.env.example`); E2E selalu memakainya, produksi tidak. `/lab/kirim` menjalankan alur kirim dari ujung ke ujung: kompres foto, render gambar OG, kirim, baca, buka, lalu hapus.
+
+## Kotak surat
+
+Surat dari link hilang 30 hari setelah dikirim dan fotonya 7 hari setelah dibuka (kontrak), jadi penerima bisa menyimpannya di perangkatnya ([PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat)). Tidak ada perubahan backend: semuanya di IndexedDB.
+
+- **Simpan surat** (`KeepLetter` di `/l/:slug`) memanggil `useSavedLetters().keep()`. Foto depan dan foto isi diunduh dari URL publiknya, disimpan sebagai momen lewat `useMemories().addMoments()`, baru suratnya dicatat (`utils/saved-letters.ts`). Jadi surat tersimpan tidak pernah menunjuk foto yang belum ada, dan fotonya ikut sinkron Pocket kalau login menyala. Foto yang sudah dihapus server (404, atau 400 dari Storage) jadi placeholder; gangguan koneksi menghentikan proses tanpa menyimpan setengah. Data surat tersimpan ditulis lewat `update()` idb-keyval dalam satu transaksi, jadi tab atau jendela PWA lain tidak tertimpa, dan tampilan baru berubah setelah tulisannya berhasil.
+- **Satu CD per folder.** Foto surat di folder "Surat untukmu" masuk CD "Surat untukmu"; CD-nya dicatat di folder (`album`) dan dibuat lagi kalau sudah dihapus. Setelah tiap penyimpanan (juga yang terputus di tengah), CD-nya dicocokkan lagi dengan semua surat di folder itu. Menghapus surat atau folder dari Kotak surat tidak menghapus fotonya dari CD. `/tv?album=<id>` langsung memutar CD itu.
+- **Unduh foto** (`utils/letter-photos.ts`): di iPhone dan iPad lewat lembar Bagikan (`navigator.share({ files })`), karena unduhan biasa masuk app File, bukan Foto. Di tempat lain unduhan biasa berjeda 350 ms. Fotonya diunduh lebih dulu begitu bagian Simpan tampil, karena Safari menolak lembar Bagikan kalau ketukannya sudah lama berlalu. Kalau belum selesai saat diketuk, ketukan itu memakai unduhan yang sedang berjalan, dan di iPhone ketukan berikutnya yang membuka lembar Bagikan.
+- **Folder kaca** (`GlassFolder`): panggung 340 × 272 yang diskalakan ke lebar folder. Seninya dilukis di kanvas dari resep `kotak.folders` (`utils/folder-art.ts`), bertahap paling lama 6 ms per frame lewat satu antrean (`utils/folder-paint.ts`) dan disimpan per resep dan ukuran. Tanpa GPU (`data-render="cpu"`) dan dengan `prefers-reduced-transparency`, kacanya tidak dikaburkan tapi lapisan warnanya lebih pekat. Lembar yang menyembul di atas kaca bisa diketuk; bagian di balik kaca menutup folder. Nama dan tanggal di lembar ada di label putih, jadi terbaca di atas gambar depan apa pun. Saat terbuka, ruang di atas folder membesar sesuai jumlah lembar di kipas (`openRoom()`), jadi kipasnya tidak menutupi judul di atasnya; halaman yang memuat folder memakai `overflow-x-clip`, jadi kipas yang melewati tepi layar HP tidak membuat halaman bisa digeser. Folder condong hanya saat disorot mouse (`@media (hover: hover)`) atau difokus keyboard (`:focus-visible`), karena di HP `:hover` dan fokus menempel setelah diketuk. Folder `sealed` tidak bisa dibuka, memakai cap tanggal, dan bergoyang saat diketuk.
+- **Penampil** (`LetterViewer`): kartu tumbuh dari lembar yang diketuk (`origin`), lalu Sebelumnya dan Berikutnya menggeser kartu. Kartu yang sedang keluar dibuat `inert` dan `aria-hidden`, jadi hanya satu surat yang aktif. Setiap kali penampil dibuka, kartunya mulai tertutup. Tanpa lembar asal (dibuka dari daftar, atau lembarnya di luar layar), kartunya naik dari bawah, dan selama bergerak kartunya tidak bisa diketuk. "Baca lebih besar" (`LetterReader`, z-60) menutupi penampil. Di surat pertama dan terakhir fokus keyboard pindah ke tombol arah sebaliknya, dan kalau lembar yang membuka penampil ikut terhapus, fokus kembali ke `fallbackFocus` (judul halaman Kotak surat). Aksi tambahan, misalnya Hapus di Kotak surat, ada di kepala penampil, jadi tinggi kakinya tetap. Tanpa GPU atau dengan `prefers-reduced-motion`, animasinya langsung ke keadaan akhir (`calmMotion()`).
 
 ## Checklist per sprint
 
@@ -236,6 +249,12 @@ SYNC_E2E=1 pnpm --filter @postpocket/web exec playwright test --project=android 
 
 Login Google sendiri tidak bisa diuji otomatis. Tesnya memakai user yang dibuat lewat admin API, dan provider email tetap nyala di stack lokal untuk itu. Tes tombol Google memastikan alamat `/auth/v1/authorize` yang dibuka sudah benar. E2E biasa tidak menyentuh Supabase, karena URL-nya dikosongkan.
 
+**Kotak surat** ([PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat))
+
+- [x] Simpan surat dan Unduh foto di halaman penerima; fotonya masuk CD "Surat untukmu" di TV
+- [x] Halaman `/kotak` dengan folder kaca, baca surat satu per satu, hapus surat dan folder
+- [ ] Animasi folder kaca dan penampil dicek di iPhone dan Android sungguhan ([langkah 9](#uji-di-hp-sungguhan))
+
 ## PWA
 
 PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan service worker). Service worker hanya ada di build production; `pnpm dev` tidak memakainya, jadi cek PWA lewat `pnpm build && node apps/web/.output/server/index.mjs` atau `pnpm test:e2e`.
@@ -243,7 +262,7 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 | Yang disimpan | Cara | Kenapa |
 | --- | --- | --- |
 | JS, CSS, ilustrasi, ikon, stiker, `offline.html` | Precache saat service worker dipasang | Aplikasi tetap jalan tanpa sinyal |
-| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, Pocket, TV, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat dan kenangan memang ada di IndexedDB, dan Pocket serta TV hanya dirender di browser, jadi salinan halamannya tidak memuat data pribadi |
+| Halaman | Jaringan dulu, salinan terakhir kalau offline. Beranda, editor surat, Pocket, TV, Kotak surat, dan halaman pertama disimpan sejak kunjungan pertama | Selalu versi terbaru, tapi tetap bisa dibuka offline; draf surat, kenangan, dan surat tersimpan memang ada di IndexedDB, dan Pocket, TV, serta Kotak surat hanya dirender di browser, jadi salinan halamannya tidak memuat data pribadi |
 | Font (`/_fonts/`) | Disimpan saat dipakai | Hanya subset yang benar-benar dimuat |
 | Surat penerima (`/l/…`) | Tidak pernah disimpan | Isinya pribadi |
 
@@ -256,10 +275,11 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 
 ## Uji di HP sungguhan
 
-Tiga item checklist yang tersisa dicek sekali jalan dengan daftar di bawah:
+Item checklist yang tersisa dicek sekali jalan dengan daftar di bawah:
 - benchmark dan kamera (Sprint 0);
 - gerbang 50 fps (Sprint 1);
-- uji di 3 HP (beta).
+- uji di 3 HP (beta);
+- animasi Kotak surat (langkah 9).
 
 Pakai tiga HP: iPhone (Safari), Android kelas menengah (Chrome), dan satu Android lain, lebih bagus lagi kalau yang murah. Semua dibuka di domain produksi, karena kamera butuh HTTPS.
 
@@ -273,13 +293,14 @@ Pakai tiga HP: iPhone (Safari), Android kelas menengah (Chrome), dan satu Androi
 | 6 | TV: putar album bulan ini, seret CD ke TV, ganti filter | CD terbang ke slot dan slideshow jalan dengan filter |
 | 7 | Booth: ambil strip 1×4, simpan ke Pocket dan CD, lalu Pakai di surat | Hitung mundur jalan, strip sesuai pratinjau, dan muncul di surat |
 | 8 | Pasang ke layar utama, nyalakan mode pesawat, buka Pocket dan TV | Keduanya tetap terbuka offline, lengkap dengan foto |
+| 9 | Buka surat berfoto dari link WhatsApp, Simpan surat, lalu Unduh foto. Buka Kotak surat, buka foldernya, ketuk salah satu surat, geser ke surat berikutnya, lalu nyalakan mode pesawat dan buka lagi | Foto masuk app Foto (iPhone) atau galeri (Android). Folder condong dan menyebar tanpa patah-patah, kartu keluar dari lembarnya, dan surat tetap terbuka offline |
 
 Laporan per HP berisi:
 - model HP, versi OS, dan browser;
 - hasil langkah 1;
 - nomor langkah yang bermasalah, beserta screenshot.
 
-Kalau ketiga HP lolos, centang ketiga item itu di checklist.
+Kalau ketiga HP lolos, centang item-item itu di checklist.
 
 - `/lab/foil?bench=1` menjalankan benchmark otomatis; hasilnya muncul di pojok kanan atas dan bisa disalin dari langkah 5. Parameter lain: `?flip=1` (sampul belakang) dan `?open=1` (kartu terbuka).
 - `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: buka di domain produksi, atau `pnpm dev --host` lalu tunnel HTTPS.

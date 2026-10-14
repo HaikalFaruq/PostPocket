@@ -136,6 +136,22 @@ const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(
               <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
             </NuxtLink>
           </li>
+          <li>
+            <NuxtLink to="/kotak" class="group flex items-center gap-4 py-4">
+              <span class="grid w-14 shrink-0 place-items-center">
+                <span class="w-12 -rotate-3 transition-transform group-hover:rotate-0">
+                  <FolderMini />
+                </span>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-[17px] font-bold tracking-[-0.02em]">Kotak surat</span>
+                <span class="mt-0.5 block text-ink-muted">
+                  Surat yang kamu simpan dari link, tetap bisa dibuka walau link-nya sudah mati.
+                </span>
+              </span>
+              <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
+            </NuxtLink>
+          </li>
         </ul>
       </div>
     </main>

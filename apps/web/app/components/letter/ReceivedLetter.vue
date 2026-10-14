@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import type { Letter } from '~/utils/letter-api'
 import { cardRatio } from '~/utils/letter-draft'
+import type { ShownLetter } from '~/utils/letter-view'
 
 /**
  * Kartu surat untuk penerima: sampul dari desain dan cover pengirim, lalu isi surat saat
- * dibuka. Hanya dirender di browser karena peta foil dibuat di kanvas.
+ * dibuka. Dipakai halaman surat, kotak bareng, dan Kotak surat. Hanya dirender di browser
+ * karena peta foil dibuat di kanvas.
  */
-const props = defineProps<{ letter: Letter }>()
+const props = withDefaults(defineProps<{ letter: ShownLetter; label?: string }>(), {
+  label: 'Surat untukmu',
+})
 const open = defineModel<boolean>('open', { default: false })
 /** Tampilan baca selebar layar (LetterReader). */
 const reading = defineModel<boolean>('reading', { default: false })
@@ -15,19 +18,17 @@ const design = computed(() => props.letter.design)
 const coverUrl = computed(() => props.letter.cover?.url ?? null)
 const { foil, paper, art, mask } = useCardFront(design, coverUrl)
 const ratio = computed(() => cardRatio(props.letter.design, props.letter.cover))
-const photoUrls = computed(() =>
-  Object.fromEntries(Object.entries(props.letter.photos).map(([key, asset]) => [key, asset.url])),
-)
 </script>
 
 <template>
   <LetterReader
     v-model:open="reading"
     :content="letter.content"
-    :photo-urls="photoUrls"
-    :photo-placeholder="letter.photosDeletedAt ? 'Foto sudah dihapus' : undefined"
+    :photo-urls="letter.photoUrls"
+    :photo-placeholder="letter.photoPlaceholder"
     :paper="paper"
     :ratio="ratio"
+    :title="letter.from ? `Dari ${letter.from}` : undefined"
   />
   <FoilCard
     v-model:open="open"
@@ -37,14 +38,30 @@ const photoUrls = computed(() =>
     :paper="paper"
     :ratio="ratio"
     :foil-border="letter.design.foilBorder"
-    label="Surat untukmu"
+    :label="label"
   >
     <template #inside>
       <LetterPage
         :content="letter.content"
-        :photo-urls="photoUrls"
-        :photo-placeholder="letter.photosDeletedAt ? 'Foto sudah dihapus' : undefined"
+        :photo-urls="letter.photoUrls"
+        :photo-placeholder="letter.photoPlaceholder"
       />
+    </template>
+    <template v-if="letter.from" #inside-cover>
+      <p class="from-note" data-testid="letter-from">Dari {{ letter.from }}</p>
     </template>
   </FoilCard>
 </template>
+
+<style scoped>
+/* Nama pengirim ditulis tangan di balik sampul, seperti di kartu ucapan. */
+.from-note {
+  position: absolute;
+  inset: auto 10% 12% 10%;
+  font-family: var(--font-letter);
+  font-size: 11cqw;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+</style>

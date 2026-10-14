@@ -24,6 +24,11 @@ useSeoMeta({
         Supaya tidak dihapus browser diam-diam, PostPocket meminta izin penyimpanan permanen. Paling
         aman kalau PostPocket dipasang ke layar utama.
       </li>
+      <li>
+        Surat yang kamu simpan lewat "Simpan surat" (Kotak surat) juga ada di browser ini. Fotonya
+        disimpan sebagai kenangan Pocket di CD "Surat untukmu", jadi suratnya tetap bisa dibuka
+        setelah surat dan fotonya dihapus dari server.
+      </li>
     </ul>
 
     <h2>Yang dikirim ke server</h2>

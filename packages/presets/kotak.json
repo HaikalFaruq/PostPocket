@@ -1,0 +1,59 @@
+{
+  "folders": [
+    {
+      "id": "par-avion",
+      "label": "Par avion",
+      "style": "streak",
+      "colors": ["#f4f6fb", "#d9e1f1", "#e23b3b", "#7a1f2b", "#18204a", "#4d6bb3", "#eef2fa"],
+      "scale": 0.7,
+      "warp": 1.4,
+      "angle": -0.62,
+      "gloss": 0.18,
+      "veins": 0
+    },
+    {
+      "id": "emas",
+      "label": "Emas",
+      "style": "marble",
+      "colors": ["#140f06", "#3d2c0c", "#8a6420", "#d9ad4f", "#f6dd94", "#fff6dc", "#b0812e"],
+      "scale": 0.66,
+      "warp": 3.2,
+      "angle": -0.4,
+      "gloss": 0.6,
+      "veins": 0.45
+    },
+    {
+      "id": "senja",
+      "label": "Senja",
+      "style": "marble",
+      "colors": ["#120c18", "#3e2850", "#8f6c9c", "#2b1a24", "#b3502f", "#eab08a", "#fbe7d2"],
+      "scale": 0.75,
+      "warp": 3.6,
+      "angle": 0.8,
+      "gloss": 0.5,
+      "veins": 0.5
+    },
+    {
+      "id": "laut",
+      "label": "Laut",
+      "style": "streak",
+      "colors": ["#f7f9fc", "#d6e4f2", "#8fb3d9", "#e9f0f8", "#5d86b8", "#ffffff"],
+      "scale": 0.7,
+      "warp": 1.6,
+      "angle": 0.35,
+      "gloss": 0.25,
+      "veins": 0
+    },
+    {
+      "id": "daun",
+      "label": "Daun",
+      "style": "marble",
+      "colors": ["#070b08", "#173024", "#4f7a5a", "#141812", "#a7843a", "#e9cf87", "#fbf3d6"],
+      "scale": 0.7,
+      "warp": 3.4,
+      "angle": 2.1,
+      "gloss": 0.5,
+      "veins": 0.5
+    }
+  ]
+}

@@ -17,6 +17,6 @@ export default defineNuxtPlugin((nuxtApp) => {
   nuxtApp.hook('service-worker:activated', () => {
     // Halaman galat (misalnya 404) tidak disimpan; menyimpannya hanya menghasilkan request gagal.
     const current = nuxtApp.payload.error ? [] : [window.location.pathname]
-    warmPages(['/', '/letter/new', '/pocket', '/tv', ...current])
+    warmPages(['/', '/letter/new', '/pocket', '/tv', '/kotak', ...current])
   })
 })

@@ -1,3 +1,4 @@
+import kotakData from '../kotak.json'
 import letterData from '../letter.json'
 import pocketData from '../pocket.json'
 import tvData from '../tv.json'
@@ -120,9 +121,35 @@ export interface TvPresets {
   clayColors: ColorOption[]
 }
 
+/**
+ * Seni di panel belakang folder kaca (Kotak surat): bidang noise yang dilipat lalu diberi cahaya
+ * seperti permukaan cairan, digambar di browser dari resep ini. Tidak ada berkas gambarnya.
+ */
+export interface FolderArt extends Option {
+  /** `marble` melipat warna satu sama lain; `streak` menariknya jadi jejak panjang. */
+  style: 'marble' | 'streak'
+  /** Dua warna atau lebih, urut sepanjang bidangnya. */
+  colors: string[]
+  /** Ukuran bentuk: makin kecil makin besar dan tenang. */
+  scale: number
+  /** Seberapa kuat bidangnya terlipat. */
+  warp: number
+  /** Arah aliran, radian. */
+  angle: number
+  /** Kilau di permukaan cairan, 0 sampai 1. */
+  gloss: number
+  /** Urat gelap di sepanjang lipatan, 0 sampai 1. */
+  veins: number
+}
+
+export interface KotakPresets {
+  folders: FolderArt[]
+}
+
 export const letter: LetterPresets = letterData
 export const pocket: PocketPresets = pocketData
 export const tv: TvPresets = tvData
+export const kotak: KotakPresets = kotakData as KotakPresets
 
 export function byId<T extends Option>(list: readonly T[], id: string): T | undefined {
   return list.find((item) => item.id === id)
