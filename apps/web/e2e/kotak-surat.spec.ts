@@ -168,9 +168,13 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
   const viewer = page.getByTestId('letter-viewer')
   await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 1 dari 2')
   await expect(viewer.getByTestId('viewer-prev')).toBeDisabled()
-  await viewer.getByTestId('viewer-next').click()
+  // Dengan keyboard: di surat terakhir tombol Berikutnya nonaktif, jadi fokusnya pindah ke
+  // Sebelumnya dan tidak lepas dari penampil.
+  await viewer.getByTestId('viewer-next').focus()
+  await page.keyboard.press('Enter')
   await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 2 dari 2')
   await expect(viewer.getByTestId('viewer-next')).toBeDisabled()
+  await expect(viewer.getByTestId('viewer-prev')).toBeFocused()
   await shownCard(viewer)
     .getByRole('button', { name: /Surat untukmu/ })
     .click()
@@ -193,6 +197,13 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
   await viewer.getByRole('button', { name: 'Baca lebih besar' }).click()
   const reader = page.getByTestId('letter-reader')
   await expect(reader).toContainText('Surat pertama')
+  // Tampilan baca menutupi penampil sepenuhnya, termasuk kepala dan kaki penampil.
+  const layers = await page.evaluate(() => {
+    const z = (id: string) =>
+      Number(getComputedStyle(document.querySelector(`[data-testid="${id}"]`)!).zIndex)
+    return { overlay: z('letter-reader-overlay'), viewer: z('letter-viewer') }
+  })
+  expect(layers.overlay).toBeGreaterThan(layers.viewer)
   await reader.getByRole('button', { name: 'Tutup' }).click()
   await expect(reader).toBeHidden()
   await expect(viewer).toBeVisible()
@@ -208,6 +219,8 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
   await viewer.getByTestId('viewer-remove').click()
   await expect(viewer).toBeHidden()
   await expect(page.getByTestId('kotak-empty')).toBeVisible()
+  // Lembar yang membuka penampil ikut hilang bersama foldernya, jadi fokus pindah ke judul.
+  await expect(page.getByRole('heading', { name: 'Kotak surat', level: 1 })).toBeFocused()
 })
 
 test('foto surat bisa diunduh ke perangkat', async ({ page, request, browserName }) => {

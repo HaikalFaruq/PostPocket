@@ -87,6 +87,8 @@ function file(item: SavedLetter): FolderFile {
 
 // Satu folder terbuka dalam satu waktu.
 const openFolder = ref<string | null>(null)
+/** Judul halaman: tujuan fokus kalau folder yang membuka penampil ikut terhapus. */
+const heading = ref<HTMLElement | null>(null)
 const folderRefs = new Map<string, { sheetRect: (id: string) => DOMRect | null }>()
 function setFolderRef(id: string, el: unknown) {
   if (el) folderRefs.set(id, el as { sheetRect: (id: string) => DOMRect | null })
@@ -131,6 +133,12 @@ async function removeLetter(item: ShownLetter) {
   const note = cd ? ` Fotonya tetap ada di CD "${cd.title}".` : ''
   if (!window.confirm(`Hapus surat ini dari HP ini?${note}`)) return
   await saved.remove(item.id)
+  // Surat terakhir di folder: foldernya ikut hilang dan penampilnya menutup sendiri.
+  if (folder && openFolder.value === folder.id && !folderExists(folder.id)) openFolder.value = null
+}
+
+function folderExists(id: string) {
+  return saved.folders.some((entry) => entry.id === id)
 }
 
 async function removeFolder(id: string, title: string) {
@@ -144,7 +152,12 @@ async function removeFolder(id: string, title: string) {
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-dvh max-w-6xl flex-col px-4 sm:px-6" data-testid="kotak-page">
+  <div
+    class="mx-auto flex min-h-dvh max-w-6xl flex-col overflow-x-clip px-4 sm:px-6"
+    data-testid="kotak-page"
+  >
+    <!-- overflow-x-clip: kipas folder yang terbuka boleh melewati tepi layar HP tanpa membuat
+         halamannya bisa digeser ke samping. -->
     <header class="py-4">
       <NuxtLink
         to="/"
@@ -152,7 +165,13 @@ async function removeFolder(id: string, title: string) {
       >
         <Icon name="chevron-left" :size="14" /> PostPocket
       </NuxtLink>
-      <h1 class="mt-2 text-[34px] leading-none font-bold tracking-[-0.035em]">Kotak surat</h1>
+      <h1
+        ref="heading"
+        tabindex="-1"
+        class="mt-2 text-[34px] leading-none font-bold tracking-[-0.035em] outline-none"
+      >
+        Kotak surat
+      </h1>
       <p class="mt-2 max-w-md text-pretty text-ink-muted">
         Surat yang kamu simpan di HP ini. Tetap bisa dibuka walau link-nya sudah mati, tanpa sinyal
         sekalipun.
@@ -187,7 +206,7 @@ async function removeFolder(id: string, title: string) {
             :seed="hashString(folder.id) % 997"
             :files="folder.items.map(file)"
             :width="folderWidth"
-            :appear-delay="position * 120"
+            :appear-delay="Math.min(position, 2) * 120"
             @update:open="(value: boolean) => (openFolder = value ? folder.id : null)"
             @select="(item: FolderFile, index: number) => read(folder.id, index, item.id)"
           />
@@ -204,7 +223,7 @@ async function removeFolder(id: string, title: string) {
                 <button
                   type="button"
                   class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-panel"
-                  @click="read(folder.id, index)"
+                  @click="read(folder.id, index, item.id)"
                 >
                   <span class="min-w-0 flex-1 truncate text-body font-semibold">{{
                     file(item).name
@@ -218,16 +237,16 @@ async function removeFolder(id: string, title: string) {
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
-                class="inline-flex h-10 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+                class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
                 data-testid="folder-read"
-                @click="read(folder.id, 0)"
+                @click="read(folder.id, 0, folder.items[0]?.id)"
               >
                 Baca dari awal
               </button>
               <NuxtLink
                 v-if="cdOf(folder.album)"
                 :to="`/tv?album=${folder.album}`"
-                class="inline-flex h-10 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+                class="inline-flex h-11 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
                 data-testid="folder-tv"
               >
                 <Icon name="play" :size="14" /> Putar fotonya di TV
@@ -235,7 +254,7 @@ async function removeFolder(id: string, title: string) {
             </div>
             <button
               type="button"
-              class="self-start text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+              class="inline-flex min-h-11 items-center self-start text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
               @click="removeFolder(folder.id, folder.title)"
             >
               Hapus folder ini dari HP
@@ -272,16 +291,17 @@ async function removeFolder(id: string, title: string) {
       :letters="viewerLetters"
       :title="viewerFolder?.title ?? 'Surat'"
       :origin="viewer.origin"
+      :fallback-focus="() => heading"
     >
       <template #actions="{ letter }">
-        <button
-          type="button"
-          class="inline-flex h-10 items-center gap-1.5 rounded-control px-3 text-body font-semibold text-ink-muted hover:bg-fill hover:text-ink"
+        <IconButton
+          label="Hapus surat ini dari HP"
+          variant="ghost"
           data-testid="viewer-remove"
           @click="removeLetter(letter)"
         >
-          <Icon name="trash" :size="15" /> Hapus
-        </button>
+          <Icon name="trash" :size="17" />
+        </IconButton>
       </template>
     </LetterViewer>
   </div>

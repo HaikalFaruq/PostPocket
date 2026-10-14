@@ -1,8 +1,8 @@
 import type { FolderArt } from '@postpocket/presets'
 import { hexToRgb } from './color'
 
-// Seni panel belakang folder kaca (Kotak surat), diadaptasi dari template "Glass Folder Cards"
-// yang dibagikan Kall: bidang noise yang dilipat dua kali, lalu diwarnai sebagai permukaan
+// Seni panel belakang folder kaca (Kotak surat), diadaptasi dari komponen "Glassmorphism Folder
+// Cards" karya Kedhareswer Naidu di 21st.dev (MIT, lihat docs/assets.md): bidang noise yang dilipat dua kali, lalu diwarnai sebagai permukaan
 // cairan. Dikerjakan bertahap per baris supaya tidak ada tugas panjang yang membuat animasi
 // tersendat di HP; utils/folder-paint.ts yang membagi kerjanya ke beberapa frame.
 
@@ -260,4 +260,18 @@ export function createArtJob(
 /** Posisi berkas di kipas: -1 sampai 1 dari kiri ke kanan, 0 kalau cuma satu. */
 export function fanSlot(index: number, count: number): number {
   return count <= 1 ? 0 : (index / (count - 1)) * 2 - 1
+}
+
+/** Ruang di atas folder kaca yang tertutup, dalam satuan folder (340 × 272). */
+export const FOLDER_HEADROOM = 54
+
+/**
+ * Ruang di atas folder kaca yang terbuka dengan `count` lembar di kipasnya, sesuai nilai
+ * `.gf-root[data-open]` di GlassFolder: lembar paling belakang naik 96 + 30 per lapis dari
+ * posisinya (96 di bawah tepi atas), lalu 18 lagi saat disorot dan sampai 20 di sudutnya yang
+ * miring. Dengan ruang ini kipasnya tidak menutupi isi halaman di atas folder.
+ */
+export function openRoom(count: number): number {
+  const layers = Math.max(1, count) - 1
+  return Math.max(FOLDER_HEADROOM, 96 + 30 * layers + 18 + 20 - 96)
 }

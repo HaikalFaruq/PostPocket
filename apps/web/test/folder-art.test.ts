@@ -1,6 +1,13 @@
 import { kotak } from '@postpocket/presets'
 import { describe, expect, it } from 'vitest'
-import { createArtJob, fanSlot, hashString, rng } from '../app/utils/folder-art'
+import {
+  FOLDER_HEADROOM,
+  createArtJob,
+  fanSlot,
+  hashString,
+  openRoom,
+  rng,
+} from '../app/utils/folder-art'
 
 function finish(width: number, height: number, seed: number, recipe = kotak.folders[0]!) {
   const job = createArtJob(width, height, recipe, seed)
@@ -58,5 +65,12 @@ describe('alat bantu', () => {
   it('fanSlot menyebar dari kiri ke kanan', () => {
     expect(fanSlot(0, 1)).toBe(0)
     expect([0, 1, 2].map((index) => fanSlot(index, 3))).toEqual([-1, 0, 1])
+  })
+
+  it('openRoom memberi ruang untuk kipas yang terbuka, tidak pernah kurang dari tertutup', () => {
+    expect(openRoom(0)).toBe(FOLDER_HEADROOM)
+    expect(openRoom(1)).toBe(FOLDER_HEADROOM)
+    // Lembar paling belakang naik 96 + 30 per lapis, plus 38 untuk sorotan dan kemiringan.
+    expect([2, 3, 4].map(openRoom)).toEqual([68, 98, 128])
   })
 })

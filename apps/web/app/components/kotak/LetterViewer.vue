@@ -22,31 +22,45 @@ const props = withDefaults(
     title: string
     /** Kotak layar lembar surat di folder, untuk animasi keluar dari folder. */
     origin?: DOMRect | null
+    /** Tujuan fokus setelah menutup, kalau tombol yang membuka penampil sudah tidak ada. */
+    fallbackFocus?: () => HTMLElement | null
   }>(),
-  { origin: null },
+  { origin: null, fallbackFocus: undefined },
 )
 const open = defineModel<boolean>('open', { default: false })
 const index = defineModel<number>('index', { default: 0 })
 const emit = defineEmits<{ opened: [id: string] }>()
 
-const current = computed(() => props.letters[index.value] ?? props.letters[0] ?? null)
+// Surat terakhir yang tampil tetap dipakai kalau daftarnya habis (surat terakhir dihapus),
+// supaya penampil yang sedang menutup tidak sempat berganti judul.
+const last = shallowRef<ShownLetter | null>(null)
+const current = computed(
+  () =>
+    props.letters[index.value] ?? props.letters[0] ?? (props.letters.length ? null : last.value),
+)
+watch(current, (letter) => letter && (last.value = letter), { immediate: true })
 const cardOpen = ref(false)
 const reading = ref(false)
 const direction = ref(1)
 const stage = ref<HTMLElement | null>(null)
+const prevButton = ref<{ $el: HTMLElement } | null>(null)
+const nextButton = ref<{ $el: HTMLElement } | null>(null)
 
 // Daftar berubah (misalnya surat dihapus): indeks tetap di dalam daftar, dan penampil ditutup
-// kalau suratnya habis.
+// kalau suratnya habis. Surat sebelumnya masuk dari kiri, sesuai arahnya.
 watch(
   () => props.letters.length,
   (count) => {
     if (!count) open.value = false
-    else if (index.value > count - 1) index.value = count - 1
+    else if (index.value > count - 1) {
+      direction.value = -1
+      index.value = count - 1
+    }
   },
 )
 
 watch(current, (next, previous) => {
-  if (next?.id === previous?.id) return
+  if (!next || next.id === previous?.id) return
   cardOpen.value = false
   reading.value = false
 })
@@ -70,6 +84,24 @@ function go(step: number) {
   if (next < 0 || next > props.letters.length - 1) return
   direction.value = step
   index.value = next
+  // Di surat pertama atau terakhir tombolnya nonaktif. Kalau fokus keyboard ada di sana, fokusnya
+  // dipindah ke tombol arah sebaliknya, supaya tidak lepas dari penampil.
+  const pressed = (step > 0 ? nextButton : prevButton).value?.$el
+  const other = (step > 0 ? prevButton : nextButton).value?.$el
+  const atEnd = step > 0 ? next === props.letters.length - 1 : next === 0
+  if (atEnd && pressed && document.activeElement === pressed) void nextTick(() => other?.focus())
+}
+
+// Tombol yang membuka penampil. Kalau tombol itu hilang selama penampil terbuka (suratnya dihapus
+// dan foldernya ikut hilang), fokus kembali ke `fallbackFocus`, bukan ke <body>.
+let opener: Element | null = null
+watch(open, (isOpen) => isOpen && (opener = document.activeElement), { flush: 'sync' })
+function onCloseFocus(event: Event) {
+  if (!opener || opener.isConnected) return
+  const target = props.fallbackFocus?.()
+  if (!target) return
+  event.preventDefault()
+  target.focus()
 }
 
 // Back di HP menutup penampil, bukan meninggalkan halaman.
@@ -77,23 +109,50 @@ useBackToClose(open, () => {
   open.value = false
 })
 
-/** Kartu tumbuh dari lembar suratnya di folder ke tengah layar. */
+/**
+ * Kartu tumbuh dari lembar suratnya di folder ke tengah layar. Tanpa lembar asal (dibuka dari
+ * daftar, atau lembarnya di luar layar), kartunya naik dari bawah. Selama bergerak kartunya tidak
+ * bisa diketuk, supaya ketukan kedua di lembar tadi tidak langsung membuka kartu yang lewat.
+ */
 function rise() {
   const el = stage.value
-  const from = props.origin
-  if (!el || !from || calmMotion()) return
+  if (!el || calmMotion()) return
   const to = el.getBoundingClientRect()
   if (!to.width || !to.height) return
-  const scale = Math.max(0.12, Math.min(1, from.height / (to.height * 0.72)))
-  const dx = from.left + from.width / 2 - (to.left + to.width / 2)
-  const dy = from.top + from.height / 2 - (to.top + to.height / 2)
-  el.animate(
-    [
+  const from = props.origin
+  const visible = !!from && from.bottom > 0 && from.top < window.innerHeight
+  let keyframes: Keyframe[]
+  if (from && visible) {
+    // Kartunya (bukan seluruh panggung) dicocokkan ke lembar: ukurannya muat di lembar, lalu
+    // titik tengahnya mendarat di titik tengah lembar.
+    const card = el.querySelector('.foil-rotor')?.getBoundingClientRect()
+    const target = card && card.width > 0 && card.height > 0 ? card : null
+    const fit = target
+      ? Math.min(from.width / target.width, from.height / target.height)
+      : from.height / (to.height * 0.72)
+    const scale = Math.max(0.12, Math.min(1, fit))
+    const ox = to.left + to.width / 2
+    const oy = to.top + to.height / 2
+    const cx = target ? target.left + target.width / 2 : ox
+    const cy = target ? target.top + target.height / 2 : oy
+    const dx = from.left + from.width / 2 - (ox + scale * (cx - ox))
+    const dy = from.top + from.height / 2 - (oy + scale * (cy - oy))
+    keyframes = [
       { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.2 },
       { transform: 'none', opacity: 1 },
-    ],
-    { duration: 480, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
-  )
+    ]
+  } else {
+    keyframes = [
+      { transform: 'translateY(32px) scale(0.94)', opacity: 0 },
+      { transform: 'none', opacity: 1 },
+    ]
+  }
+  el.style.pointerEvents = 'none'
+  const done = () => (el.style.pointerEvents = '')
+  el.animate(keyframes, {
+    duration: visible ? 480 : 360,
+    easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+  }).finished.then(done, done)
 }
 
 // Setiap kali dibuka, kartunya mulai tertutup. Diatur sebelum render, supaya kartu yang terakhir
@@ -129,6 +188,7 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
         class="fixed inset-0 z-50 flex flex-col px-4 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] outline-none data-[state=closed]:animate-fade-out"
         :aria-describedby="undefined"
         data-testid="letter-viewer"
+        @close-auto-focus="onCloseFocus"
       >
         <header
           class="mx-auto flex w-full max-w-xl items-center gap-3 rounded-[18px] bg-surface/90 py-2 pr-2 pl-4 shadow-float"
@@ -140,11 +200,13 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
             <p
               v-if="letters.length > 1"
               class="text-caption text-ink-muted"
+              aria-live="polite"
               data-testid="viewer-count"
             >
               Surat {{ index + 1 }} dari {{ letters.length }}
             </p>
           </div>
+          <slot v-if="current" name="actions" :letter="current" />
           <DialogClose as-child>
             <IconButton label="Tutup" variant="ghost">
               <Icon name="close" :size="18" />
@@ -174,8 +236,10 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
           class="mx-auto flex w-full max-w-xl items-center gap-2 rounded-[18px] bg-surface/90 p-2 shadow-float"
         >
           <IconButton
+            ref="prevButton"
             label="Surat sebelumnya"
             variant="ghost"
+            size="lg"
             :disabled="index === 0"
             data-testid="viewer-prev"
             @click="go(-1)"
@@ -189,16 +253,17 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
             <button
               v-else
               type="button"
-              class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+              class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
               @click="reading = true"
             >
               Baca lebih besar
             </button>
-            <slot v-if="current" name="actions" :letter="current" />
           </div>
           <IconButton
+            ref="nextButton"
             label="Surat berikutnya"
             variant="ghost"
+            size="lg"
             :disabled="index >= letters.length - 1"
             data-testid="viewer-next"
             @click="go(1)"

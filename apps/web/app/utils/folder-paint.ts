@@ -3,6 +3,8 @@ import { createArtJob, type ArtJob, type ArtRecipe } from './folder-art'
 // Satu pelukis untuk semua folder di halaman: tiap folder mengantrekan seninya di sini, dan antrean
 // hanya memakai beberapa milidetik per frame, jadi deretan folder tidak membuat layar tersendat.
 // Hasilnya disimpan per resep dan ukuran, jadi folder dengan seni yang sama tidak dilukis ulang.
+// Diadaptasi dari komponen "Glassmorphism Folder Cards" karya Kedhareswer Naidu di 21st.dev (MIT,
+// lihat docs/assets.md).
 
 const cache = new Map<string, Promise<HTMLCanvasElement>>()
 const queue: { job: ArtJob; priority: number; done: (canvas: HTMLCanvasElement) => void }[] = []

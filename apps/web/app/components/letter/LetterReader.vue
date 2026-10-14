@@ -37,11 +37,13 @@ useBackToClose(open, () => {
 <template>
   <DialogRoot v-model:open="open">
     <DialogPortal>
+      <!-- z-60: di atas penampil Kotak surat (z-40 dan z-50), tempat tampilan ini juga dibuka. -->
       <DialogOverlay
-        class="fixed inset-0 z-40 bg-[rgb(24_32_74/0.94)] backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
+        data-testid="letter-reader-overlay"
+        class="fixed inset-0 z-[60] bg-[rgb(24_32_74/0.94)] backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
       />
       <DialogContent
-        class="fixed inset-0 z-50 overflow-y-auto overscroll-contain px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))] data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
+        class="fixed inset-0 z-[60] overflow-y-auto overscroll-contain px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))] data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
         :aria-describedby="undefined"
         data-testid="letter-reader"
         data-surface="dark"

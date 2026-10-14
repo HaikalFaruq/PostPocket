@@ -64,18 +64,24 @@ export function exportMethod(env: ExportEnv): 'share' | 'download' {
   return env.canShareFiles && isIos(env.userAgent, env.maxTouchPoints) ? 'share' : 'download'
 }
 
+/** Berkas ini akan dikirim lewat lembar Bagikan (iPhone dan iPad), bukan diunduh biasa. */
+export function sharesToPhotos(files: File[]): boolean {
+  return (
+    exportMethod({
+      userAgent: navigator.userAgent,
+      maxTouchPoints: navigator.maxTouchPoints ?? 0,
+      canShareFiles: typeof navigator.canShare === 'function' && navigator.canShare({ files }),
+    }) === 'share'
+  )
+}
+
 /**
  * Kirim foto ke galeri. `cancelled` kalau lembar Bagikan ditutup tanpa memilih. Kalau browser
  * menolak lembar Bagikan (misalnya izin dari ketukan sudah lewat), foto diunduh biasa.
  */
 export async function exportPhotos(files: File[]): Promise<'shared' | 'downloaded' | 'cancelled'> {
   if (!files.length) return 'downloaded'
-  const method = exportMethod({
-    userAgent: navigator.userAgent,
-    maxTouchPoints: navigator.maxTouchPoints ?? 0,
-    canShareFiles: typeof navigator.canShare === 'function' && navigator.canShare({ files }),
-  })
-  if (method === 'share') {
+  if (sharesToPhotos(files)) {
     try {
       await navigator.share({ files })
       return 'shared'

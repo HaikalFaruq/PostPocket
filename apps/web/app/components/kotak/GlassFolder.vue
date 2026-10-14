@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { byId, kotak } from '@postpocket/presets'
-import { fanSlot, hashString, rng } from '~/utils/folder-art'
+import { FOLDER_HEADROOM, fanSlot, hashString, openRoom, rng } from '~/utils/folder-art'
 import { paintArt } from '~/utils/folder-paint'
 
 /**
- * Folder kaca untuk Kotak surat, diadaptasi dari template "Glass Folder Cards" yang dibagikan
- * Kall. Tiga lapis dari belakang ke depan: panel belakang berisi seni dari preset, surat-surat di
- * dalamnya, lalu panel depan dari kaca buram yang mengaburkan apa pun di belakangnya.
+ * Folder kaca untuk Kotak surat, diadaptasi dari komponen "Glassmorphism Folder Cards" karya
+ * Kedhareswer Naidu (https://21st.dev/kedhareswer/glass-folder-cards/default, lisensi MIT,
+ * pemberitahuannya di docs/assets.md). Tiga lapis dari belakang ke depan: panel belakang berisi
+ * seni dari preset, surat-surat di dalamnya, lalu panel depan dari kaca buram yang mengaburkan apa
+ * pun di belakangnya.
  *
  * - Diam: rata dan tertutup, ujung atas surat baru sedikit terlihat di balik kaca.
- * - Disorot (hover atau fokus): kaca condong ke depan di engsel bawahnya, surat sedikit terangkat.
+ * - Disorot mouse atau difokus keyboard: kaca condong ke depan di engsel bawahnya, surat sedikit
+ *   terangkat. Tidak setelah diketuk di HP, supaya folder yang ditutup kembali rata.
  * - Dibuka (ketuk, Enter, Spasi): kaca jatuh lebih jauh, surat naik dan menyebar seperti kipas,
- *   dan tiap surat jadi tombol.
- * - Disegel (`sealed`): tidak bisa dibuka, dengan cap tanggal di kacanya.
+ *   dan tiap surat jadi tombol. Ruang di atas folder ikut membesar, jadi kipasnya tidak menutupi
+ *   judul di atasnya.
+ * - Disegel (`sealed`): tidak bisa dibuka, dengan cap tanggal di kacanya, dan bergoyang saat
+ *   diketuk.
  */
 export interface FolderFile {
   id: string
@@ -68,7 +73,7 @@ const emit = defineEmits<{ select: [file: FolderFile, index: number] }>()
 const W = 340
 const H = 272
 /** Ruang di atas panel belakang tempat surat naik saat folder dibuka. */
-const HEADROOM = 54
+const HEADROOM = FOLDER_HEADROOM
 const FRONT_TOP = 74
 const FRONT_H = H - FRONT_TOP
 const SHEET_W = 272
@@ -96,6 +101,12 @@ const visible = computed(() => props.files.slice(0, MAX_VISIBLE))
 const count = computed(() => props.files.length)
 const metaLine = computed(() => props.meta ?? `${count.value} surat`)
 
+// Saat terbuka, kipas tiga atau empat lembar naik lebih tinggi dari HEADROOM, jadi ruangnya ikut
+// membesar (dan foldernya turun) supaya kipasnya tidak menutupi judul di atas folder.
+const room = computed(() =>
+  open.value && !props.sealed ? openRoom(visible.value.length) : HEADROOM,
+)
+
 function sheetStyle(file: FolderFile, index: number) {
   const jitter = rng(hashString(file.id))
   const depth = index
@@ -109,9 +120,18 @@ function sheetStyle(file: FolderFile, index: number) {
   }
 }
 
+// Folder yang disegel bergoyang sedikit saat diketuk, tanda belum bisa dibuka.
+const nudging = ref(false)
 function toggle() {
-  if (props.sealed) return
+  if (props.sealed) {
+    nudging.value = false
+    requestAnimationFrame(() => (nudging.value = true))
+    return
+  }
   open.value = !open.value
+}
+function endNudge(event: AnimationEvent) {
+  if (event.target === event.currentTarget) nudging.value = false
 }
 
 // Seni panel belakang dilukis sekali per resep dan ukuran, lalu dipakai bersama.
@@ -212,14 +232,15 @@ defineExpose({
     :data-entered="entered || undefined"
     :data-place="labelPlacement"
     :data-sealed="sealed || undefined"
-    :style="{ width: `${width}px`, height: `${(H + HEADROOM) * k}px` }"
+    :data-nudge="nudging || undefined"
+    :style="{ width: `${width}px`, height: `${(H + room) * k}px` }"
     data-testid="glass-folder"
     @pointermove="onPointerMove"
     @pointerleave="onPointerLeave"
     @keydown="onKeydown"
   >
-    <div class="gf-stage" :style="{ transform: `translateY(${HEADROOM * k}px) scale(${k})` }">
-      <div class="gf-tilt">
+    <div class="gf-stage" :style="{ transform: `translateY(${room * k}px) scale(${k})` }">
+      <div class="gf-tilt" @animationend="endNudge">
         <div class="gf-shadow" aria-hidden="true" />
 
         <!-- Panel belakang dan seninya. -->
@@ -304,8 +325,8 @@ defineExpose({
               <i style="width: 88%" />
               <i style="width: 42%" />
             </span>
-            <span class="gf-sheet-head" aria-hidden="true">
-              <span class="gf-sheet-name">{{ file.name }}</span>
+            <span v-if="file.name || file.meta" class="gf-sheet-head" aria-hidden="true">
+              <span v-if="file.name" class="gf-sheet-name">{{ file.name }}</span>
               <span v-if="file.meta" class="gf-sheet-meta">{{ file.meta }}</span>
             </span>
             <span v-if="file.unread" class="gf-unread" aria-hidden="true" />
@@ -336,10 +357,25 @@ defineExpose({
   text-align: left;
   -webkit-tap-highlight-color: transparent;
   isolation: isolate;
+  transition: height 0.6s var(--gf-ease);
 }
 
-.gf-root:hover,
-.gf-root:focus-within {
+/*
+ * Condong saat disorot mouse atau difokus keyboard. Bukan saat diketuk: di HP :hover menempel dan
+ * tombol yang diketuk ikut terfokus, jadi folder yang baru ditutup akan tampak setengah terbuka.
+ * Dua aturan terpisah, supaya browser tanpa :has() tetap memakai yang pertama.
+ */
+@media (hover: hover) {
+  .gf-root:hover {
+    --gf-hinge: -11deg;
+    --gf-lift: -34px;
+    --gf-spread: 8px;
+    --gf-fan: 1.4deg;
+    --gf-stack: 10px;
+  }
+}
+
+.gf-root:has(:focus-visible) {
   --gf-hinge: -11deg;
   --gf-lift: -34px;
   --gf-spread: 8px;
@@ -371,6 +407,30 @@ defineExpose({
   width: 340px;
   height: 272px;
   transform-origin: 0 0;
+  transition: transform 0.6s var(--gf-ease);
+}
+
+.gf-root[data-nudge] .gf-tilt {
+  animation: gf-nudge 0.46s var(--gf-ease);
+}
+
+@keyframes gf-nudge {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  20% {
+    translate: -7px 0;
+  }
+
+  45% {
+    translate: 6px 0;
+  }
+
+  70% {
+    translate: -3px 0;
+  }
 }
 
 .gf-tilt {
@@ -491,7 +551,6 @@ defineExpose({
     opacity 0.9s var(--gf-ease);
 }
 
-.gf-root[data-open] .gf-sheet:hover,
 .gf-root[data-open] .gf-sheet:focus-visible {
   transform: translate(
       calc(var(--gf-jx) + var(--gf-slot) * var(--gf-spread)),
@@ -503,6 +562,21 @@ defineExpose({
     0 0 0 0.5px rgb(24 32 74 / 0.12),
     0 22px 40px -12px rgb(24 32 74 / 0.42);
   transition-delay: 0s;
+}
+
+@media (hover: hover) {
+  .gf-root[data-open] .gf-sheet:hover {
+    transform: translate(
+        calc(var(--gf-jx) + var(--gf-slot) * var(--gf-spread)),
+        calc(var(--gf-lift) + var(--gf-depth) * var(--gf-stack) * -1 - 18px)
+      )
+      rotate(calc(var(--gf-slot) * var(--gf-fan) * 0.6));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 0 0 0.5px rgb(24 32 74 / 0.12),
+      0 22px 40px -12px rgb(24 32 74 / 0.42);
+    transition-delay: 0s;
+  }
 }
 
 .gf-sheet:focus-visible {
@@ -520,31 +594,42 @@ defineExpose({
   object-position: 50% 30%;
 }
 
-/* Gradasi gelap di atas gambar supaya nama pengirim tetap terbaca (minimal 4,5:1). */
 .gf-sheet--art::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgb(10 14 36 / 0.62) 0%, rgb(10 14 36 / 0) 38%);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2);
   pointer-events: none;
 }
 
 .gf-sheet-head {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  top: 11px;
+  left: 10px;
+  right: 10px;
+  top: 9px;
   z-index: 1;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   white-space: nowrap;
 }
 
+/*
+ * Nama dan tanggal di label putih seperti etiket kertas, supaya terbaca (minimal 4,5:1) di atas
+ * gambar depan apa pun, juga kertas gelap atau foto yang terang.
+ */
+.gf-sheet-name,
+.gf-sheet-meta {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 1px 2px rgb(24 32 74 / 0.16);
+}
+
 .gf-sheet-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 14px;
@@ -555,19 +640,10 @@ defineExpose({
 
 .gf-sheet-meta {
   flex: none;
+  margin-left: auto;
   font-size: 12px;
   font-weight: 500;
   color: var(--color-ink-muted);
-}
-
-.gf-sheet--art .gf-sheet-name {
-  color: #fff;
-  text-shadow: 0 1px 2px rgb(10 14 36 / 0.45);
-}
-
-.gf-sheet--art .gf-sheet-meta {
-  color: rgb(255 255 255 / 0.86);
-  text-shadow: 0 1px 2px rgb(10 14 36 / 0.45);
 }
 
 .gf-unread {
@@ -712,7 +788,8 @@ defineExpose({
 .gf-meta {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-ink-muted);
+  /* Lebih pekat dari ink-muted: kacanya bisa gelap di belakang seni atau surat bergambar. */
+  color: rgb(24 32 74 / 0.8);
   white-space: nowrap;
   animation: gf-roll 0.5s var(--gf-ease) both;
 }
@@ -824,6 +901,7 @@ defineExpose({
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gf-root,
   .gf-root *,
   .gf-root *::before,
   .gf-root *::after {

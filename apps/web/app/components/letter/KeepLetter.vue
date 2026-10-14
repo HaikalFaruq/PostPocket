@@ -6,6 +6,7 @@ import {
   exportPhotos,
   fetchPhoto,
   photoFileName,
+  sharesToPhotos,
   type RemotePhoto,
 } from '~/utils/letter-photos'
 import { isInAppBrowser } from '~/utils/pwa'
@@ -83,23 +84,29 @@ async function keep() {
 // lembar Bagikan di iPhone langsung terbuka dari ketukan. Safari menolaknya kalau ketukannya
 // sudah lama berlalu.
 const files = shallowRef<File[] | null>(null)
-async function prepareFiles(): Promise<File[]> {
-  if (files.value) return files.value
-  const photos = await Promise.all(remotePhotos.value.map((photo) => fetchPhoto(photo)))
-  files.value = photos.flatMap((photo, index) =>
-    photo
-      ? [
-          new File(
-            [photo.blob],
-            photoFileName(`surat ${props.letter.slug}`, index, photo.blob.type),
-            {
-              type: photo.blob.type || 'image/jpeg',
-            },
-          ),
-        ]
-      : [],
-  )
-  return files.value
+// Unduhan yang sedang berjalan dipakai bersama, supaya ketukan selama foto disiapkan tidak
+// mengunduh semuanya lagi.
+let preparing: Promise<File[]> | null = null
+function prepareFiles(): Promise<File[]> {
+  preparing ??= (async () => {
+    const photos = await Promise.all(remotePhotos.value.map((photo) => fetchPhoto(photo)))
+    files.value = photos.flatMap((photo, index) =>
+      photo
+        ? [
+            new File(
+              [photo.blob],
+              photoFileName(`surat ${props.letter.slug}`, index, photo.blob.type),
+              { type: photo.blob.type || 'image/jpeg' },
+            ),
+          ]
+        : [],
+    )
+    return files.value
+  })().catch((problem) => {
+    preparing = null
+    throw problem
+  })
+  return preparing
 }
 onMounted(() => {
   if (remotePhotos.value.length) prepareFiles().catch(() => {})
@@ -110,9 +117,16 @@ async function download() {
   exporting.value = true
   message.value = ''
   try {
-    const list = await prepareFiles()
+    const ready = files.value
+    const list = ready ?? (await prepareFiles())
     if (!list.length) {
       message.value = 'Fotonya sudah dihapus dari server.'
+      return
+    }
+    // Lembar Bagikan di iPhone butuh ketukan yang masih baru. Kalau fotonya baru selesai
+    // disiapkan, ketukan berikutnya yang menyimpannya.
+    if (!ready && sharesToPhotos(list)) {
+      message.value = `${list.length} foto siap. Ketuk Unduh foto sekali lagi untuk menyimpannya.`
       return
     }
     const result = await exportPhotos(list)
@@ -162,7 +176,7 @@ async function download() {
       <NuxtLink
         v-if="state === 'saved'"
         to="/kotak"
-        class="inline-flex h-10 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+        class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
         data-testid="keep-open-box"
       >
         Buka Kotak surat
@@ -170,7 +184,7 @@ async function download() {
       <button
         v-else
         type="button"
-        class="inline-flex h-10 items-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90 disabled:opacity-60"
+        class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90 disabled:opacity-70"
         :disabled="state === 'saving'"
         data-testid="keep-save"
         @click="keep"
@@ -185,7 +199,7 @@ async function download() {
       <button
         v-if="remotePhotos.length"
         type="button"
-        class="inline-flex h-10 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel disabled:opacity-60"
+        class="inline-flex h-11 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel disabled:opacity-70"
         :disabled="exporting"
         data-testid="keep-download"
         @click="download"
