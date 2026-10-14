@@ -24,6 +24,10 @@
   --color-line: rgb(24 32 74 / 0.14);
   --color-line-soft: rgb(24 32 74 / 0.08);
   --color-fill: rgb(24 32 74 / 0.05);
+  /* Garis figur Hairline di Beranda: tinta yang memudar ke putih, dari tepi sampai yang menjauh. */
+  --color-hairline-edge: #9599ae;
+  --color-hairline-mid: #c5c8d5;
+  --color-hairline-lo: #e3e5ec;
   --color-post-red: #e23b3b;
 
   /*
