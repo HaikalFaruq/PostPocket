@@ -255,7 +255,7 @@ Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql
 
 - Tarik perubahan pakai jendela tumpang tindih: `updated_at > sinkron_terakhir - 5 menit`. `updated_at = now()` adalah waktu mulai transaksi, jadi transaksi yang commit belakangan bisa punya `updated_at` lebih kecil dari titik sinkron terakhir. Penerapan di browser harus idempoten, karena baris yang sama bisa datang dua kali.
 - "Tulisan terakhir menang" per baris berarti HP yang lama offline bisa menimpa urutan `moment_ids` yang lebih baru. Di kantong, browser menempelkan lagi momen dengan `day` itu yang tidak ada di array, jadi foto tidak hilang dari kantong. Di album CD, tambahan dari HP lain bisa hilang. Diterima untuk beta.
-- Sinkron pertama mengganti id lokal momen (`m` + 6 karakter) dan album (`a` + 6 karakter) dengan UUID, termasuk di `PocketDay.moments`, `Album.moments`, dan kunci foto di IndexedDB.
+- Id lokal momen dan album sudah UUID sejak #48. Data lama (`m`/`a` + 6 karakter) diganti saat dimuat, termasuk di `PocketDay.moments` dan `Album.moments`, jadi sinkron pertama tidak perlu mengganti id. Fotonya tidak dipindah: momen lama menyimpan kunci fotonya di `Moment.photoKey`. Kolom ini hanya ada di perangkat itu, tidak ikut ke server.
 - Yang naik ke bucket adalah versi kompres ≤ 500 KB, sama seperti foto surat. Foto lokal (JPEG 2048 px, kualitas 0,86) sering lebih besar, jadi HP lain mendapat versi kompresnya.
 
 **Storage**
