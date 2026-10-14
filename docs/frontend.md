@@ -208,6 +208,31 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 
 ## Uji di HP sungguhan
 
+Tiga item checklist yang tersisa dicek sekali jalan dengan daftar di bawah:
+- benchmark dan kamera (Sprint 0);
+- gerbang 50 fps (Sprint 1);
+- uji di 3 HP (beta).
+
+Pakai tiga HP: iPhone (Safari), Android kelas menengah (Chrome), dan satu Android lain, lebih bagus lagi kalau yang murah. Semua dibuka di domain produksi, karena kamera butuh HTTPS.
+
+| # | Lakukan | Yang harus terjadi |
+| --- | --- | --- |
+| 1 | Buka `/lab/foil?bench=1`, tunggu 4 detik, lalu tekan "Salin hasil" di langkah 5 | Hasil fps dan p95 tersalin. Gerbang: di atas 50 fps di Android kelas menengah |
+| 2 | Buka `/lab/safari` | Semua cek lolos, dan kamera tampil setelah diberi izin |
+| 3 | Tulis surat: foto depan dari galeri (HEIC di iPhone), coba Detail, Bayangan, dan Satu warna, isi 2 foto dan stiker, lalu Buat link | Kartu berubah langsung, link keluar, dan foto tidak tertutup foil |
+| 4 | Kirim link-nya lewat WhatsApp ke HP lain, buka, ketuk kartu, lalu Bikin balasan | Preview muncul, surat terbuka tanpa login, dan animasi bukanya mulus |
+| 5 | Pocket: simpan hari dengan 3 foto, buka kantong dengan ketukan lalu dengan goresan, geser foto di tali, ganti desain, lalu hapus kantong | Foto keluar dari mulut kantong, tali bisa digeser, tidak patah-patah |
+| 6 | TV: putar album bulan ini, seret CD ke TV, ganti filter | CD terbang ke slot dan slideshow jalan dengan filter |
+| 7 | Booth: ambil strip 1×4, simpan ke Pocket dan CD, lalu Pakai di surat | Hitung mundur jalan, strip sesuai pratinjau, dan muncul di surat |
+| 8 | Pasang ke layar utama, nyalakan mode pesawat, buka Pocket dan TV | Keduanya tetap terbuka offline, lengkap dengan foto |
+
+Laporan per HP berisi:
+- model HP, versi OS, dan browser;
+- hasil langkah 1;
+- nomor langkah yang bermasalah, beserta screenshot.
+
+Kalau ketiga HP lolos, centang ketiga item itu di checklist.
+
 - `/lab/foil?bench=1` menjalankan benchmark otomatis; hasilnya muncul di pojok kanan atas dan bisa disalin dari langkah 5. Parameter lain: `?flip=1` (sampul belakang) dan `?open=1` (kartu terbuka).
 - `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: buka di domain produksi, atau `pnpm dev --host` lalu tunnel HTTPS.
 
