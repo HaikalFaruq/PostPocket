@@ -275,9 +275,9 @@ Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql
 
 ## Login Google
 
-Login fase 2 hanya lewat Google (keputusan #47), dipasang bareng Kall karena butuh akses Google Cloud dan dashboard Supabase. Client secret hanya diketik langsung di dashboard Supabase (dan `supabase/.env` lokal kalau perlu), tidak pernah lewat chat, commit, atau PR.
+Login fase 2 hanya lewat Google (keputusan #47). Kall membuat OAuth client di Google Cloud dan menempelkan client secret sendiri di dashboard Supabase, setelah diundang Bintang ke organisasi Supabase. Jadi secret-nya tidak pernah pindah tangan, dan tidak pernah lewat chat, commit, atau PR.
 
-**1. Google Cloud (Google Auth Platform)**
+**1. Google Cloud (Google Auth Platform), oleh Kall**
 
 - Branding: nama aplikasi PostPocket, email dukungan, domain `postpocket.vercel.app`, link ke `/privasi`.
 - Audience: External. Selama beta cukup mode Testing dengan tester didaftarkan (maksimal 100). Scope hanya `openid`, `email`, `profile`, jadi tidak perlu verifikasi Google kalau nanti dipublikasikan.
@@ -287,9 +287,11 @@ Login fase 2 hanya lewat Google (keputusan #47), dipasang bareng Kall karena but
 
 **2. Dashboard Supabase (Authentication)**
 
-- Sign In / Providers → Google: aktifkan, isi Client ID dan Client Secret.
+Bintang mengundang email Kall ke organisasi Supabase dulu (Organization → Team), lalu:
+
+- Sign In / Providers → Google: aktifkan, isi Client ID dan Client Secret (Kall).
 - Sign In / Providers → Email: matikan pendaftaran baru. Sampai sekarang pendaftaran email di produksi masih terbuka (dicek lewat `/auth/v1/settings`), dan PostPocket tidak memakainya.
-- URL Configuration: Site URL `https://postpocket.vercel.app`, Redirect URLs `https://postpocket.vercel.app/**`. Preview Vercel dan localhost tidak didaftarkan, sama seperti CORS.
+- URL Configuration: Site URL `https://postpocket.vercel.app`, Redirect URLs `https://postpocket.vercel.app/**`. Preview Vercel dan localhost tidak didaftarkan, sama seperti CORS: REST Supabase menerima origin mana pun, jadi redirect ke localhost membuat `pnpm dev` bisa login dan menulis tabel fase 2 di produksi. Login saat development lewat stack lokal, yang Site URL-nya sudah `http://localhost:3000` di `config.toml` dan callback-nya `http://127.0.0.1:54321/auth/v1/callback` (sudah didaftarkan di Google).
 
 **3. Cek setelah setup**
 
