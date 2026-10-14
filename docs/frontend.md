@@ -67,6 +67,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 - **`mask` dijalankan setelah `filter`.** Kalau elemen ber-mask butuh bayangan, taruh `drop-shadow` di pembungkusnya.
 - **Foto user selalu lewat `preparePhoto()`**: diputar sesuai EXIF, diperkecil ke 2048 px, lalu disimpan ulang sebagai JPEG supaya metadata lokasi hilang (PRD bagian Privasi).
 - **Draf di IndexedDB menyimpan foto sebagai byte (`ArrayBuffer`), bukan `Blob`**: Safari Private Browsing menolak Blob di IndexedDB. Foto disimpan di key terpisah supaya mengetik isi surat tidak menulis ulang foto.
+- **Id momen dan album Pocket adalah UUID (`crypto.randomUUID()`)**, karena sinkron fase 2 memakai id dari browser (rancangan skema fase 2 di `docs/backend.md`, PR #47). Data lama, dengan id `m`/`a` + 6 karakter, diganti sekali saat dimuat. Fotonya tetap di kunci lama lewat `Moment.photoKey`, jadi penggantiannya cukup satu tulisan dan aman kalau terputus. Baca dan hapus foto selalu lewat store, jangan pakai `PHOTO_PREFIX + id` langsung.
 - **Isi surat hanya dirender `LetterElementView`**, di editor, kartu, maupun halaman penerima. Jangan bikin renderer kedua, supaya yang dilihat penerima sama dengan yang disusun pengirim ([keputusan](spikes/editor-isi-surat.md)).
 - **Ekspor foto berfilter lewat `drawFiltered()`**, jangan `ctx.filter` langsung: Safari tidak mendukung `ctx.filter` dan filternya hilang diam-diam ([hasil spike](spikes/safari.md)).
 

@@ -4,10 +4,12 @@ import {
   albumShelf,
   dayAlbum,
   dayKey,
+  hasLegacyIds,
   monthAlbums,
   monthTitle,
   normalizeMemories,
   parseDay,
+  withUuids,
   withoutMoments,
   type MemoryData,
   type Moment,
@@ -89,6 +91,17 @@ describe('normalizeMemories', () => {
     expect(Object.keys(data.days)).toEqual(['2026-10-01'])
     expect(data.albums).toHaveLength(1)
     expect(data.albums[0]).toMatchObject({ title: 'Album', emoji: '📀', moments: ['a'] })
+  })
+
+  it('photoKey momen lama dipertahankan, yang rusak dibuang', () => {
+    const data = normalizeMemories({
+      moments: {
+        lama: { ...moment('u1', '2026-10-01', '2026-10-01T08:00:00.000Z'), photoKey: 'm4k2x9' },
+        rusak: { ...moment('u2', '2026-10-01', '2026-10-01T09:00:00.000Z'), photoKey: '../x' },
+      },
+    })
+    expect(data.moments.u1?.photoKey).toBe('m4k2x9')
+    expect(data.moments.u2).not.toHaveProperty('photoKey')
   })
 
   it('stiker kantong yang tidak dikenal diganti bawaan', () => {
@@ -188,5 +201,66 @@ describe('withoutMoments', () => {
     expect(Object.keys(next.days)).toEqual(['2026-10-02'])
     expect(Object.keys(next.moments)).toEqual(['c'])
     expect(next.albums[0]!.moments).toEqual(['c'])
+  })
+})
+
+describe('withUuids', () => {
+  const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const kept = uuid(99)
+  const legacy: MemoryData = {
+    version: 1,
+    moments: {
+      m1aaaa: moment('m1aaaa', '2026-10-01', '2026-10-01T10:00:00.000Z'),
+      m2bbbb: moment('m2bbbb', '2026-10-01', '2026-10-01T11:00:00.000Z'),
+      [kept]: moment(kept, '2026-10-02', '2026-10-02T09:00:00.000Z'),
+    },
+    days: {
+      '2026-10-01': {
+        day: '2026-10-01',
+        packet: 'blue',
+        sticker: 'heart',
+        frame: 'polaroid',
+        frameColor: 'cream',
+        moments: ['m2bbbb', 'm1aaaa'],
+        savedAt: '2026-10-01T12:00:00.000Z',
+      },
+    },
+    albums: [
+      {
+        id: 'a3cccc',
+        title: 'Liburan',
+        emoji: '📀',
+        color: '#ff8fa3',
+        moments: [kept, 'm2bbbb'],
+        createdAt: '2026-10-02T12:00:00.000Z',
+      },
+    ],
+  }
+
+  it('id lama momen dan album jadi UUID, urutan di kantong dan album tetap', () => {
+    let n = 0
+    const next = withUuids(legacy, () => uuid(++n))
+    expect(hasLegacyIds(legacy)).toBe(true)
+    expect(hasLegacyIds(next)).toBe(false)
+    expect(next.moments[uuid(1)]).toMatchObject({ id: uuid(1), photoKey: 'm1aaaa' })
+    expect(next.moments[uuid(2)]).toMatchObject({ id: uuid(2), photoKey: 'm2bbbb' })
+    // Momen yang sudah UUID tidak berubah dan tidak perlu photoKey.
+    expect(next.moments[kept]).toEqual(legacy.moments[kept])
+    expect(next.days['2026-10-01']!.moments).toEqual([uuid(2), uuid(1)])
+    expect(next.albums[0]).toMatchObject({ id: uuid(3), moments: [kept, uuid(2)] })
+    // Data asli tidak diubah.
+    expect(legacy.days['2026-10-01']!.moments).toEqual(['m2bbbb', 'm1aaaa'])
+  })
+
+  it('data yang sudah UUID semua dikembalikan sama persis', () => {
+    let n = 0
+    const once = withUuids(legacy, () => uuid(++n))
+    expect(withUuids(once, () => uuid(++n))).toEqual(once)
+  })
+
+  it('hasil penggantian lolos normalizeMemories, photoKey ikut tersimpan', () => {
+    let n = 0
+    const next = withUuids(legacy, () => uuid(++n))
+    expect(normalizeMemories(JSON.parse(JSON.stringify(next)))).toEqual(next)
   })
 })

@@ -5,6 +5,7 @@ import { byId, letter, pocket } from '@postpocket/presets'
 
 /** Satu foto kenangan, dari upload atau Booth. Gambarnya disimpan terpisah per id. */
 export interface Moment {
+  /** UUID, dibuat di browser supaya unik di semua perangkat saat disinkronkan (fase 2). */
   id: string
   /** Hari kantongnya, tanggal lokal `YYYY-MM-DD`. */
   day: string
@@ -13,6 +14,11 @@ export interface Moment {
   source: 'upload' | 'booth'
   width: number
   height: number
+  /**
+   * Kunci foto di IndexedDB kalau beda dengan `id`: id lama momen yang dibuat sebelum UUID.
+   * Fotonya tidak dipindah supaya penggantian id cukup satu tulisan. Hanya di perangkat ini.
+   */
+  photoKey?: string
 }
 
 /** Satu hari di Pocket: desain kantong dan momen di dalamnya. */
@@ -154,6 +160,9 @@ function toMoment(value: unknown): Moment | null {
     source: item.source === 'booth' ? 'booth' : 'upload',
     width,
     height,
+    ...(typeof item.photoKey === 'string' && ID.test(item.photoKey)
+      ? { photoKey: item.photoKey }
+      : {}),
   }
 }
 
@@ -214,6 +223,53 @@ export function normalizeMemories(raw: unknown): MemoryData {
     }
   }
   return data
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Masih ada momen atau album dengan id lama (`m`/`a` + 6 karakter) yang belum jadi UUID. */
+export function hasLegacyIds(data: MemoryData): boolean {
+  return (
+    Object.keys(data.moments).some((id) => !UUID.test(id)) ||
+    data.albums.some((album) => !UUID.test(album.id))
+  )
+}
+
+/**
+ * Data yang sama, dengan id lama momen dan album diganti UUID, termasuk di kantong dan album.
+ * Fase 2 menyinkronkan baris dengan id dari browser (docs/backend.md, Rancangan skema fase 2),
+ * jadi id harus unik di semua perangkat; id lama hanya 6 karakter acak per perangkat. Momen
+ * yang diganti menyimpan id lamanya sebagai `photoKey`, jadi fotonya tidak perlu dipindah.
+ */
+export function withUuids(
+  data: MemoryData,
+  newId: () => string = () => crypto.randomUUID(),
+): MemoryData {
+  const renamed = new Map<string, string>()
+  for (const id of Object.keys(data.moments)) if (!UUID.test(id)) renamed.set(id, newId())
+  const rename = (id: string) => renamed.get(id) ?? id
+  return {
+    ...data,
+    moments: Object.fromEntries(
+      Object.values(data.moments).map((moment) => {
+        const id = renamed.get(moment.id)
+        return id
+          ? [id, { ...moment, id, photoKey: moment.photoKey ?? moment.id }]
+          : [moment.id, moment]
+      }),
+    ),
+    days: Object.fromEntries(
+      Object.entries(data.days).map(([key, day]) => [
+        key,
+        { ...day, moments: day.moments.map(rename) },
+      ]),
+    ),
+    albums: data.albums.map((album) => ({
+      ...album,
+      id: UUID.test(album.id) ? album.id : newId(),
+      moments: album.moments.map(rename),
+    })),
+  }
 }
 
 /** CD sementara berisi satu kantong Pocket, untuk tombol "Putar di TV". */

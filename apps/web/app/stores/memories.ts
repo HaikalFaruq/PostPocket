@@ -1,13 +1,14 @@
 import { del, get, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
 import { toStoredPhoto, type DraftPhoto, type StoredPhoto } from '~/utils/letter-draft'
-import { uniqueId } from '~/utils/letter-gesture'
 import { requestPersistentStorage } from '~/utils/pwa'
 import {
   SPINE_COLORS,
   albumShelf,
   emptyMemories,
+  hasLegacyIds,
   normalizeMemories,
+  withUuids,
   withoutMoments,
   type Album,
   type MemoryData,
@@ -33,10 +34,18 @@ export const useMemories = defineStore('memories', () => {
     if (ready.value) return
     try {
       data.value = normalizeMemories(await get(DATA_KEY))
+      // Id lama diganti UUID sekali, dalam satu tulisan: fotonya tetap di kunci lama
+      // (`photoKey`), jadi kalau terputus di tengah, data lama masih utuh dan diulang nanti.
+      if (hasLegacyIds(data.value)) await persist(withUuids(data.value))
     } catch {
       // IndexedDB tidak tersedia: mulai kosong.
     }
     ready.value = true
+  }
+
+  /** Kunci foto momen di IndexedDB. Momen dari sebelum UUID memakai id lamanya. */
+  function photoKey(id: string): string {
+    return PHOTO_PREFIX + (data.value.moments[id]?.photoKey ?? id)
   }
 
   async function persist(next: MemoryData) {
@@ -52,7 +61,7 @@ export const useMemories = defineStore('memories', () => {
   /** Foto momen dari IndexedDB, atau `null` kalau sudah tidak ada. */
   async function photo(id: string): Promise<DraftPhoto | null> {
     try {
-      const stored = (await get(PHOTO_PREFIX + id)) as StoredPhoto | undefined
+      const stored = (await get(photoKey(id))) as StoredPhoto | undefined
       if (!stored?.bytes) return null
       return {
         blob: new Blob([stored.bytes], { type: stored.type || 'image/jpeg' }),
@@ -80,11 +89,9 @@ export const useMemories = defineStore('memories', () => {
     options: { day: string; source: Moment['source'] },
   ): Promise<string[]> {
     const moments = { ...data.value.moments }
-    const taken = new Set(Object.keys(moments))
     const ids: string[] = []
     for (const item of photos) {
-      const id = uniqueId('m', taken)
-      taken.add(id)
+      const id = crypto.randomUUID()
       await set(PHOTO_PREFIX + id, await toStoredPhoto(item.photo))
       moments[id] = {
         id,
@@ -109,7 +116,7 @@ export const useMemories = defineStore('memories', () => {
 
   async function createAlbum(title: string, emoji = '📀', moments: string[] = []): Promise<Album> {
     const album: Album = {
-      id: uniqueId('a', new Set(data.value.albums.map((item) => item.id))),
+      id: crypto.randomUUID(),
       title: title.trim().slice(0, 40) || 'Album baru',
       emoji,
       color: SPINE_COLORS[data.value.albums.length % SPINE_COLORS.length]!,
@@ -148,13 +155,15 @@ export const useMemories = defineStore('memories', () => {
   /** Hapus momen dari semua hari dan album, beserta fotonya. */
   /** Hapus momen-momen ini beserta fotonya, dari kantong dan album CD. */
   async function deleteMoments(ids: string[], dropDay?: string) {
+    // Kunci fotonya diambil sebelum momennya hilang dari data (momen lama memakai `photoKey`).
+    const keys = ids.map(photoKey)
     await persist(withoutMoments(data.value, ids, dropDay))
-    for (const id of ids) {
+    for (const [index, id] of ids.entries()) {
       const url = urls.get(id)
       urls.delete(id)
       url?.then((value) => value && URL.revokeObjectURL(value))
       try {
-        await del(PHOTO_PREFIX + id)
+        await del(keys[index]!)
       } catch {
         // Tidak ada yang perlu dihapus.
       }
