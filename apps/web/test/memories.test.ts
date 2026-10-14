@@ -9,8 +9,11 @@ import {
   monthTitle,
   normalizeMemories,
   parseDay,
+  withNewIds,
+  withPending,
   withUuids,
   withoutMoments,
+  withoutSent,
   type MemoryData,
   type Moment,
 } from '../app/utils/memories'
@@ -262,5 +265,88 @@ describe('withUuids', () => {
     let n = 0
     const next = withUuids(legacy, () => uuid(++n))
     expect(normalizeMemories(JSON.parse(JSON.stringify(next)))).toEqual(next)
+  })
+})
+
+describe('catatan perubahan (pending)', () => {
+  it('withPending mencatat baris dengan nomor urut baru, withoutSent hanya membuang yang terkirim', () => {
+    const once = withPending(
+      { version: 1, moments: {}, days: {}, albums: [] },
+      { moments: ['m1'], days: ['2026-10-14'] },
+    )
+    expect(once.pending).toEqual({
+      seq: 1,
+      moments: { m1: 1 },
+      days: { '2026-10-14': 1 },
+      albums: {},
+    })
+    // Kantong berubah lagi selama sinkron: nomornya naik, jadi tidak ikut dibuang.
+    const again = withPending(once, { days: ['2026-10-14'] })
+    const sent = withoutSent(again, { moments: { m1: 1 }, days: { '2026-10-14': 1 } })
+    expect(sent.pending).toEqual({ seq: 2, moments: {}, days: { '2026-10-14': 2 }, albums: {} })
+  })
+
+  it('normalizeMemories menyimpan catatan yang valid, termasuk baris yang sudah dihapus', () => {
+    const data = normalizeMemories({
+      pending: {
+        seq: 3,
+        moments: { m1: 2, 'bukan id!': 1, m2: 'x' },
+        days: { '2026-10-14': 3, kemarin: 1 },
+        albums: {},
+      },
+    })
+    expect(data.pending).toEqual({
+      seq: 3,
+      moments: { m1: 2 },
+      days: { '2026-10-14': 3 },
+      albums: {},
+    })
+    expect(normalizeMemories({ pending: { seq: -1 } }).pending).toBeUndefined()
+  })
+})
+
+describe('withNewIds', () => {
+  it('semua momen dan album dapat id baru, foto tetap di kuncinya, catatan perubahan dikosongkan', () => {
+    const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const data: MemoryData = {
+      version: 1,
+      moments: {
+        [uuid(1)]: moment(uuid(1), '2026-10-01', '2026-10-01T10:00:00.000Z'),
+        [uuid(2)]: {
+          ...moment(uuid(2), '2026-10-01', '2026-10-01T11:00:00.000Z'),
+          photoKey: 'm2lama',
+        },
+      },
+      days: {
+        '2026-10-01': {
+          day: '2026-10-01',
+          packet: 'blue',
+          sticker: 'heart',
+          frame: 'polaroid',
+          frameColor: 'cream',
+          moments: [uuid(2), uuid(1)],
+          savedAt: '2026-10-01T12:00:00.000Z',
+        },
+      },
+      albums: [
+        {
+          id: uuid(9),
+          title: 'Liburan',
+          emoji: '📀',
+          color: '#ff8fa3',
+          moments: [uuid(1)],
+          createdAt: '2026-10-01T12:00:00.000Z',
+        },
+      ],
+      pending: { seq: 1, moments: { [uuid(1)]: 1 }, days: {}, albums: {} },
+    }
+    let n = 100
+    const next = withNewIds(data, () => uuid(++n))
+    expect(Object.keys(next.moments)).toEqual([uuid(101), uuid(102)])
+    expect(next.moments[uuid(101)]!.photoKey).toBe(uuid(1))
+    expect(next.moments[uuid(102)]!.photoKey).toBe('m2lama')
+    expect(next.days['2026-10-01']!.moments).toEqual([uuid(102), uuid(101)])
+    expect(next.albums[0]).toMatchObject({ id: uuid(103), moments: [uuid(101)] })
+    expect(next.pending).toBeUndefined()
   })
 })

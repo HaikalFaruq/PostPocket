@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const port = 4320
+// Sinkron Pocket (e2e/sinkron.spec.ts) jalan ke stack Supabase lokal kalau SYNC_E2E=1, dengan
+// API_URL, PUBLISHABLE_KEY, dan SECRET_KEY dari `supabase status -o env`. Port-nya sendiri, supaya
+// server E2E biasa (tanpa Supabase) tidak terpakai ulang.
+const syncE2E = process.env.SYNC_E2E === '1'
+const port = syncE2E ? 4321 : 4320
 
 // Gerbang Sprint 2 (e2e/live.spec.ts) jalan ke situs asli kalau LIVE_BASE_URL diisi, misalnya
 // https://postpocket.vercel.app. Tanpa itu, semua tes memakai build lokal dan mock API.
@@ -18,7 +22,9 @@ export default defineConfig({
   testDir: 'e2e',
   ...(live
     ? { testMatch: '**/live.spec.ts', outputDir: `test-results/live-${process.env.LIVE_RUN}` }
-    : { testIgnore: '**/live.spec.ts' }),
+    : syncE2E
+      ? { testMatch: '**/sinkron.spec.ts', outputDir: 'test-results/sinkron' }
+      : { testIgnore: ['**/live.spec.ts', '**/sinkron.spec.ts'] }),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -48,12 +54,15 @@ export default defineConfig({
     ? undefined
     : {
         command: `pnpm build && node .output/server/index.mjs`,
-        // E2E memakai mock API surat (server/routes/mock-api), bukan Supabase sungguhan.
+        // E2E memakai mock API surat (server/routes/mock-api), bukan Supabase sungguhan. Tanpa
+        // URL Supabase, cadangan Pocket mati; SYNC_E2E mengarahkannya ke stack lokal.
         env: {
           NITRO_PORT: String(port),
           NITRO_HOST: '127.0.0.1',
           NUXT_MOCK_API: '1',
           NUXT_PUBLIC_API_BASE: '/mock-api',
+          NUXT_PUBLIC_SUPABASE_URL: syncE2E ? (process.env.API_URL ?? '') : '',
+          NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: syncE2E ? (process.env.PUBLISHABLE_KEY ?? '') : '',
         },
         url: `http://127.0.0.1:${port}`,
         reuseExistingServer: !process.env.CI,

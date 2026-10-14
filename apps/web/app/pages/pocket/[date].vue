@@ -28,6 +28,9 @@ const route = useRoute()
 const day = computed(() => String(route.params.date))
 const memories = useMemories()
 onMounted(() => memories.load())
+// Setelah login, kenangan juga tersinkron dari halaman ini (stores/sync.ts).
+const sync = useSync()
+onMounted(() => sync.start())
 
 const saved = computed(() => memories.data.days[day.value])
 const color = computed(
