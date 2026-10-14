@@ -24,6 +24,9 @@ const phase = ref<Phase>('photos')
 const uploaded = ref(0)
 const total = ref(0)
 const error = ref('')
+/** Kode error titipan yang tidak bisa berhasil kalau dikirim ulang apa adanya. */
+const FINAL_TITIP = new Set(['not_found', 'box_not_found', 'box_closed', 'box_full'])
+const final = ref(false)
 const sent = ref<SentLetter | null>(null)
 const copied = ref(false)
 const dialog = ref<HTMLElement | null>(null)
@@ -59,12 +62,13 @@ const opensText = computed(() => {
   const when = formatWhen(box.opensAt, deviceTimeZone())
   return box.scheduled
     ? `${box.to} bisa membukanya mulai ${when}.`
-    : `${box.to} bisa membukanya begitu pembuat kotak membukanya, paling lambat ${when}.`
+    : `${box.to} bisa membacanya setelah pembuat kotak menekan Buka sekarang, paling lambat ${when}.`
 })
 
 async function send() {
   state.value = 'sending'
   error.value = ''
+  final.value = false
   phase.value = 'photos'
   uploaded.value = 0
   try {
@@ -109,11 +113,17 @@ async function send() {
     sent.value = result
     state.value = 'done'
   } catch (problem) {
-    // Draf titipan ikut terhapus kalau kotaknya dihapus pembuatnya (kontrak 0.3.0).
+    const code = problem instanceof LetterApiError ? problem.code : null
+    // Kotak yang dihapus, ditutup, atau penuh tidak akan menerima surat yang sama kalau dikirim
+    // ulang, jadi tidak ada Coba lagi. Draf titipan ikut terhapus kalau kotaknya dihapus
+    // pembuatnya (kontrak 0.3.0).
+    final.value = !!titip.value && FINAL_TITIP.has(code ?? '')
     error.value =
-      titip.value && problem instanceof LetterApiError && problem.code === 'not_found'
+      titip.value && code === 'not_found'
         ? 'Kotak ini sudah dihapus pembuatnya, jadi suratnya tidak bisa dititip.'
-        : errorMessage(problem)
+        : titip.value && code === 'box_closed'
+          ? 'Kotak ini sudah ditutup. Suratmu tetap ada di draf: tekan Batal titip untuk mengirimnya sebagai link biasa.'
+          : errorMessage(problem)
     state.value = 'error'
   }
 }
@@ -355,6 +365,7 @@ onMounted(() => {
         <p role="alert" class="mt-1 text-ink-muted">{{ error }}</p>
         <div class="mt-6 flex gap-2">
           <button
+            v-if="!final"
             type="button"
             class="h-10 flex-1 rounded-control bg-ink text-body font-semibold text-white"
             @click="send"
@@ -363,7 +374,8 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="h-10 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line"
+            class="h-10 rounded-control px-4 text-body font-semibold"
+            :class="final ? 'flex-1 bg-ink text-white' : 'inset-ring inset-ring-line'"
             @click="close"
           >
             Tutup

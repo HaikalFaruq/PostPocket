@@ -73,7 +73,9 @@ async function keepAll() {
     message.value =
       problem instanceof PhotoFetchError
         ? 'Sebagian foto gagal diunduh. Cek sinyal, lalu simpan lagi untuk melanjutkan.'
-        : 'Surat tidak bisa disimpan di browser ini. Coba unduh fotonya saja.'
+        : remotePhotos.value.length
+          ? 'Surat tidak bisa disimpan di browser ini. Coba unduh fotonya saja.'
+          : 'Surat tidak bisa disimpan di browser ini.'
   }
 }
 
@@ -162,8 +164,10 @@ async function prepareFiles(): Promise<File[]> {
     <template v-else>
       <h2 id="keep-box-title" class="text-body font-semibold">Simpan semua jadi kenangan</h2>
       <p class="mt-1 text-caption text-ink-muted">
-        Kotak ini tidak disimpan selamanya. Simpan semua suratnya di HP ini, dan fotonya sekalian
-        jadi satu CD di TV.
+        Kotak ini tidak disimpan selamanya. Simpan semua suratnya di HP ini<template
+          v-if="remotePhotos.length"
+          >, dan fotonya sekalian jadi satu CD di TV</template
+        >.
       </p>
       <p v-if="inApp" class="mt-2 text-caption text-ink-muted">
         Link ini terbuka di dalam aplikasi lain. Supaya ketemu lagi nanti, buka link-nya di Chrome
@@ -176,14 +180,14 @@ async function prepareFiles(): Promise<File[]> {
         <NuxtLink
           v-if="album"
           :to="`/tv?album=${album.id}`"
-          class="inline-flex h-10 items-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+          class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
           data-testid="keep-box-tv"
         >
           <Icon name="play" :size="14" /> Putar di TV
         </NuxtLink>
         <NuxtLink
           to="/kotak"
-          class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+          class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
           data-testid="keep-box-open"
         >
           Buka Kotak surat
@@ -192,7 +196,7 @@ async function prepareFiles(): Promise<File[]> {
       <button
         v-else
         type="button"
-        class="inline-flex h-10 items-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90 disabled:opacity-60"
+        class="inline-flex h-11 items-center gap-2 rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90 disabled:opacity-70"
         :disabled="state === 'saving'"
         data-testid="keep-box-save"
         @click="keepAll"
@@ -211,7 +215,7 @@ async function prepareFiles(): Promise<File[]> {
       <button
         v-if="remotePhotos.length"
         type="button"
-        class="inline-flex h-10 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel disabled:opacity-60"
+        class="inline-flex h-11 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel disabled:opacity-70"
         :disabled="exporting"
         data-testid="keep-box-download"
         @click="download"

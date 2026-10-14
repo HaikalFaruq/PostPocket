@@ -57,6 +57,13 @@ async function reload() {
   }
 }
 
+const retrying = ref(false)
+async function retry() {
+  retrying.value = true
+  await reload()
+  retrying.value = false
+}
+
 // Waktu ditulis dalam WIB saat di-SSR, lalu dalam zona waktu HP begitu halaman dimuat.
 const zone = ref(WIB)
 onMounted(() => (zone.value = deviceTimeZone()))
@@ -67,14 +74,16 @@ const site = useRequestURL().origin
 useSeoMeta({
   title: () =>
     box.value
-      ? `Kotak surat untuk ${box.value.to} · PostPocket`
+      ? `Kotak bareng untuk ${box.value.to} · PostPocket`
       : 'Kotak tidak tersedia · PostPocket',
   description: 'Teman-temanmu menitipkan surat foil di kotak ini.',
-  ogTitle: () => (box.value ? `Kotak surat untuk ${box.value.to}` : 'Kotak surat'),
+  ogTitle: () => (box.value ? `Kotak bareng untuk ${box.value.to}` : 'Kotak bareng'),
   ogDescription: () =>
-    box.value
-      ? `${box.value.letterCount} surat dari teman-temanmu. Ketuk untuk membuka.`
-      : 'Kotak ini sudah tidak tersedia.',
+    !box.value
+      ? 'Kotak ini sudah tidak tersedia.'
+      : box.value.letterCount
+        ? `${box.value.letterCount} surat dari teman-temanmu. Ketuk untuk membuka.`
+        : 'Teman-temanmu sedang mengumpulkan surat untukmu di kotak ini.',
   ogImage: `${site}/og-kotak.jpg`,
   ogImageWidth: 1200,
   ogImageHeight: 630,
@@ -123,9 +132,11 @@ const folderOpen = ref(false)
 const folder = ref<{ sheetRect: (id: string) => DOMRect | null } | null>(null)
 const viewer = reactive({ open: false, index: 0, origin: null as DOMRect | null })
 
-function openLetterAt(index: number, fileId?: string) {
+/** Buka surat ke-`index`. Kalau lembarnya ada di folder, kartunya keluar dari lembar itu. */
+function openLetterAt(index: number) {
+  const id = letters.value[index]?.id
   viewer.index = index
-  viewer.origin = fileId ? (folder.value?.sheetRect(fileId) ?? null) : null
+  viewer.origin = id ? (folder.value?.sheetRect(id) ?? null) : null
   viewer.open = true
 }
 
@@ -169,14 +180,40 @@ onMounted(() => {
     void reload()
   }, 15_000)
 })
-onBeforeUnmount(() => clearInterval(ticker))
+// Kembali ke tab ini: kotak yang masih disegel langsung dicek lagi, tanpa menunggu putaran
+// berikutnya.
+function onVisible() {
+  if (document.visibilityState !== 'visible') return
+  if (!(failed.value || (box.value && !box.value.openable))) return
+  lastCheck = Date.now()
+  void reload()
+}
+onMounted(() => document.addEventListener('visibilitychange', onVisible))
+onBeforeUnmount(() => {
+  clearInterval(ticker)
+  document.removeEventListener('visibilitychange', onVisible)
+})
+const announcement = ref('')
+watch(
+  () => box.value?.openable,
+  (openable, before) => {
+    if (openable && before === false) {
+      announcement.value = 'Kotaknya sudah terbuka. Ketuk kotaknya untuk melihat suratnya.'
+    }
+  },
+)
 const untilOpen = computed(() =>
   box.value && !box.value.openable ? Date.parse(box.value.opensAt) - now.value : 0,
 )
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 sm:px-6" data-testid="box-page">
+  <div
+    class="mx-auto flex min-h-dvh max-w-3xl flex-col overflow-x-clip px-4 sm:px-6"
+    data-testid="box-page"
+  >
+    <!-- overflow-x-clip: kipas folder yang terbuka boleh melewati tepi layar HP tanpa membuat
+         halamannya bisa digeser ke samping. -->
     <header class="flex items-center gap-2 py-4">
       <NuxtLink
         to="/"
@@ -187,8 +224,10 @@ const untilOpen = computed(() =>
     </header>
 
     <main v-if="box" class="flex flex-1 flex-col items-center pb-10 text-center">
-      <p class="text-body text-ink-muted">Kotak surat untuk {{ box.to }}</p>
-      <h1 class="mt-1 text-[30px] leading-tight font-bold tracking-[-0.03em] text-balance">
+      <p class="text-body text-ink-muted">Kotak bareng untuk {{ box.to }}</p>
+      <h1
+        class="mt-1 text-[30px] leading-tight font-bold tracking-[-0.03em] text-balance [overflow-wrap:anywhere]"
+      >
         {{ box.title }}
       </h1>
 
@@ -207,7 +246,7 @@ const untilOpen = computed(() =>
             :width="folderWidth"
             :sealed="!box.openable"
             :sealed-text="box.scheduled ? `Dibuka ${formatDay(box.opensAt)}` : 'Disegel'"
-            @select="(file: FolderFile, index: number) => openLetterAt(index, file.id)"
+            @select="(_: FolderFile, index: number) => openLetterAt(index)"
           />
           <template #fallback>
             <div class="aspect-[340/326] w-full" />
@@ -215,10 +254,16 @@ const untilOpen = computed(() =>
         </ClientOnly>
       </div>
 
+      <!-- Kotak yang terbuka sendiri selagi halaman ini terbuka diumumkan ke pembaca layar. -->
+      <p class="sr-only" aria-live="polite">{{ announcement }}</p>
+
       <template v-if="!box.openable">
         <p class="mt-6 text-title" data-testid="box-sealed">Kotak ini masih disegel</p>
         <p class="mt-2 max-w-sm text-pretty text-ink-muted">
-          {{ box.letterCount }} surat dari teman-temanmu sudah menunggu di dalamnya.
+          <template v-if="box.letterCount">
+            {{ box.letterCount }} surat dari teman-temanmu sudah menunggu di dalamnya.
+          </template>
+          <template v-else>Teman-temanmu sedang mengumpulkan surat untukmu.</template>
           <template v-if="box.scheduled">
             Bisa dibuka {{ formatWhen(box.opensAt)
             }}<template v-if="interactive && untilOpen < 86_400_000"
@@ -300,7 +345,11 @@ const untilOpen = computed(() =>
         </ClientOnly>
       </template>
 
-      <p class="mt-6 max-w-sm text-caption text-ink-muted">
+      <!-- Selama disegel, expiresAt baru perkiraan: hitungan 30 harinya mulai saat kotak terbuka. -->
+      <p v-if="!box.openable" class="mt-6 max-w-sm text-caption text-ink-muted">
+        Setelah terbuka, kotak ini tersedia 30 hari.
+      </p>
+      <p v-else class="mt-6 max-w-sm text-caption text-ink-muted">
         Kotak ini bisa dibuka sampai {{ formatWhen(box.expiresAt) }}.
         <template v-if="box.photosDeletedAt">Foto di dalamnya sudah dihapus.</template>
         <template v-else-if="box.photosExpireAt">
@@ -338,17 +387,30 @@ const untilOpen = computed(() =>
       </h1>
       <p class="mt-2 max-w-sm text-pretty text-ink-muted">
         <template v-if="missing">
-          Mungkin sudah lewat 30 hari sejak dibuka, pembuatnya menghapusnya, atau
+          Mungkin sudah lewat 30 hari sejak kotaknya terbuka, pembuatnya menghapusnya, atau
           <span class="whitespace-nowrap">link-nya</span> terpotong saat disalin.
         </template>
-        <template v-else>Coba muat ulang halaman ini sebentar lagi.</template>
+        <template v-else>Cek sinyal, lalu muat ulang.</template>
       </p>
-      <NuxtLink
-        to="/kotak"
-        class="mt-6 inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white"
-      >
-        Buka Kotak surat
-      </NuxtLink>
+      <div class="mt-6 flex flex-wrap justify-center gap-2">
+        <button
+          v-if="!missing"
+          type="button"
+          class="inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white disabled:opacity-70"
+          :disabled="retrying"
+          data-testid="box-retry"
+          @click="retry"
+        >
+          {{ retrying ? 'Memuat…' : 'Muat ulang' }}
+        </button>
+        <NuxtLink
+          to="/kotak"
+          class="inline-flex h-11 items-center rounded-control px-6 text-body font-semibold"
+          :class="missing ? 'bg-ink text-white' : 'inset-ring inset-ring-line'"
+        >
+          Buka Kotak surat
+        </NuxtLink>
+      </div>
     </main>
 
     <footer class="py-6 text-center text-caption text-ink-muted">

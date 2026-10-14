@@ -159,6 +159,10 @@ test('pembuat bikin kotak, dua teman menitip, penerima membaca satu per satu lal
   await expect(rani.getByTestId('box-sealed')).toBeVisible()
   await expect(rani.getByTestId('box-page')).toContainText('2 surat dari teman-temanmu')
   await expect(rani.getByTestId('folder-toggle')).toHaveAttribute('aria-label', /Disegel/)
+  // Diketuk selagi disegel: foldernya bergoyang, tidak terbuka.
+  await rani.getByTestId('folder-toggle').click({ force: true })
+  await expect(rani.getByTestId('glass-folder')).toHaveAttribute('data-nudge', 'true')
+  await expect(rani.getByTestId('glass-folder')).not.toHaveAttribute('data-open', /.*/)
   const before = await (await request.get(`/mock-api/k/${slug}`)).json()
   expect(before).toMatchObject({ openable: false, letterCount: 2, letters: [] })
   expect((await request.post(`/mock-api/k/${slug}/open`)).status()).toBe(409)
@@ -171,6 +175,12 @@ test('pembuat bikin kotak, dua teman menitip, penerima membaca satu per satu lal
   await page.getByTestId('box-open-now').click()
   await expect(page.getByTestId('box-manage-status')).toContainText('Sudah terbuka untuk Rani')
   await expect(page.getByTestId('box-open-now')).toHaveCount(0)
+  // Link titip tidak ditawarkan lagi, dan pesannya tampil di dekat link untuk Rani.
+  await expect(page.getByRole('heading', { name: 'Titipan sudah ditutup' })).toBeVisible()
+  await expect(page.getByTestId('box-invite-url')).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: 'Kirim link buka' })).toHaveText(
+    'Kotak sudah terbuka. Kirim link buka ke Rani.',
+  )
 
   // Penerima: kotak terbuka, surat dibaca satu per satu.
   await rani.reload()
@@ -266,10 +276,21 @@ test('titipan bisa ditarik dan dihapus, kotak yang sudah dibuka menolak titipan,
   await page.getByTestId('box-entry').getByRole('button', { name: 'Hapus' }).click()
   await expect(page.getByTestId('box-entry')).toHaveCount(0)
 
-  // Setelah dibuka, titipan baru ditolak.
+  // Setelah dibuka, titipan baru ditolak. Teman yang sedang menulis tidak ditawari Coba lagi,
+  // karena kotak yang sudah ditutup tidak akan menerimanya.
+  await friend.goto(`/letter/new?titip=${codeOf(links.invite)}`)
+  await expect(friend.getByTestId('titip-banner')).toContainText('Perpisahan Dimas')
+  await friend.getByRole('textbox', { name: 'Isi surat' }).fill('Hampir telat')
+  await friend.getByTestId('titip-from').fill('Andi')
   page.once('dialog', (question) => question.accept())
   await page.getByTestId('box-open-now').click()
   await expect(page.getByTestId('box-manage-status')).toContainText('Sudah terbuka')
+  await friend.getByRole('button', { name: 'Titip ke kotak' }).click()
+  const failed = friend.getByTestId('send-letter')
+  await expect(failed).toHaveAttribute('data-state', 'error', { timeout: 20_000 })
+  await expect(failed.getByRole('alert')).toContainText('Kotak ini sudah ditutup')
+  await expect(failed.getByRole('button', { name: 'Coba lagi' })).toHaveCount(0)
+  await failed.getByRole('button', { name: 'Tutup' }).click()
   const late = await titipViaApi(request, links.invite, 'Telat', 'Telat', false)
   expect(late.status).toBe(422)
   expect(late.body.error.code).toBe('box_closed')
@@ -326,6 +347,51 @@ test('kotak terjadwal tersegel sampai waktunya, jadwalnya bisa diubah atau dijad
   await nadia.context().close()
 })
 
+test('kipas surat di folder yang terbuka tidak menutupi judul dan tidak membuat halaman bergeser', async ({
+  page,
+  browser,
+  request,
+}) => {
+  const links = await createBox(page, 'Wisuda Bima', 'Bima')
+  for (const name of ['Ayu', 'Bayu', 'Citra', 'Doni']) {
+    expect((await titipViaApi(request, links.invite, name, 'Selamat!', false)).status).toBe(200)
+  }
+  page.once('dialog', (question) => question.accept())
+  await page.getByTestId('box-open-now').click()
+  await expect(page.getByTestId('box-manage-status')).toContainText('Sudah terbuka')
+
+  // Layar HP sempit: empat lembar di kipas, paling lebar ke kanan.
+  const bima = await (await browser.newContext({ viewport: { width: 360, height: 780 } })).newPage()
+  await bima.goto(links.open)
+  await bima.getByTestId('folder-toggle').click()
+  await expect(bima.getByTestId('glass-folder')).toHaveAttribute('data-open', 'true')
+  // Tunggu kipasnya selesai menyebar (animasi tanpa akhir, kalau ada, diabaikan).
+  await bima.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getComputedTiming().endTime === Infinity,
+      ),
+  )
+  const layout = await bima.evaluate(() => {
+    const title = document.querySelector('h1')!.getBoundingClientRect()
+    const sheets = [...document.querySelectorAll('.gf-sheet')].map((sheet) =>
+      sheet.getBoundingClientRect(),
+    )
+    return {
+      sheets: sheets.length,
+      gap: Math.min(...sheets.map((sheet) => sheet.top)) - title.bottom,
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+    }
+  })
+  expect(layout.sheets).toBe(4)
+  expect(layout.gap).toBeGreaterThanOrEqual(0)
+  expect(layout.overflow).toBeLessThanOrEqual(0)
+  await bima.context().close()
+})
+
 test('kotak yang penuh menolak titipan berikutnya', async ({ page, request }) => {
   test.setTimeout(60_000)
   const links = await createBox(page, 'Kotak ramai', 'Tia')
@@ -338,7 +404,9 @@ test('kotak yang penuh menolak titipan berikutnya', async ({ page, request }) =>
   expect(extra.status).toBe(422)
   expect(extra.body.error.code).toBe('box_full')
   await page.goto(links.invite)
-  await expect(page.getByTestId('titip-room')).toHaveText('Kotak ini sudah penuh.')
+  await expect(page.getByTestId('titip-room')).toHaveText(
+    'Kotak ini sudah penuh, jadi titipan baru tidak muat lagi.',
+  )
   await expect(page.getByTestId('titip-write')).toHaveCount(0)
 })
 
@@ -351,7 +419,9 @@ test('link kotak dan link titip yang salah memberi 404 yang jelas', async ({ pag
   await expect(page.getByTestId('titip-missing')).toContainText('sudah tidak tersedia')
   // Pengelola kotak yang dibuat di browser lain tidak bisa dibuka dari sini.
   await page.goto('/kotak/00000000-0000-4000-8000-000000000000')
-  await expect(page.getByTestId('box-manage-missing')).toContainText('dibuat di perangkat lain')
+  await expect(page.getByTestId('box-manage-missing')).toContainText(
+    'tidak tercatat di browser ini',
+  )
 })
 
 test('strip Booth yang dipakai di surat tetap dititip ke kotak', async ({ page, browserName }) => {

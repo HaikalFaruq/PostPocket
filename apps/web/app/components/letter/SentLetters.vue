@@ -150,7 +150,7 @@ async function remove(item: SentRecord) {
                 :disabled="busy === item.id"
                 @click="remove(item)"
               >
-                Hapus
+                {{ item.titip ? 'Tarik' : 'Hapus' }}
               </button>
             </div>
           </li>

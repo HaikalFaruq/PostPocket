@@ -37,17 +37,26 @@ const load = () =>
 const { data, error } = await useAsyncData(`titip-${code}`, load)
 // Salinan yang dimuat ulang setelah surat ditarik, tanpa hilang saat koneksi sedang putus.
 const invite = ref(data.value)
-const missing = computed(() => !error.value && !invite.value)
-if (import.meta.server && (missing.value || error.value)) {
+const failed = ref(!!error.value)
+const missing = computed(() => !failed.value && !invite.value)
+if (import.meta.server && (missing.value || failed.value)) {
   const event = useRequestEvent()
   if (event) setResponseStatus(event, missing.value ? 404 : 503)
 }
 async function reload() {
   try {
     invite.value = await load()
+    failed.value = false
   } catch {
     // Data yang tampil tetap dipakai.
   }
+}
+
+const retrying = ref(false)
+async function retry() {
+  retrying.value = true
+  await reload()
+  retrying.value = false
 }
 
 // Waktu ditulis dalam WIB saat di-SSR, lalu dalam zona waktu HP begitu halaman dimuat.
@@ -145,7 +154,9 @@ async function withdraw(item: SentRecord) {
 
     <main v-if="invite" class="flex flex-1 flex-col items-center pb-10 text-center">
       <p class="text-body text-ink-muted">Kotak bareng untuk {{ invite.to }}</p>
-      <h1 class="mt-1 text-[30px] leading-tight font-bold tracking-[-0.03em] text-balance">
+      <h1
+        class="mt-1 text-[30px] leading-tight font-bold tracking-[-0.03em] text-balance [overflow-wrap:anywhere]"
+      >
         Titip surat untuk {{ invite.to }}
       </h1>
 
@@ -200,7 +211,9 @@ async function withdraw(item: SentRecord) {
           Isinya rahasia: kamu tidak bisa membaca surat teman lain.
         </p>
         <p class="mt-2 text-caption text-ink-muted" data-testid="titip-room">
-          <template v-if="full">Kotak ini sudah penuh.</template>
+          <template v-if="full">
+            Kotak ini sudah penuh, jadi titipan baru tidak muat lagi.
+          </template>
           <template v-else>
             {{
               invite.usage.letters
@@ -218,7 +231,7 @@ async function withdraw(item: SentRecord) {
         >
           Tulis surat
         </NuxtLink>
-        <p class="mt-3 max-w-sm text-caption text-ink-muted">
+        <p v-if="!full" class="mt-3 max-w-sm text-caption text-ink-muted">
           Mau pakai strip foto Booth? Mulai tulis suratnya, lalu pilih Ambil foto di Booth.
         </p>
       </template>
@@ -237,7 +250,7 @@ async function withdraw(item: SentRecord) {
             </span>
             <button
               type="button"
-              class="shrink-0 text-caption font-semibold text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
+              class="-mr-2 inline-flex min-h-11 shrink-0 items-center px-2 text-caption font-semibold text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
               :disabled="busy === item.id"
               @click="withdraw(item)"
             >
@@ -262,14 +275,27 @@ async function withdraw(item: SentRecord) {
           Mungkin pembuatnya sudah menghapusnya, atau
           <span class="whitespace-nowrap">link-nya</span> terpotong saat disalin.
         </template>
-        <template v-else>Coba muat ulang halaman ini sebentar lagi.</template>
+        <template v-else>Cek sinyal, lalu muat ulang.</template>
       </p>
-      <NuxtLink
-        to="/letter/new"
-        class="mt-6 inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white"
-      >
-        Tulis surat sendiri
-      </NuxtLink>
+      <div class="mt-6 flex flex-wrap justify-center gap-2">
+        <button
+          v-if="!missing"
+          type="button"
+          class="inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white disabled:opacity-70"
+          :disabled="retrying"
+          data-testid="titip-retry"
+          @click="retry"
+        >
+          {{ retrying ? 'Memuat…' : 'Muat ulang' }}
+        </button>
+        <NuxtLink
+          to="/letter/new"
+          class="inline-flex h-11 items-center rounded-control px-6 text-body font-semibold"
+          :class="missing ? 'bg-ink text-white' : 'inset-ring inset-ring-line'"
+        >
+          Tulis surat sendiri
+        </NuxtLink>
+      </div>
     </main>
 
     <footer class="py-6 text-center text-caption text-ink-muted">

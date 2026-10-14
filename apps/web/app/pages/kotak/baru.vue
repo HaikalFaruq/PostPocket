@@ -5,6 +5,7 @@ import { LetterApiError, errorMessage } from '~/utils/letter-api'
 import { BOX_TEXT_LIMIT, boxText } from '~/utils/letter-draft'
 import type { CreatedBox } from '~/utils/box-api'
 import { rememberBox } from '~/utils/my-boxes'
+import { isInAppBrowser } from '~/utils/pwa'
 
 /**
  * Bikin kotak bareng (kontrak 0.3.0): judul, nama penerima, seni folder, dan kapan dibuka.
@@ -24,6 +25,11 @@ const opensAt = ref('')
 const busy = ref(false)
 const error = ref('')
 const toField = ref<HTMLInputElement | null>(null)
+// Kotak dikelola lewat token yang disimpan di browser ini saja. Browser bawaan aplikasi lain
+// (Instagram, LINE, …) menyimpannya terpisah, jadi kotaknya tidak bisa dikelola lagi dari Chrome
+// atau Safari.
+const inApp = ref(false)
+onMounted(() => (inApp.value = isInAppBrowser(navigator.userAgent)))
 
 const shownTitle = computed(() => title.value.trim() || `Untuk ${to.value.trim() || 'dia'}`)
 // Rentang jadwal ikut bergeser selama halaman terbuka.
@@ -131,7 +137,7 @@ async function create() {
           id="unsaved-invite"
           :value="unsaved.inviteUrl"
           readonly
-          class="mt-1 h-10 w-full rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
+          class="mt-1 h-11 w-full rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
           @focus="($event.target as HTMLInputElement).select()"
         />
         <label class="mt-3 block text-body font-semibold" for="unsaved-open">
@@ -141,7 +147,7 @@ async function create() {
           id="unsaved-open"
           :value="unsaved.url"
           readonly
-          class="mt-1 h-10 w-full rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
+          class="mt-1 h-11 w-full rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
           @focus="($event.target as HTMLInputElement).select()"
         />
       </section>
@@ -178,8 +184,8 @@ async function create() {
           <legend class="text-body font-semibold">Kapan dibuka?</legend>
           <PillGroup v-model="when" label="Kapan dibuka" :options="whenOptions" class="mt-2" />
           <p v-if="when === 'manual'" class="mt-2 text-caption text-ink-muted">
-            Kamu yang menekan Buka sekarang di halaman kelola, paling lambat 30 hari lagi. Sampai
-            itu, teman-teman bisa terus menitip.
+            Kamu yang menekan Buka sekarang di halaman kelola. Kalau belum kamu buka, kotaknya
+            terbuka sendiri 30 hari lagi. Sebelum itu, teman-teman bisa terus menitip.
           </p>
           <template v-else>
             <label for="box-opens" class="mt-3 block text-caption text-ink-muted">
@@ -216,6 +222,13 @@ async function create() {
             </Swatch>
           </SwatchGroup>
         </fieldset>
+        <p class="text-caption text-ink-muted" data-testid="box-browser-note">
+          Kotak ini hanya bisa dikelola dari browser ini, lewat Kotak surat.
+          <template v-if="inApp">
+            Link ini terbuka di dalam aplikasi lain, jadi buka PostPocket di Chrome atau Safari dulu
+            supaya kotaknya ketemu lagi nanti.
+          </template>
+        </p>
         <p
           v-if="error"
           role="alert"
@@ -226,7 +239,7 @@ async function create() {
         </p>
         <button
           type="submit"
-          class="inline-flex h-12 w-full items-center justify-center gap-2 rounded-control bg-ink text-[15px] font-semibold text-white hover:bg-ink/90 disabled:opacity-60 sm:w-auto sm:px-8"
+          class="inline-flex h-12 w-full items-center justify-center gap-2 rounded-control bg-ink text-[15px] font-semibold text-white hover:bg-ink/90 disabled:opacity-70 sm:w-auto sm:px-8"
           :disabled="busy"
           data-testid="box-create"
         >

@@ -3,7 +3,7 @@ import { byId, isFilledElement, letter, templateForPhotos } from '@postpocket/pr
 import { BottomSheet, SidePanel } from '#components'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { looksLikeImage } from '~/utils/heic'
-import { errorMessage } from '~/utils/letter-api'
+import { LetterApiError, errorMessage } from '~/utils/letter-api'
 import { BOX_TEXT_LIMIT, INVITE_PATTERN, MESSAGE_LIMIT } from '~/utils/letter-draft'
 import { takePendingPhoto, type PendingPhoto } from '~/utils/pending-photo'
 import { listSent, stillOpen } from '~/utils/sent-letters'
@@ -91,7 +91,12 @@ async function startTitip(invite: string) {
   try {
     info = await useBoxApi().invite(invite)
   } catch (problem) {
-    notice.value = errorMessage(problem)
+    if (problem instanceof LetterApiError && problem.code === 'network') {
+      // Kode titipnya dikembalikan ke alamat halaman, supaya memuat ulang mencoba lagi.
+      void router.replace({ query: { titip: invite } })
+      notice.value =
+        'Kotaknya belum bisa dimuat, jadi surat ini belum dititip. Muat ulang halaman ini setelah sinyal kembali.'
+    } else notice.value = errorMessage(problem)
     return
   }
   if (info.closed) {
@@ -445,7 +450,8 @@ async function startOver() {
       <div class="px-6 pt-6 pb-1">
         <h1 class="text-title">Surat foil</h1>
         <p class="mt-1 text-ink-muted">
-          Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu kirim lewat link.
+          Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu
+          {{ draft.box ? 'titip ke kotak' : 'kirim lewat link' }}.
         </p>
         <button
           v-if="sentCount"

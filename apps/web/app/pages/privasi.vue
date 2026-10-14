@@ -77,11 +77,11 @@ useSeoMeta({
         </li>
         <li>
           pembuat kotak hanya melihat nama pengirim dan jumlah fotonya, bukan isi suratnya. Isinya
-          terlihat oleh pemegang link buka setelah kotaknya dibuka;
+          terlihat oleh pemegang link buka setelah kotaknya terbuka;
         </li>
         <li>
           kotak menerima titipan paling lama 30 hari. Kotak dan semua titipannya dihapus 30 hari
-          setelah kotak dibuka, dan fotonya 7 hari setelah penerima membuka surat pertama;
+          setelah kotaknya terbuka, dan fotonya 7 hari setelah penerima membuka surat pertama;
         </li>
         <li>
           pengirim bisa menarik suratnya, dan pembuat kotak bisa menghapus titipan atau kotaknya

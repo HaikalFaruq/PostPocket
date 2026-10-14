@@ -173,7 +173,7 @@ export function errorMessage(error: unknown): string {
     case 'box_closed':
       return 'Kotak ini sudah ditutup, jadi tidak bisa menerima titipan lagi.'
     case 'box_full':
-      return 'Kotak ini sudah penuh. Coba kurangi foto di suratmu, atau tanya pembuat kotaknya.'
+      return 'Kotak ini sudah penuh: paling banyak 20 surat dan 40 foto. Kalau suratnya masih muat, kurangi fotomu.'
     case 'box_not_open':
       return 'Kotak ini belum bisa dibuka.'
     case 'invalid_box':

@@ -37,6 +37,9 @@ const box = ref<OrganizerBox | null>(null)
 const state = ref<'loading' | 'ready' | 'elsewhere' | 'missing' | 'error'>('loading')
 const error = ref('')
 const notice = ref('')
+/** Bagian tempat pesan aksi terakhir tampil: di dekat tombol yang ditekan. */
+type MessageAt = 'top' | 'link' | 'schedule' | 'entries' | 'bottom'
+const messageAt = ref<MessageAt>('top')
 const busy = ref(false)
 
 /** Kotak sudah dihapus server. Hanya `box_not_found`: 404 umum tidak menghapus token pembuatnya. */
@@ -71,6 +74,7 @@ async function load(background = false) {
     if (problem instanceof LetterApiError && problem.code === 'box_not_found') await gone()
     // Gangguan sesaat saat memuat ulang di belakang: data yang sudah tampil tetap dipakai.
     else if (background && box.value) {
+      messageAt.value = 'top'
       notice.value = 'Kotak belum bisa dimuat ulang. Yang tampil mungkin belum yang terbaru.'
     } else {
       error.value = errorMessage(problem)
@@ -139,8 +143,8 @@ async function share(which: 'invite' | 'open') {
           url: box.value.inviteUrl,
         }
       : {
-          title: `Kotak surat untuk ${box.value.to}`,
-          text: 'Ada kotak surat dari teman-temanmu. Ketuk untuk membuka.',
+          title: `Kotak bareng untuk ${box.value.to}`,
+          text: 'Teman-temanmu mengumpulkan surat untukmu di satu kotak. Ketuk untuk membuka.',
           url: box.value.url,
         }
   try {
@@ -150,11 +154,16 @@ async function share(which: 'invite' | 'open') {
   }
 }
 
-async function run(action: () => Promise<OrganizerBox | undefined>, done?: string) {
+async function run(
+  action: () => Promise<OrganizerBox | undefined>,
+  where: MessageAt,
+  done?: string,
+) {
   if (!local.value || busy.value) return
   busy.value = true
   error.value = ''
   notice.value = ''
+  messageAt.value = where
   const ticket = ++latest
   try {
     const next = await action()
@@ -166,11 +175,15 @@ async function run(action: () => Promise<OrganizerBox | undefined>, done?: strin
       await gone()
       return
     }
-    error.value =
-      problem instanceof LetterApiError && problem.code === 'box_closed'
-        ? 'Kotak ini sudah terbuka, jadi jadwalnya tidak bisa diubah lagi.'
-        : errorMessage(problem)
-    if (problem instanceof LetterApiError && problem.code === 'box_closed') void load()
+    const closed = problem instanceof LetterApiError && problem.code === 'box_closed'
+    error.value = closed
+      ? 'Kotak ini sudah terbuka, jadi jadwalnya tidak bisa diubah lagi.'
+      : errorMessage(problem)
+    // Bagian jadwal hilang begitu kotaknya dimuat ulang sebagai terbuka, jadi pesannya di atas.
+    if (closed) {
+      messageAt.value = 'top'
+      void load()
+    }
   } finally {
     busy.value = false
   }
@@ -182,6 +195,7 @@ function openNow() {
   if (!window.confirm(question)) return
   void run(
     () => api.update(id, local.value!.editToken, { openNow: true }),
+    'link',
     `Kotak sudah terbuka. Kirim link buka ke ${box.value.to}.`,
   )
 }
@@ -205,12 +219,15 @@ function saveSchedule() {
   const date = fromLocalInput(scheduleInput.value)
   const { min, max } = scheduleRangeNow.value
   if (!date || date.getTime() < min || date.getTime() > max) {
+    notice.value = ''
+    messageAt.value = 'schedule'
     error.value = `Pilih waktu antara 10 menit lagi dan ${formatWhen(max)}.`
     return
   }
   editing.value = false
   void run(
     () => api.update(id, local.value!.editToken, { opensAt: date.toISOString() }),
+    'schedule',
     `Kotak terbuka sendiri ${formatWhen(date)}.`,
   )
 }
@@ -218,21 +235,26 @@ function makeManual() {
   editing.value = false
   void run(
     () => api.update(id, local.value!.editToken, { opensAt: null }),
+    'schedule',
     'Kotak dibuka saat kamu menekan Buka sekarang.',
   )
 }
 
 function removeEntry(entry: OrganizerBox['letters'][number]) {
   if (!window.confirm(`Hapus surat dari ${entry.from}? Suratnya tidak bisa dikembalikan.`)) return
-  void run(async () => {
-    try {
-      await api.removeLetter(id, local.value!.editToken, entry.id)
-    } catch (problem) {
-      // Pengirimnya sudah menariknya lebih dulu: cukup muat ulang daftarnya.
-      if (!(problem instanceof LetterApiError && problem.code === 'box_not_found')) throw problem
-    }
-    return api.get(id, local.value!.editToken)
-  }, `Surat dari ${entry.from} sudah tidak ada di kotak.`)
+  void run(
+    async () => {
+      try {
+        await api.removeLetter(id, local.value!.editToken, entry.id)
+      } catch (problem) {
+        // Pengirimnya sudah menariknya lebih dulu: cukup muat ulang daftarnya.
+        if (!(problem instanceof LetterApiError && problem.code === 'box_not_found')) throw problem
+      }
+      return api.get(id, local.value!.editToken)
+    },
+    'entries',
+    `Surat dari ${entry.from} sudah tidak ada di kotak.`,
+  )
 }
 
 async function removeBox() {
@@ -240,6 +262,9 @@ async function removeBox() {
   const question = `Hapus kotak "${box.value.title}" beserta ${box.value.usage.letters} suratnya? Link titip dan link buka langsung mati.`
   if (!window.confirm(question)) return
   busy.value = true
+  error.value = ''
+  notice.value = ''
+  messageAt.value = 'bottom'
   try {
     await api.remove(id, local.value.editToken)
     await forgetBox(id)
@@ -267,7 +292,7 @@ async function removeBox() {
       <div class="max-w-xl min-w-0">
         <p class="text-body text-ink-muted">Kotak bareng untuk {{ box.to }}</p>
         <h1
-          class="mt-1 text-[32px] leading-tight font-bold tracking-[-0.03em] text-balance"
+          class="mt-1 text-[32px] leading-tight font-bold tracking-[-0.03em] text-balance [overflow-wrap:anywhere]"
           data-testid="box-manage-title"
         >
           {{ box.title }}
@@ -280,27 +305,27 @@ async function removeBox() {
             >. Kotak ini dihapus {{ formatWhen(box.expiresAt) }}.
           </template>
           <template v-else-if="box.scheduled">
-            Terbuka sendiri {{ formatWhen(box.opensAt) }}. Sampai itu, teman-teman bisa terus
+            Terbuka sendiri {{ formatWhen(box.opensAt) }}. Sebelum itu, teman-teman bisa terus
             menitip.
           </template>
           <template v-else>
-            Kamu yang membukanya, paling lambat {{ formatWhen(box.opensAt) }}. Sampai itu,
-            teman-teman bisa terus menitip.
+            Kamu yang membukanya. Kalau belum kamu buka, kotaknya terbuka sendiri
+            {{ formatWhen(box.opensAt) }}. Sebelum itu, teman-teman bisa terus menitip.
           </template>
         </p>
 
-        <p v-if="notice" role="status" class="mt-3 rounded-control bg-fill px-3 py-2 text-caption">
-          {{ notice }}
-        </p>
-        <p
-          v-if="error"
-          role="alert"
-          class="mt-3 rounded-control bg-[#fbefd2] px-3 py-2 text-caption text-[#7a5a14]"
-        >
-          {{ error }}
-        </p>
+        <BoxMessage v-if="messageAt === 'top'" :notice="notice" :error="error" />
 
-        <section class="mt-8" aria-labelledby="invite-title">
+        <!-- Setelah kotaknya terbuka, link titip tidak menerima surat lagi (409 box_closed). -->
+        <section v-if="open" class="mt-8" aria-labelledby="invite-title">
+          <h2 id="invite-title" class="text-[19px] font-bold tracking-[-0.02em]">
+            Titipan sudah ditutup
+          </h2>
+          <p class="mt-1 text-caption text-ink-muted">
+            Kotaknya sudah terbuka, jadi link titip tidak menerima surat baru lagi.
+          </p>
+        </section>
+        <section v-else class="mt-8" aria-labelledby="invite-title">
           <h2 id="invite-title" class="text-[19px] font-bold tracking-[-0.02em]">
             Ajak teman menitip surat
           </h2>
@@ -313,13 +338,13 @@ async function removeBox() {
               :value="box.inviteUrl"
               readonly
               aria-label="Link titip"
-              class="h-10 min-w-0 flex-1 rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
+              class="h-11 min-w-0 flex-1 rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
               data-testid="box-invite-url"
               @focus="($event.target as HTMLInputElement).select()"
             />
             <button
               type="button"
-              class="h-10 shrink-0 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+              class="h-11 shrink-0 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
               @click="copy('invite')"
             >
               {{ copied === 'invite' ? 'Tersalin' : 'Salin' }}
@@ -327,17 +352,16 @@ async function removeBox() {
           </div>
           <div class="mt-2 flex flex-wrap gap-2">
             <button
-              v-if="canShare && !open"
+              v-if="canShare"
               type="button"
-              class="inline-flex h-10 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+              class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
               @click="share('invite')"
             >
               Bagikan link titip
             </button>
             <NuxtLink
-              v-if="!open"
               :to="`/letter/new?titip=${box.invite}`"
-              class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+              class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
               data-testid="box-manage-write"
             >
               Tulis suratmu juga
@@ -364,13 +388,13 @@ async function removeBox() {
               :value="box.url"
               readonly
               :aria-label="`Link untuk ${box.to}`"
-              class="h-10 min-w-0 flex-1 rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
+              class="h-11 min-w-0 flex-1 rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
               data-testid="box-open-url"
               @focus="($event.target as HTMLInputElement).select()"
             />
             <button
               type="button"
-              class="h-10 shrink-0 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+              class="h-11 shrink-0 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
               @click="copy('open')"
             >
               {{ copied === 'open' ? 'Tersalin' : 'Salin' }}
@@ -380,7 +404,7 @@ async function removeBox() {
             <button
               v-if="canShare"
               type="button"
-              class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+              class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
               @click="share('open')"
             >
               Bagikan ke {{ box.to }}
@@ -389,10 +413,11 @@ async function removeBox() {
               :href="box.url"
               target="_blank"
               rel="noopener"
-              class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+              class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
               >Lihat seperti {{ box.to }}</a
             >
           </div>
+          <BoxMessage v-if="messageAt === 'link'" :notice="notice" :error="error" />
         </section>
 
         <section
@@ -404,7 +429,7 @@ async function removeBox() {
           <div class="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              class="inline-flex h-10 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90 disabled:opacity-60"
+              class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90 disabled:opacity-60"
               :disabled="busy"
               data-testid="box-open-now"
               @click="openNow"
@@ -413,7 +438,7 @@ async function removeBox() {
             </button>
             <button
               type="button"
-              class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel disabled:opacity-60"
+              class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel disabled:opacity-60"
               :disabled="busy"
               data-testid="box-schedule"
               @click="startEditing"
@@ -423,7 +448,7 @@ async function removeBox() {
             <button
               v-if="box.scheduled"
               type="button"
-              class="inline-flex h-10 items-center rounded-control px-4 text-body font-semibold text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-60"
+              class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-60"
               :disabled="busy"
               @click="makeManual"
             >
@@ -442,17 +467,18 @@ async function removeBox() {
                 type="datetime-local"
                 :min="toLocalInput(scheduleRangeNow.min)"
                 :max="toLocalInput(scheduleRangeNow.max)"
-                class="mt-1 h-10 w-full rounded-control bg-surface px-3 text-body inset-ring inset-ring-line"
+                class="mt-1 h-11 w-full rounded-control bg-surface px-3 text-body inset-ring inset-ring-line"
                 data-testid="box-schedule-input"
               />
             </label>
             <button
               type="submit"
-              class="h-10 rounded-control bg-ink px-4 text-body font-semibold text-white"
+              class="h-11 rounded-control bg-ink px-4 text-body font-semibold text-white"
             >
               Simpan jadwal
             </button>
           </form>
+          <BoxMessage v-if="messageAt === 'schedule'" :notice="notice" :error="error" />
         </section>
 
         <section class="mt-8 border-t border-line-soft pt-6" aria-labelledby="entries-title">
@@ -460,8 +486,10 @@ async function removeBox() {
             Titipan ({{ box.usage.letters }})
           </h2>
           <p class="mt-1 text-caption text-ink-muted" data-testid="box-room">
-            Masih muat {{ room.letters }} surat dan {{ room.photos }} foto. Isinya rahasia, jadi
-            yang terlihat di sini hanya nama pengirimnya.
+            <template v-if="!open">
+              Masih muat {{ room.letters }} surat dan {{ room.photos }} foto.
+            </template>
+            Isinya rahasia, jadi yang terlihat di sini hanya nama pengirimnya.
           </p>
           <ul
             v-if="box.letters.length"
@@ -478,12 +506,12 @@ async function removeBox() {
                 <span class="block truncate text-body font-semibold">Dari {{ entry.from }}</span>
                 <span class="block text-caption text-ink-muted">
                   {{ formatDay(entry.publishedAt)
-                  }}<template v-if="entry.photos"> , {{ entry.photos }} foto</template>
+                  }}<template v-if="entry.photos">, {{ entry.photos }} foto</template>
                 </span>
               </span>
               <button
                 type="button"
-                class="shrink-0 text-caption font-semibold text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
+                class="-mr-2 inline-flex min-h-11 shrink-0 items-center px-2 text-caption font-semibold text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
                 :disabled="busy"
                 @click="removeEntry(entry)"
               >
@@ -494,16 +522,18 @@ async function removeBox() {
           <p v-else class="mt-3 text-body text-ink-muted">
             Belum ada titipan. Bagikan link titip ke teman-teman, atau tulis suratmu sendiri.
           </p>
+          <BoxMessage v-if="messageAt === 'entries'" :notice="notice" :error="error" />
         </section>
 
         <button
           type="button"
-          class="mt-10 text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+          class="mt-8 inline-flex min-h-11 items-center text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
           data-testid="box-delete"
           @click="removeBox"
         >
           Hapus kotak ini
         </button>
+        <BoxMessage v-if="messageAt === 'bottom'" :notice="notice" :error="error" />
       </div>
 
       <figure class="order-first flex flex-col items-center lg:order-none lg:sticky lg:top-6" inert>
@@ -517,7 +547,9 @@ async function removeBox() {
           sealed
           :sealed-text="
             open
-              ? 'Sudah dibuka'
+              ? box.openedAt
+                ? 'Sudah dibuka'
+                : 'Sudah terbuka'
               : box.scheduled
                 ? `Dibuka ${formatDay(box.opensAt)}`
                 : 'Belum dibuka'
@@ -534,7 +566,7 @@ async function removeBox() {
       <h1 class="text-title">
         {{
           state === 'elsewhere'
-            ? 'Kotak ini dibuat di perangkat lain'
+            ? 'Kotak ini tidak tercatat di browser ini'
             : state === 'missing'
               ? 'Kotak ini sudah tidak ada'
               : 'Kotak belum bisa dimuat'
@@ -542,10 +574,11 @@ async function removeBox() {
       </h1>
       <p class="mt-2 max-w-sm text-pretty text-ink-muted">
         <template v-if="state === 'elsewhere'">
-          Kotak bareng hanya bisa dikelola dari browser yang dipakai untuk membuatnya.
+          Kotak bareng hanya bisa dikelola dari browser yang dipakai untuk membuatnya. Buka link ini
+          di browser itu, atau lewat Kotak surat di sana.
         </template>
         <template v-else-if="state === 'missing'">
-          Mungkin sudah lewat 30 hari sejak dibuka, atau sudah kamu hapus.
+          Mungkin sudah lewat 30 hari sejak kotaknya terbuka, atau sudah kamu hapus.
         </template>
         <template v-else>{{ error }}</template>
       </p>
