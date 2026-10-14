@@ -192,7 +192,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS: [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi `phase2` dan test `phase2.test.sql`
 - [ ] Login Google: OAuth client dan provider di dashboard, dipasang bareng Kall ([Login Google](#login-google))
-- [ ] Edge Function hapus akun
+- [ ] Edge Function `account` untuk `DELETE /account` (kontrak 0.4.0): hapus berkas `moments/<user_id>/…` lewat Storage API, lalu `auth.admin.deleteUser`; sesi dicek dengan `auth.getUser(token)`. Test integrasi: tanpa token dan token salah `401`, akun lain tidak tersentuh, berkas dan baris hilang
 - [ ] Lingkungan beta
 - [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
 
