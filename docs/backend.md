@@ -190,7 +190,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 4 dan beta (minggu 8–10)**
 
-- [ ] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) beserta RLS
+- [ ] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS. Rancangannya di [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi menunggu keputusan di sana
 - [ ] Lingkungan beta
 - [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
 
@@ -220,7 +220,44 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
 - `expires_at` = `published_at` + 30 hari. `photos_deleted_at` diisi job pembersihan, supaya `GET /l/:slug` tahu harus menampilkan placeholder foto.
 
-Tabel fase 2 (`profiles`, `pockets`, `moments`, `albums`, `album_moments`) ada di PRD bagian Arsitektur. CRUD-nya lewat klien Supabase langsung dengan Row Level Security: user hanya bisa membaca dan menulis barisnya sendiri.
+## Rancangan skema fase 2
+
+Rancangan, belum jadi migrasi. Migrasinya dibuat setelah Kall menyetujui bentuknya dan keputusan di bawah diambil. Sumbernya tabel fase 2 di PRD bagian Arsitektur, disesuaikan dengan data Pocket yang sudah jalan di browser (`apps/web/app/utils/memories.ts`), supaya sinkron nanti cuma memindahkan baris, bukan mengubah bentuk data.
+
+**Prinsip**
+
+- IndexedDB tetap sumber utama dan tetap jalan offline. Server adalah cadangan dan jalur sinkron antar perangkat, aktif hanya setelah login.
+- CRUD lewat klien Supabase langsung (`supabase-js` dengan sesi user), tanpa Edge Function. RLS di setiap tabel: user hanya bisa membaca dan menulis baris dengan `owner_id = auth.uid()`.
+- Id dibuat di browser (`crypto.randomUUID()`), supaya momen bisa dibuat offline dan dikirim ulang dengan `upsert` tanpa jadi ganda. Id lokal sekarang (`m` + 6 karakter acak) diganti UUID saat sinkron pertama.
+- Hapus di satu perangkat harus sampai ke perangkat lain, jadi baris tidak langsung dihapus: `deleted_at` diisi, dan perangkat lain menarik perubahan lewat `updated_at > sinkron terakhir`. Baris berstatus hapus dibuang job pembersihan setelah 30 hari.
+- `updated_at` diisi trigger server, bukan browser, supaya jam HP yang salah tidak merusak urutan sinkron. Konflik diselesaikan "tulisan terakhir menang" per baris.
+
+**Tabel**
+
+| Tabel | Kolom | Beda dari PRD |
+| --- | --- | --- |
+| `profiles` | `id` (= `auth.users.id`), `display_name` (≤ 40 karakter), `created_at` | Dibuat trigger saat user mendaftar |
+| `moments` | `id`, `owner_id`, `day` (date), `taken_at`, `source` (`upload`/`booth`), `width`, `height`, `mime`, `size`, `uploaded_at`, `created_at`, `updated_at`, `deleted_at` | `day` menggantikan `pocket_id`, sama seperti `Moment.day` di browser: momen bisa ada sebelum kantongnya disimpan. `storage_path` tidak disimpan karena selalu `<owner_id>/<id>.<ext>` |
+| `pockets` | `id`, `owner_id`, `day` (unik per user), `packet`, `sticker`, `frame`, `frame_color`, `moment_ids` (uuid[], urutan di kantong), `saved_at`, `updated_at`, `deleted_at` | Nama kolom mengikuti `PocketDay`. Urutan momen disimpan sebagai array |
+| `albums` | `id`, `owner_id`, `title` (≤ 40), `emoji`, `color`, `moment_ids` (uuid[], urutan di CD, maksimal 500), `created_at`, `updated_at`, `deleted_at` | Hanya album buatan user. Album per bulan dihitung browser dari `moments.day`, jadi `kind` dan `month` tidak perlu. `album_moments` diganti `moment_ids` |
+
+- `packet`, `sticker`, `frame`, dan `frame_color` menyimpan id preset (atau `#rrggbb` untuk warna custom), sama seperti `design` di `letters`. Database hanya mengecek bentuknya (huruf, angka, `-`, maksimal 40 karakter), bukan isi daftar preset.
+- `moment_ids` sebagai array, bukan tabel `album_moments`, karena satu album selalu ditulis utuh (`Album.moments` di browser), sehingga sinkronnya satu baris per album. Id momen milik user lain di array tidak berbahaya: RLS tetap menyembunyikan momennya. Kalau nanti butuh query "momen ini ada di album mana", baru dipecah jadi tabel.
+- `owner_id` punya `default auth.uid()` dan `references auth.users on delete cascade`, jadi hapus akun menghapus semua barisnya. Berkas di Storage tetap harus dihapus dulu lewat Storage API (lihat `letter_assets`), jadi hapus akun lewat Edge Function, bukan langsung dari browser.
+- Hak `anon` dicabut dari semua tabel ini. `authenticated` hanya dapat `select`, `insert`, dan `update`, tanpa `delete`: hapus dari browser selalu lewat `deleted_at`.
+
+**Storage**
+
+- Bucket `moments`: privat, 500 KB per berkas, JPEG atau WebP, path `<owner_id>/<moment_id>.<ext>`.
+- Policy untuk `authenticated`: baca, unggah, dan hapus hanya kalau folder pertamanya `auth.uid()`. Tidak ada policy update, jadi berkas tidak bisa ditimpa (sama seperti `letter-assets`). Tidak ada policy untuk `anon`.
+- Foto ditampilkan lewat signed URL berumur pendek (`createSignedUrls`, satu panggilan per banyak foto).
+- `security.test.sql` disesuaikan: policy storage untuk `authenticated` hanya boleh ada di bucket `moments` dan wajib memeriksa `auth.uid()`. Untuk `anon` dan `public` tetap tidak boleh ada.
+
+**Keputusan yang perlu diambil bareng Kall**
+
+1. **Login.** Ini keputusan yang masih menunggu di atas. Usul: Google OAuth dulu, karena tidak perlu mengirim email. Magic link email butuh SMTP sendiri: SMTP bawaan Supabase hanya mengirim beberapa email per jam dan hanya ke anggota tim proyek.
+2. **Kuota foto.** Foto Pocket disimpan selamanya, beda dengan surat yang terhapus sendiri. Storage gratis 1 GB cuma muat sekitar 2.000 foto 500 KB untuk semua user. Usul: selama beta, sinkron dibatasi 100 foto per user (sekitar 50 MB, dicek trigger di `moments`), dan foto Pocket pindah ke Cloudflare R2 (gratis 10 GB) sebelum dibuka untuk umum. Bucket `letter-assets` tetap di Supabase.
+3. **Kapan migrasinya masuk produksi.** Usul: tabelnya dibuat di produksi hanya bersamaan dengan login dan sinkron di frontend. Sebelum itu, migrasi dan test pgTAP-nya cukup jalan di stack lokal dan CI.
 
 ## Endpoint rilis 1
 
