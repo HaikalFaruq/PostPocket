@@ -4,7 +4,7 @@
 
 import { db } from './db.ts'
 
-const FUNCTIONS = new Set(['letters', 'l', 'cleanup'])
+const FUNCTIONS = new Set(['letters', 'l', 'cleanup', 'boxes', 'k'])
 const SAFE_NAME = /^[A-Za-z0-9_]{1,60}$/
 const SAFE_CODE = /^[A-Za-z0-9_]{1,20}$/
 
@@ -18,6 +18,14 @@ export function routePattern(path: string): string {
     if (name === 'letters' && action === 'publish') return '/letters/:id/publish'
     if (name === 'l' && id && !action) return '/l/:slug'
     if (name === 'l' && id && action === 'open') return '/l/:slug/open'
+    if (name === 'boxes' && !id) return '/boxes'
+    if (name === 'boxes' && id === 'invite' && action) return '/boxes/invite/:invite'
+    if (name === 'boxes' && id && !action) return '/boxes/:id'
+    if (name === 'k' && id && !action) return '/k/:slug'
+    if (name === 'k' && id && action === 'open') return '/k/:slug/open'
+  }
+  if (name === 'boxes' && id && action === 'letters' && rest.length === 1) {
+    return '/boxes/:id/letters/:letterId'
   }
   return '/:other'
 }

@@ -279,3 +279,75 @@ Deno.test({
     await admin().auth.admin.deleteUser(active.owner)
   },
 })
+
+/** Kotak bareng berisi satu titipan berfoto yang sudah terbit. */
+async function boxWithEntry() {
+  const headers = {
+    apikey: KEY,
+    'content-type': 'application/json',
+    'x-forwarded-for': `10.7.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`,
+  }
+  const boxResponse = await fetch(`${API}/functions/v1/boxes`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ title: 'Kotak uji', to: 'Rani', design: 'laut', opensAt: null }),
+  })
+  const box = await boxResponse.json()
+  assertEquals(boxResponse.status, 201, JSON.stringify(box))
+  const { body, files } = letterFixture()
+  const created = await fetch(`${API}/functions/v1/letters`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ...body, og: null, box: { invite: box.invite, from: 'Budi' } }),
+  }).then((response) => response.json())
+  await upload(created.uploads.photos.p1, files.photo)
+  const published = await call('POST', `/letters/${created.id}/publish`, created.editToken)
+  assertEquals(published.status, 200, JSON.stringify(published.body))
+  return { box, letterId: created.id as string }
+}
+
+Deno.test({
+  name: 'cleanup: foto titipan 7 hari setelah kotak dibuka, kotak lewat masanya dihapus',
+  ignore,
+  async fn() {
+    const { box, letterId } = await boxWithEntry()
+    const open = await fetch(`${API}/functions/v1/boxes/${box.id}`, {
+      method: 'PATCH',
+      headers: { apikey: KEY, 'content-type': 'application/json', 'x-edit-token': box.editToken },
+      body: JSON.stringify({ openNow: true }),
+    })
+    await open.body?.cancel()
+    assertEquals((await call('POST', `/k/${box.slug}/open`)).status, 200)
+    const before = await call('GET', `/k/${box.slug}`)
+    const photoUrl = before.body.letters[0].photos.p1.url
+    assert(await fileExists(photoUrl))
+
+    // Foto lewat masanya: tidak dikembalikan lagi, lalu job menghapus berkasnya.
+    const expiredAt = ago(HOUR)
+    await admin().from('boxes').update({ photos_expire_at: expiredAt }).eq('id', box.id)
+    await admin().from('letters').update({ photos_expire_at: expiredAt }).eq('id', letterId)
+    const hidden = await call('GET', `/k/${box.slug}`)
+    assertEquals(hidden.body.letters[0].photos, {})
+    assertEquals(Date.parse(hidden.body.photosDeletedAt), Date.parse(expiredAt))
+    assertEquals((await cleanup()).status, 200)
+    assertEquals(await assetKinds(letterId), [])
+    assert(!(await fileExists(photoUrl)), 'foto titipan dihapus dari Storage')
+
+    // Kotak lewat expires_at: titipan dan kotaknya hilang, link jadi 404.
+    const opensAt = ago(31 * DAY)
+    await admin().from('boxes').update({
+      created_at: ago(40 * DAY),
+      opens_at: opensAt,
+      expires_at: new Date(Date.parse(opensAt) + 30 * DAY).toISOString(),
+      opened_at: opensAt,
+      photos_expire_at: expiredAt < opensAt ? expiredAt : opensAt,
+    }).eq('id', box.id)
+    const result = await cleanup()
+    assertEquals(result.status, 200, JSON.stringify(result.body))
+    assert(result.body.boxes >= 1, JSON.stringify(result.body))
+    assertEquals(await letterRow(letterId), null)
+    const gone = await admin().from('boxes').select('id').eq('id', box.id)
+    assertEquals(gone.data, [])
+    assertEquals((await call('GET', `/k/${box.slug}`)).status, 404)
+  },
+})

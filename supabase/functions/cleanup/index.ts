@@ -6,12 +6,15 @@
 // - surat yang lewat expires_at (30 hari sejak publish), beserta berkasnya;
 // - foto surat yang lewat photos_expire_at (7 hari sejak dibuka), plus cover dan gambar OG
 //   kalau gambar depannya foto user, lalu mengisi photos_deleted_at;
+// - kotak bareng yang lewat expires_at (30 hari setelah opens_at), beserta semua titipannya
+//   (termasuk draf) dan berkasnya. Foto titipan lewat jalur foto surat di atas, karena open_box()
+//   mengisi photos_expire_at tiap titipan;
 // - berkas Pocket (bucket moments) yang tidak punya baris moments aktif: momennya sudah dihapus
 //   atau user-nya sudah dihapus. Baris berstatus hapus dibuang public.run_cleanup() setelah 30 hari.
 
 import { type AssetRow, check, db, type LetterRow, ok, secretKey } from '../_shared/db.ts'
 import { recordError } from '../_shared/errors.ts'
-import { deleteLetters, frontIsPhoto, removeAssets } from '../_shared/files.ts'
+import { deleteBoxes, deleteLetters, frontIsPhoto, removeAssets } from '../_shared/files.ts'
 import { bytea, sameHash, sha256 } from '../_shared/token.ts'
 
 // Satu batch dipakai langsung di filter `.in()`, jadi jangan lebih dari IN_LIMIT di _shared/files.ts.
@@ -68,6 +71,15 @@ async function expiredPhotos(): Promise<string[]> {
   return ids
 }
 
+async function expiredBoxes(): Promise<string[]> {
+  const rows = check(
+    await db().from('boxes').select('id').lte('expires_at', new Date().toISOString())
+      .order('expires_at').limit(BATCH),
+  ) as { id: string }[]
+  await deleteBoxes(rows.map((row) => row.id))
+  return rows.map((row) => row.id)
+}
+
 /** Berkas momen yang sudah tidak punya baris aktif (migrasi moments_cleanup). */
 async function orphanMomentFiles(): Promise<string[]> {
   const names = check(
@@ -98,6 +110,7 @@ Deno.serve(async (request) => {
       drafts: await drain(() => expiredLetters('draft')),
       letters: await drain(() => expiredLetters('sent')),
       photos: await drain(expiredPhotos),
+      boxes: await drain(expiredBoxes),
       momentFiles: await drain(orphanMomentFiles),
     }
     console.log('cleanup', JSON.stringify(result))

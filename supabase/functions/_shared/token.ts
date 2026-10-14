@@ -36,16 +36,22 @@ export function sameHash(hash: Uint8Array, stored: string): boolean {
   return diff === 0
 }
 
-/** 10 karakter base62 tanpa bias modulo (byte ≥ 248 dibuang). */
-export function newSlug(): string {
-  let slug = ''
-  while (slug.length < 10) {
+/** Kode base62 acak tanpa bias modulo (byte ≥ 248 dibuang). */
+export function newCode(length: number): string {
+  let code = ''
+  while (code.length < length) {
     for (const byte of crypto.getRandomValues(new Uint8Array(16))) {
-      if (byte < 248 && slug.length < 10) slug += BASE62[byte % 62]
+      if (byte < 248 && code.length < length) code += BASE62[byte % 62]
     }
   }
-  return slug
+  return code
 }
+
+/** Slug surat atau kotak: 10 karakter base62. */
+export const newSlug = () => newCode(10)
+
+/** Kode titip kotak bareng: 12 karakter base62. */
+export const newInvite = () => newCode(12)
 
 /**
  * Bagian IP yang dipakai untuk rate limit. IPv6 dipotong ke /64, karena satu perangkat

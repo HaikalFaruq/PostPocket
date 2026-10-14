@@ -80,6 +80,27 @@ export interface LetterRow {
   opened_at: string | null
   photos_expire_at: string | null
   photos_deleted_at: string | null
+  /** Kotak bareng tujuan surat titipan (kontrak 0.3.0), `null` untuk surat biasa. */
+  box_id: string | null
+  from_name: string | null
+}
+
+/** Baris tabel `boxes` (kotak bareng). `recipient` adalah `to` di kontrak. */
+export interface BoxRow {
+  id: string
+  slug: string
+  invite: string
+  edit_token_hash: string
+  title: string
+  recipient: string
+  design: string
+  scheduled: boolean
+  created_at: string
+  opens_at: string
+  expires_at: string
+  opened_at: string | null
+  photos_expire_at: string | null
+  photos_deleted_at: string | null
 }
 
 export interface AssetRow {

@@ -75,6 +75,7 @@ Job `pg_cron` `pembersihan-surat` jalan tiap jam di menit ke-7 dan menjalankan `
 - draf yang tidak pernah di-publish setelah 24 jam, beserta filenya (diberi tenggang 10 menit supaya publish yang sedang berjalan tidak terpotong);
 - foto surat yang `photos_expire_at`-nya sudah lewat (7 hari setelah dibuka), beserta cover dan gambar OG kalau gambar depannya foto user, lalu mengisi `photos_deleted_at`;
 - surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya;
+- kotak bareng yang lewat `expires_at` (30 hari setelah `opens_at`), beserta semua titipan (termasuk draf) dan berkasnya;
 - berkas di bucket `moments` yang tidak punya baris `moments` aktif (`orphan_moment_files()`): momennya sudah dihapus, atau user-nya sudah dihapus dan barisnya ikut terhapus cascade. Berkas selalu diunggah setelah barisnya ada (policy unggah), jadi berkas tanpa baris aktif pasti sampah.
 
 Satu putaran memproses paling banyak 1.000 surat per jenis; sisanya diambil putaran berikutnya. `GET /l/:slug` tidak menunggu job: surat jadi 404 begitu `expires_at` lewat, dan foto tidak dikembalikan lagi begitu `photos_expire_at` lewat. Jadi jeda sampai job jalan hanya memengaruhi kuota, tidak pernah terlihat penerima.
@@ -195,11 +196,11 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Kotak bareng** (kontrak 0.3.0, [rancangan](#rancangan-kotak-bareng))
 
-- [ ] Review kontrak 0.3.0 (usulan Kall) dan putuskan angka di [Yang perlu diputuskan](#yang-perlu-diputuskan)
-- [ ] Migrasi `boxes`, kolom `letters.box_id` dan `letters.from_name`, beserta RLS, constraint, dan test pgTAP
-- [ ] `POST /letters` menerima `box` (ganti penjaga sementara `box_not_found` di `_shared/validate.ts`), publish memeriksa kotaknya, dan `GET /l/:slug`, `POST /l/:slug/open`, serta `replyTo` memperlakukan surat titipan sebagai tidak ada
-- [ ] Edge Function `boxes` (enam endpoint `/boxes/…`) dan `k` (`GET /k/:slug`, `POST /k/:slug/open`), preflight CORS di `_shared/http.ts` menerima `PATCH`, dan `_shared/errors.ts` mencatat error kedua fungsi itu
-- [ ] Job pembersihan: kotak lewat `expires_at` beserta titipannya, foto titipan 7 hari setelah kotak dibuka
+- [x] Review kontrak 0.3.0 (usulan Kall) dan putuskan angka di [Keputusan kotak bareng](#keputusan-kotak-bareng)
+- [x] Migrasi `boxes`, kolom `letters.box_id` dan `letters.from_name`, beserta RLS, constraint, dan test pgTAP
+- [x] `POST /letters` menerima `box` (ganti penjaga sementara `box_not_found` di `_shared/validate.ts`), publish memeriksa kotaknya, dan `GET /l/:slug`, `POST /l/:slug/open`, serta `replyTo` memperlakukan surat titipan sebagai tidak ada
+- [x] Edge Function `boxes` (enam endpoint `/boxes/…`) dan `k` (`GET /k/:slug`, `POST /k/:slug/open`), preflight CORS di `_shared/http.ts` menerima `PATCH`, dan `_shared/errors.ts` mencatat error kedua fungsi itu
+- [x] Job pembersihan: kotak lewat `expires_at` beserta titipannya, foto titipan 7 hari setelah kotak dibuka
 - [ ] Deploy, lalu kabari Kall untuk menyalakan `NUXT_PUBLIC_KOTAK_BARENG` di Vercel
 
 ## Data model rilis 1
@@ -209,8 +210,9 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 | `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `status`, `edit_token_hash`, `reply_to_id`, `created_at`, `draft_expires_at`, `published_at`, `expires_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at` |
 | `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`cover`/`og`), `key` (kunci foto di `content`, khusus `photo`), `mime`, `size`, `width`, `height`, `uploaded_at` |
 | `rate_limit_hits` | `bucket`, `key` (HMAC dari IP, bukan IP mentah), `created_at`. Diisi `take_rate_limit()` |
-| `letter_events` | `kind` (`created`/`opened`/`replied`), `occurred_at` (dibulatkan ke jam), `after_hours`. Diisi trigger `letters_record_event` |
+| `letter_events` | `kind` (`created`/`opened`/`replied`, plus `box_created`/`box_letter`/`box_opened` untuk kotak bareng), `occurred_at` (dibulatkan ke jam), `after_hours`. Diisi trigger `letters_record_event` dan `boxes_record_event` |
 | `function_errors` | `function`, `route` (pola), `status`, `error_name`, `error_code`, `occurred_at`. Diisi Edge Functions lewat `_shared/errors.ts` |
+| `boxes` | Kotak bareng (kontrak 0.3.0), lihat [Rancangan kotak bareng](#rancangan-kotak-bareng). `letters` mendapat `box_id` dan `from_name` untuk surat titipan |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
 - `owner_id` boleh kosong selama belum ada login.
@@ -222,7 +224,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
 - Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key. Tabel fase 2 (`profiles`, `moments`, `pockets`, `albums`) beda: dibuka untuk `authenticated` dengan RLS per user, lihat [Rancangan skema fase 2](#rancangan-skema-fase-2).
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
-- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()`, `run_cleanup()`, dan `orphan_moment_files()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
+- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, `create_box()`, `update_box()`, `open_box()` (kotak bareng), serta `cleanup_token_valid()`, `run_cleanup()`, dan `orphan_moment_files()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -296,12 +298,14 @@ Detail request, respons, dan kode error ada di [`docs/api/openapi.yaml`](api/ope
 
 ## Edge Functions
 
-Tiga fungsi di `supabase/functions/`, semuanya dengan `verify_jwt = false`:
+Lima fungsi di `supabase/functions/`, semuanya dengan `verify_jwt = false`:
 
 | Fungsi | Endpoint |
 | --- | --- |
 | `letters` | `POST /letters`, `POST /letters/{id}/publish`, `DELETE /letters/{id}` |
 | `l` | `GET /l/{slug}`, `POST /l/{slug}/open` |
+| `boxes` | `POST /boxes`, `GET`/`PATCH`/`DELETE /boxes/{id}`, `DELETE /boxes/{id}/letters/{letterId}`, `GET /boxes/invite/{invite}` |
+| `k` | `GET /k/{slug}`, `POST /k/{slug}/open` |
 | `cleanup` | Job pembersihan, bukan bagian kontrak (lihat bagian Pembersihan file) |
 
 Kode bersama ada di `_shared/`:
@@ -326,12 +330,13 @@ deno test tests/unit.test.ts
 API_URL=http://127.0.0.1:54321 PUBLISHABLE_KEY=<dari supabase status> deno test -A tests/api.test.ts
 # Job pembersihan, hanya stack lokal (memundurkan waktu di database)
 API_URL=… PUBLISHABLE_KEY=… SECRET_KEY=<dari supabase status> deno test -A tests/cleanup.test.ts
+API_URL=… PUBLISHABLE_KEY=… SECRET_KEY=<dari supabase status> deno test -A tests/boxes.test.ts
 
 # Setelah kontrak berubah
 scripts/bundle-contract.sh
 
 # Deploy (setelah migrasi baru di-push dengan supabase db push)
-supabase functions deploy letters l cleanup
+supabase functions deploy letters l boxes k cleanup
 ```
 
 Di stack lokal, Kong menimpa header CORS dengan `*`, jadi test CORS di `api.test.ts` hanya jalan kalau `API_URL` menunjuk proyek Supabase asli.
@@ -391,7 +396,7 @@ Risiko yang diterima untuk rilis 1:
 
 ## Rancangan kotak bareng
 
-Usulan Kall (14 Oktober 2026), menunggu review Bintang. Kontraknya `docs/api/openapi.yaml` 0.3.0; frontend sudah jalan di atas mock yang mengikuti kontrak itu (`apps/web/server/utils/mock-boxes.ts`, diuji `e2e/mock-api.spec.ts` dan `e2e/kotak-bareng.spec.ts`), dan disembunyikan di produksi sampai fungsinya ter-deploy. Alurnya di [PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat).
+Usulan Kall (14 Oktober 2026), disetujui Bintang di #56 dan diterapkan di migrasi `boxes`, fungsi `boxes` dan `k`, serta `letters`. Kontraknya `docs/api/openapi.yaml` 0.3.0; frontend sudah jalan di atas mock yang mengikuti kontrak itu (`apps/web/server/utils/mock-boxes.ts`, diuji `e2e/mock-api.spec.ts` dan `e2e/kotak-bareng.spec.ts`), dan disembunyikan di produksi sampai fungsinya ter-deploy. Alurnya di [PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat).
 
 **Prinsip**
 
@@ -431,27 +436,30 @@ Usulan Kall (14 Oktober 2026), menunggu review Bintang. Kontraknya `docs/api/ope
 
 `POST /letters` menerima `box: { invite, from }`, `og` kosong untuk titipan dan wajib untuk surat biasa (`og_mismatch`). Surat titipan dianggap tidak ada di `GET /l/:slug`, `POST /l/:slug/open`, dan `replyTo` (`reply_not_found`). Semua 404 kotak berkode `box_not_found`, juga untuk id atau kode yang bentuknya salah, karena frontend membedakan "kotak tidak ada" dari error lain lewat kode itu. Preflight CORS menambah `PATCH`.
 
-Sejak kontrak 0.3.0, skema `CreateLetterRequest` tidak lagi mewajibkan `og`, dan bundel `_shared/openapi.json` ikut berubah. Supaya `letters` tetap aman kalau di-deploy ulang sebelum kotak bareng jadi, `parseCreateRequest()` sekarang menolak `og` yang kosong (`422 og_mismatch`) dan semua surat titipan (`422 box_not_found`), dengan unit test di `tests/unit.test.ts`. Penjaga `box_not_found` itu diganti pemeriksaan kotak yang sebenarnya saat kotak bareng diterapkan.
+`parseCreateRequest()` menolak `og` pada surat titipan dan `og` kosong pada surat biasa (`422 og_mismatch`), serta titipan yang berupa balasan (`422 invalid_box`). Kotaknya dicek `letters` saat `POST /letters` (ada, belum ditutup, masih muat), lalu sekali lagi oleh `publish_letter()` dengan baris kotak terkunci. Error kotak dari fungsi database memakai kode `P0001` dengan pesan berupa kode error kontrak (`box_closed`, `box_full`, `invalid_box`), dan `_shared/box.ts` mengubahnya jadi respons dengan status yang sesuai endpoint-nya.
 
 **Pembersihan**
 
 - Kotak yang lewat `expires_at`: berkas semua titipannya (termasuk draf), baris titipannya, lalu kotaknya. Diambil job yang sama, `run_cleanup()` dan Edge Function `cleanup`.
-- Foto titipan: lewat jalur foto surat yang sudah ada, karena `open_box()` mengisi `photos_expire_at` tiap surat. Seperti `GET /l/:slug`, `GET /k/:slug` dan `GET /boxes/:id` sudah menyembunyikan foto begitu `photos_expire_at` lewat, dengan `photosDeletedAt` = `photos_deleted_at`, atau `photos_expire_at` kalau job belum jalan. Isi `boxes.photos_deleted_at` begitu foto semua titipannya terhapus.
+- Foto titipan: lewat jalur foto surat yang sudah ada, karena `open_box()` mengisi `photos_expire_at` tiap surat. Seperti `GET /l/:slug`, `GET /k/:slug` dan `GET /boxes/:id` sudah menyembunyikan foto begitu `photos_expire_at` lewat, dengan `photosDeletedAt` = `photos_deleted_at`, atau `photos_expire_at` kalau job belum jalan. `run_cleanup()` mengisi `boxes.photos_deleted_at` begitu foto semua titipannya terhapus.
 - Draf titipan yang tidak di-publish: aturan 24 jam yang sama dengan surat biasa.
 
-**Yang perlu diputuskan**
+### Keputusan kotak bareng
 
-1. Batas per kotak: usulan 20 surat dan 40 foto (termasuk foto depan). Kotak penuh sekitar 20 MB sekali dibuka; dengan egress gratis 5 GB, sekitar 250 kotak penuh per bulan.
-2. Rate limit `POST /boxes`: usulan 5 per jam per IP.
-3. Moderasi: pembuat hanya melihat nama pengirim dan jumlah foto, bukan isinya, supaya tetap kejutan. Titipan yang tidak pantas dihapus lewat namanya.
-4. Analitik: titipan ikut dihitung `created` seperti surat biasa? Membuka kotak perlu jenis event baru?
-5. Rate limit titipan: kalau titipan memakai bucket surat (10 per jam per IP), teman-teman yang menulis bersamaan dari satu Wi-Fi atau IP operator yang sama kena `429` di surat ke-11, padahal kotaknya muat 20. Usulan: bucket sendiri per kotak, misalnya 30 per jam per IP per kotak.
+Diputuskan Bintang saat review #56 (15 Oktober 2026), dievaluasi selama beta:
 
-**Test yang perlu ditambah**
+1. **Batas per kotak: 20 surat dan 40 foto** (termasuk foto depan), `BOX_LIMITS` di `_shared/box.ts`. Yang lebih ketat sebenarnya storage, bukan egress: kotak penuh sekitar 20 MB, jadi storage 1 GB hanya muat sekitar 50 kotak penuh sekaligus, bersama surat biasa dan cadangan Pocket. Dipantau bareng kuota storage.
+2. **`POST /boxes`: 5 kotak per jam per IP** (bucket `create_box`).
+3. **Moderasi lewat nama pengirim saja.** Pembuat hanya melihat nama dan jumlah foto tiap titipan, lalu menghapus yang tidak pantas.
+4. **Analitik: titipan tidak dihitung `created`.** Titipan tidak pernah dibuka satu per satu, jadi akan merusak rasio dibuka. Jenis event sendiri: `box_created`, `box_letter` (titipan terbit), dan `box_opened` (dengan `after_hours` sejak `opens_at`).
+5. **Rate limit titipan: bucket sendiri (`box_letter`), 30 per jam per IP lintas kotak**, terpisah dari 10 surat biasa. Bukan per kotak: kalau per IP per kotak, satu IP bisa membuat 5 kotak × 30 draf × sekitar 2,5 MB unggahan, sekitar 375 MB per jam, dan storage 1 GB penuh dalam 3 jam. 30 per IP tetap muat satu kotak penuh (20) yang ditulis teman-teman dari satu Wi-Fi.
 
-- pgTAP: `boxes` tanpa akses `anon`/`authenticated`, constraint teks dan `opens_at`, `box_id` dan `from_name` berpasangan.
-- `api.test.ts`: semua endpoint kotak, sama dengan urutan di `e2e/mock-api.spec.ts` (buat, titip, tersegel, `box_not_open`, buka sekarang, `box_closed`, hapus titipan, hapus kotak), plus `box_full` dan dua publish bersamaan di batas terakhir.
-- `cleanup.test.ts`: kotak lewat `expires_at` beserta berkasnya, dan foto titipan 7 hari setelah kotak dibuka.
+**Test**
+
+- pgTAP `boxes.test.sql` (30 tes): kotak manual dan terjadwal, jendela `opens_at`, teks yang belum dipangkas, `box_id` dan `from_name` berpasangan, titipan bukan balasan, masa berlaku titipan ikut kotak, batas surat dan foto, `open_letter()` tidak mengenal titipan, ubah jadwal, `openNow`, `box_closed`, `open_box()` dan jadwal hapus fotonya, event analitik, `on delete restrict`, `photos_deleted_at` kotak. `security.test.sql` ikut menjaga hak dan RLS `boxes`.
+- `tests/boxes.test.ts` (stack lokal, butuh `SECRET_KEY`): alur penuh seperti `e2e/mock-api.spec.ts` (buat, titip, tersegel, `box_not_open`, buka sekarang, `box_closed`, baca, buka, tarik titipan, hapus kotak), jadwal dan mode manual, hapus titipan oleh pembuat, hapus kotak beserta draf, `box_full` dengan dua publish bersamaan di batas terakhir, validasi, rate limit 5 kotak dan 30 titipan per IP.
+- `cleanup.test.ts`: foto titipan 7 hari setelah kotak dibuka, kotak lewat `expires_at` beserta titipannya.
+- `api.test.ts` (produksi): preflight menerima `PATCH`.
 
 ## Di luar cakupan rilis 1
 

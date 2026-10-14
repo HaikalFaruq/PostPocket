@@ -1,4 +1,4 @@
-// Respons, CORS, dan pemeriksaan apikey yang sama untuk fungsi `letters` dan `l`.
+// Respons, CORS, dan pemeriksaan apikey yang sama untuk fungsi `letters`, `l`, `boxes`, dan `k`.
 // Aturannya ada di docs/api/openapi.yaml bagian CORS dan Error.
 
 import { recordError } from './errors.ts'
@@ -55,7 +55,7 @@ function corsHeaders(request: Request): Headers {
 
 export function preflight(request: Request): Response {
   const headers = corsHeaders(request)
-  headers.set('access-control-allow-methods', 'GET, POST, DELETE, OPTIONS')
+  headers.set('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   headers.set(
     'access-control-allow-headers',
     'apikey, authorization, content-type, x-client-info, x-edit-token',
