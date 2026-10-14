@@ -3,7 +3,7 @@
 -- Jalankan: supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 -- 1-2: tidak ada tabel atau view di public yang bisa disentuh publishable key atau user login
 select is(
@@ -43,15 +43,22 @@ select is(
       and not coalesce('security_invoker=true' = any (c.reloptions), false)),
   '{}'::text[], 'semua view di public memakai security_invoker');
 
--- 6: bucket letter-assets dibatasi ukuran dan tipe, tanpa policy di storage.objects
+-- 6: bucket letter-assets dibatasi ukuran dan tipe
 select ok(
   (select file_size_limit = 500000
       and allowed_mime_types = array['image/jpeg', 'image/webp', 'image/png']
-    from storage.buckets where id = 'letter-assets')
-  and not exists (
-    select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
-      and (qual like '%letter-assets%' or with_check like '%letter-assets%')),
-  'letter-assets: maksimal 500 KB, hanya gambar, tanpa policy listing atau upload');
+    from storage.buckets where id = 'letter-assets'),
+  'letter-assets: maksimal 500 KB, hanya gambar');
+
+-- 7: tidak ada policy storage sama sekali untuk publishable key atau user login. Policy tanpa
+-- `to` berlaku untuk role public (termasuk anon), dan policy umum seperti `using (true)` tidak
+-- menyebut nama bucket, jadi yang dicek role-nya, bukan isinya.
+select is(
+  (select coalesce(array_agg(tablename || '.' || policyname order by tablename, policyname), '{}')
+    from pg_policies
+    where schemaname = 'storage'
+      and roles && array['public', 'anon', 'authenticated']::name[]),
+  '{}'::text[], 'storage tanpa policy untuk public, anon, atau authenticated');
 
 select * from finish();
 rollback;

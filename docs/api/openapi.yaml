@@ -55,10 +55,10 @@ info:
 
     **CORS**
 
-    - Origin yang diizinkan: `https://postpocket.vercel.app` dan preview yang cocok dengan regex
-      `^https://postpocket-[a-z0-9-]+-haikalfaruqs-projects\.vercel\.app$`. Origin yang cocok
-      dikembalikan apa adanya di `Access-Control-Allow-Origin` (bukan `*`), ditambah
-      `Vary: Origin`.
+    - Origin yang diizinkan hanya `https://postpocket.vercel.app`, dikembalikan apa adanya di
+      `Access-Control-Allow-Origin` (bukan `*`), ditambah `Vary: Origin`.
+    - Preview deploy Vercel tidak diterima (sejak 0.2.3): nama `<proyek>.vercel.app` bisa
+      didaftarkan siapa saja, jadi pola preview bisa diklaim orang lain. Preview memakai mock API.
     - `http://localhost:3000` tidak diterima di produksi (sejak 0.2.3). Untuk `pnpm dev`, pakai
       mock API atau stack Supabase lokal, yang gateway-nya menjawab
       `Access-Control-Allow-Origin: *`.

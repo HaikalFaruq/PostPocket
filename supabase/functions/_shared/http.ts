@@ -22,16 +22,17 @@ export interface ErrorDetail {
   message: string
 }
 
-// Tanpa localhost: stack lokal (Kong) sudah menjawab `access-control-allow-origin: *`, jadi
-// `pnpm dev` ke stack lokal tetap jalan, sedangkan produksi tidak menerima origin localhost.
+// Hanya domain produksi. Tanpa localhost: stack lokal (Kong) sudah menjawab
+// `access-control-allow-origin: *`, jadi `pnpm dev` ke stack lokal tetap jalan. Tanpa preview
+// Vercel: nama <proyek>.vercel.app bisa didaftarkan siapa saja, jadi pola preview bisa diklaim
+// orang lain, dan preview cukup memakai mock API.
 const ORIGINS = new Set(['https://postpocket.vercel.app'])
-const PREVIEW = /^https:\/\/postpocket-[a-z0-9-]+-haikalfaruqs-projects\.vercel\.app$/
 
 /** Origin frontend yang diizinkan, atau `null`. */
 export function allowedOrigin(request: Request): string | null {
   const origin = request.headers.get('origin')
   if (!origin) return null
-  return ORIGINS.has(origin) || PREVIEW.test(origin) ? origin : null
+  return ORIGINS.has(origin) ? origin : null
 }
 
 function corsHeaders(request: Request): Headers {

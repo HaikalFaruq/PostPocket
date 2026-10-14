@@ -308,6 +308,7 @@ Review semua endpoint dan akses langsung ke Supabase, Oktober 2026 (Sprint 3). D
 Yang diperbaiki di review ini:
 
 - CORS tidak lagi menerima `http://localhost:3000` di produksi (kontrak 0.2.3). Stack lokal tidak terpengaruh, karena gateway-nya menjawab `*`.
+- CORS juga tidak lagi menerima preview Vercel (dicatat Kall). Nama `<proyek>.vercel.app` bisa didaftarkan siapa saja, jadi proyek bernama `postpocket-x-haikalfaruqs-projects` cocok dengan pola preview dan halamannya bisa memakai browser pengunjung untuk membuat surat dari banyak IP. Preview cukup memakai mock API.
 - Body `POST /letters` dibaca bertahap dan dihentikan begitu lewat 100 KB, juga kalau `Content-Length` sudah lewat batas. Sebelumnya body dibaca utuh ke memori dulu, baru dicek.
 - Semua respons JSON membawa `X-Content-Type-Options: nosniff`.
 - Test pgTAP `security.test.sql` menjaga semua aturan akses di atas. Migrasi baru yang lupa `revoke`, lupa RLS, atau membuat view tanpa `security_invoker` akan gagal di CI.
@@ -323,7 +324,7 @@ Risiko yang diterima untuk rilis 1:
 
 - `docs/api/openapi.yaml` lebih dulu, supaya Kall bisa membangun UI dengan mock.
 - URL proyek dan anon key untuk `.env` (lewat jalur privat).
-- CORS untuk domain frontend, termasuk URL preview deploy Vercel yang berubah-ubah (`*.vercel.app` milik proyek kita).
+- CORS untuk domain frontend produksi saja. Preview deploy Vercel dan `pnpm dev` memakai mock API atau stack lokal (kontrak 0.2.3).
 - Gambar OG yang dirender browser saat "Buat link" dan bisa diambil crawler WhatsApp tanpa login, lewat URL publik yang dikembalikan `GET /l/:slug`.
 - Proyek Supabase (DB dan Storage) ada di Sydney (`ap-southeast-2`). Edge Functions secara bawaan jalan di region terdekat dengan pemanggil, yaitu Singapura (`ap-southeast-1`) untuk pengguna di Indonesia dan fungsi Vercel `sin1`, lalu setiap query bolak-balik ke Sydney. Karena itu frontend memanggil fungsi dengan `?forceFunctionRegion=ap-southeast-2` (kontrak 0.2.2): `GET /l/:slug` turun dari median sekitar 1,0 detik ke 0,55 detik (diukur Kall dan Bintang, Oktober 2026). Region yang dipaksa tidak dialihkan kalau Sydney down, tapi DB-nya juga di sana.
 - Fungsi Vercel diset ke `sin1` supaya SSR `/l/:slug` tidak bolak-balik ke US.

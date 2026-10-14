@@ -217,23 +217,20 @@ Deno.test({
 })
 
 Deno.test({
-  name: 'CORS: origin frontend dan preview diizinkan, origin lain tidak',
+  name: 'CORS: hanya origin frontend produksi yang diizinkan',
   ignore: !remote,
   async fn() {
     const preflight = await fetch(`${API}/functions/v1/letters`, {
       method: 'OPTIONS',
       headers: {
-        origin: 'https://postpocket-git-fitur-haikalfaruqs-projects.vercel.app',
+        origin: ORIGIN,
         'access-control-request-method': 'POST',
         'access-control-request-headers': 'apikey, content-type, x-edit-token',
       },
     })
     await preflight.body?.cancel()
     assertEquals(preflight.status, 204)
-    assertEquals(
-      preflight.headers.get('access-control-allow-origin'),
-      'https://postpocket-git-fitur-haikalfaruqs-projects.vercel.app',
-    )
+    assertEquals(preflight.headers.get('access-control-allow-origin'), ORIGIN)
     assert(preflight.headers.get('access-control-allow-headers')!.includes('x-edit-token'))
 
     const evil = await fetch(`${API}/functions/v1/l/AAAAAAAAAA`, {
@@ -242,13 +239,20 @@ Deno.test({
     await evil.body?.cancel()
     assertEquals(evil.headers.get('access-control-allow-origin'), null)
 
-    // localhost tidak diterima di produksi.
-    const local = await fetch(`${API}/functions/v1/l/AAAAAAAAAA`, {
-      headers: { apikey: KEY, origin: 'http://localhost:3000' },
-    })
-    await local.body?.cancel()
-    assertEquals(local.headers.get('access-control-allow-origin'), null)
-    assertEquals(local.headers.get('x-content-type-options'), 'nosniff')
+    // localhost dan preview Vercel (namanya bisa diklaim orang lain) tidak diterima di produksi.
+    for (
+      const origin of [
+        'http://localhost:3000',
+        'https://postpocket-git-fitur-haikalfaruqs-projects.vercel.app',
+      ]
+    ) {
+      const other = await fetch(`${API}/functions/v1/l/AAAAAAAAAA`, {
+        headers: { apikey: KEY, origin },
+      })
+      await other.body?.cancel()
+      assertEquals(other.headers.get('access-control-allow-origin'), null, origin)
+      assertEquals(other.headers.get('x-content-type-options'), 'nosniff')
+    }
 
     // Retry-After dari 429 harus bisa dibaca klien lintas origin.
     const allowed = await call('GET', '/l/AAAAAAAAAA')
