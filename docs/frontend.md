@@ -239,7 +239,7 @@ Login Google mencadangkan dan menyinkronkan Pocket, TV, dan Booth antar perangka
 | `app/stores/sync.ts` (`useSync`) | Klien Supabase dimuat lazy saat halaman Pocket atau TV memanggil `start()`, jadi halaman surat tidak memuat `@supabase/supabase-js`. Login PKCE kembali ke `/pocket?masuk=1`. Sinkron dijadwalkan 2 detik setelah setiap perubahan, saat online lagi, dan saat aplikasi dibuka lagi |
 | `app/utils/sync-run.ts` (`runSync`) | Satu putaran: tarik, unduh foto baru dulu, gabungkan, kirim perubahan, lalu unggah ulang berkas yang hilang dari cadangan |
 | `app/utils/sync.ts` | Bentuk baris tabel dan aturan gabung (`mergeRemote`), fungsi murni |
-| `app/utils/sync-supabase.ts` | `SyncBackend` di atas PostgREST dan bucket `moments` |
+| `app/utils/sync-supabase.ts` | `SyncBackend` di atas PostgREST dan bucket `moments`. Tarikan per halaman 1.000 baris diurutkan `updated_at` lalu kunci unik (`id`, atau `day` untuk kantong), karena baris dari satu upsert punya `updated_at` yang sama persis |
 | `app/components/pocket/BackupCard.vue` | Kartu Cadangan di bawah kalender: tombol Google, status, kuota, keluar |
 
 Aturannya:
