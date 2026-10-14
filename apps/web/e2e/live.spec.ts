@@ -28,6 +28,10 @@ test('gerbang Sprint 2: surat terbuka di HP lain tanpa login dan preview-nya sia
   request,
 }) => {
   test.setTimeout(120_000)
+  // Langkah tanpa batas waktu sendiri (goto, klik, waitForResponse) dibatasi 30 detik. Kalau ada
+  // yang macet, tes gagal sebelum batas 120 detik, dan blok finally masih sempat menghapus surat
+  // ujinya. Run 14 Oktober 11.30 WIB habis waktu dan meninggalkan dua surat uji.
+  page.setDefaultTimeout(30_000)
   const message = `Uji gerbang Sprint 2 ${new Date().toISOString()}`
   // Semua panggilan fungsi jalan di region DB-nya, Sydney (kontrak 0.2.2).
   const regions: { url: string; region?: string }[] = []
@@ -76,24 +80,42 @@ test('gerbang Sprint 2: surat terbuka di HP lain tanpa login dan preview-nya sia
       hasTouch: true,
     })
     const reader = await other.newPage()
+    reader.setDefaultTimeout(30_000)
     const errors: string[] = []
     reader.on('pageerror', (error) => errors.push(error.message))
     reader.on('console', (entry) => entry.type() === 'error' && errors.push(entry.text()))
+    // Jejak panggilan fungsi dari HP penerima. Isinya ditulis di pesan gagal kalau open tidak
+    // pernah dijawab: tidak terkirim, preflight CORS gagal, atau jaringan putus.
+    const calls: string[] = []
+    reader.on('request', (r) => {
+      if (r.url().includes('/functions/v1/'))
+        calls.push(`${r.method()} ${new URL(r.url()).pathname}`)
+    })
+    reader.on('requestfailed', (r) => {
+      if (r.url().includes('/functions/v1/'))
+        calls.push(`GAGAL ${r.method()} ${new URL(r.url()).pathname}: ${r.failure()?.errorText}`)
+    })
     const response = await reader.goto(url)
     expect(response?.status()).toBe(200)
     const card = reader.getByRole('button', { name: /Surat untukmu/ })
     // Kartu yang dibuka dicatat lewat POST /l/:slug/open (dan event `opened` di analitik).
     // Jawabannya ditunggu sebelum konteks ini ditutup. Kalau tidak, request-nya bisa terputus
     // di tengah preflight CORS, dan surat uji tidak pernah tercatat dibuka.
-    const opened = reader.waitForResponse(
-      (r) => r.url().includes('/open') && r.request().method() === 'POST',
-    )
+    const opened = reader
+      .waitForResponse((r) => r.url().includes('/open') && r.request().method() === 'POST')
+      .catch(() => null)
     await card.click()
     await expect(card).toHaveAttribute('aria-pressed', 'true')
     const openResponse = await opened
-    expect(openResponse.status()).toBe(200)
-    expect(openResponse.url()).toContain('forceFunctionRegion=ap-southeast-2')
-    expect(openResponse.headers()['x-sb-edge-region']).toBe('ap-southeast-2')
+    expect(
+      openResponse,
+      `POST open tidak dijawab dalam 30 detik. Panggilan fungsi dari HP penerima: ${
+        calls.join(' | ') || 'tidak ada'
+      }`,
+    ).not.toBeNull()
+    expect(openResponse!.status()).toBe(200)
+    expect(openResponse!.url()).toContain('forceFunctionRegion=ap-southeast-2')
+    expect(openResponse!.headers()['x-sb-edge-region']).toBe('ap-southeast-2')
     const letterPage = reader.getByTestId('letter-page')
     await expect(letterPage).toContainText(message)
     // Foto isi datang dari Storage publik dan harus bisa dimuat (termasuk untuk kanvas).

@@ -218,10 +218,13 @@ Domain produksi: [postpocket.vercel.app/lab/foil?bench=1](https://postpocket.ver
 Begitu Edge Function `letters` dan `l` ter-deploy, gerbangnya dicek dalam tiga langkah:
 
 1. `LIVE_BASE_URL=https://postpocket.vercel.app pnpm --filter @postpocket/web exec playwright test --project=android` menjalankan `e2e/live.spec.ts` ke backend asli: kirim surat berfoto, buka dari konteks browser baru tanpa login (seperti HP lain), cek aturan preview WhatsApp, lalu hapus suratnya lagi. Tes lain dilewati dan server lokal tidak dinyalakan. Uji ini membuat satu surat sungguhan, jadi ikut dihitung rate limit (10 surat per jam per IP).
+   - Tiap langkah dibatasi 30 detik. Kalau ada yang macet, tes gagal sebelum batas 120 detik, dan surat ujinya tetap dihapus.
+   - Hasil tiap run disimpan di folder sendiri, `apps/web/test-results/live-<waktu>/`, jadi run berikutnya tidak menghapusnya. Trace hanya ada untuk tes yang gagal. Buka dengan `pnpm --filter @postpocket/web exec playwright show-trace <folder>/trace.zip`.
+   - Kalau `POST /l/:slug/open` tidak dijawab, pesan gagalnya mendaftar semua panggilan fungsi dari "HP lain", termasuk preflight yang gagal.
 2. `pnpm --filter @postpocket/web check:preview <link surat>` memeriksa satu link seperti crawler WhatsApp. Syarat preview: halaman 200 tanpa login, meta OG ada di HTML dari server, gambar OG https, JPEG atau PNG, 1200×630, dan maksimal 300.000 byte. Cek privasinya: halaman surat wajib `noindex`. Aturannya di `apps/web/scripts/link-preview.mjs`, dan E2E `kirim-terima.spec.ts` ikut memakainya dengan mock.
 3. Terakhir, cek manual: kirim linknya lewat WhatsApp ke HP lain, pastikan preview (judul dan sampul) muncul dan suratnya terbuka tanpa login.
 
-Langkah 1 bisa dicoba ke server lokal dengan mock: jalankan build dengan `NUXT_MOCK_API=1 NUXT_PUBLIC_API_BASE=/mock-api`, lalu pakai `LIVE_BASE_URL=http://127.0.0.1:4320`.
+Langkah 1 hanya bisa jalan ke backend asli, karena tesnya mengecek region fungsi dan header dari Supabase, jadi mock tidak bisa dipakai. Sejak kontrak 0.2.3, ini juga satu-satunya cara menguji backend asli dari browser: `pnpm dev` dan preview Vercel ditolak CORS.
 
 Hasil 13 Oktober 2026, setelah region fungsi Sydney (#31, #33) ter-deploy:
 
@@ -243,4 +246,5 @@ Proyek Vercel `postpocket` (Hobby, akun Kall) tersambung ke repo ini lewat GitHu
 | Env production, preview, development | `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, nilainya sama dengan `apps/web/.env` |
 
 - Preview dilindungi Vercel Authentication, jadi hanya bisa dibuka akun pemilik proyek. Domain produksi terbuka untuk siapa saja.
+- Sejak kontrak 0.2.3, Edge Functions hanya menerima origin domain produksi. Di preview, halaman surat masih terbuka lewat SSR, tapi "Buat link" dan menandai surat dibuka ditolak CORS. Alur kirim diuji di E2E (mock) dan tes live (produksi).
 - Env baru atau yang berubah baru terpakai di deploy berikutnya. Hanya nilai yang aman di browser yang boleh masuk sini; secret key tetap di Supabase.
