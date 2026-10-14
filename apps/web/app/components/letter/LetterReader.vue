@@ -13,15 +13,19 @@ import {
  * Halaman surat selebar layar, untuk dibaca dengan nyaman di HP. Di dalam kartu yang terbuka,
  * halamannya hanya separuh lebar kartu sehingga tulisannya kecil. Bisa diperbesar dengan dua jari.
  */
-defineProps<{
-  content: LetterContent
-  photoUrls: Record<string, string>
-  photoPlaceholder?: string
-  /** Warna kertas dan tintanya. */
-  paper: { color: string; textColor: string }
-  /** Lebar dibagi tinggi halaman. */
-  ratio: number
-}>()
+withDefaults(
+  defineProps<{
+    content: LetterContent
+    photoUrls: Record<string, string>
+    photoPlaceholder?: string
+    /** Warna kertas dan tintanya. */
+    paper: { color: string; textColor: string }
+    /** Lebar dibagi tinggi halaman. */
+    ratio: number
+    title?: string
+  }>(),
+  { photoPlaceholder: undefined, title: 'Surat untukmu' },
+)
 const open = defineModel<boolean>('open', { default: false })
 
 // Back di HP menutup tampilan baca, bukan meninggalkan halaman surat.
@@ -43,7 +47,7 @@ useBackToClose(open, () => {
         data-surface="dark"
       >
         <div class="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
-          <DialogTitle class="text-body font-semibold text-white">Surat untukmu</DialogTitle>
+          <DialogTitle class="text-body font-semibold text-white">{{ title }}</DialogTitle>
           <DialogClose as-child>
             <IconButton label="Tutup">
               <Icon name="close" :size="18" />

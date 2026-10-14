@@ -113,6 +113,25 @@ watch(
   { immediate: true },
 )
 
+// "Putar di TV" dari Kotak surat (/tv?album=<id>): CD foto surat-surat itu langsung diputar.
+const albumCd = computed(() =>
+  typeof route.query.album === 'string'
+    ? albums.value.find((album) => album.id === route.query.album && album.moments.length)
+    : undefined,
+)
+watch(
+  () => albumCd.value?.id,
+  (id) => {
+    if (!id || pocketCd.value) return
+    shelfIndex.value = Math.max(
+      0,
+      albums.value.findIndex((album) => album.id === id),
+    )
+    playingId.value = id
+  },
+  { immediate: true },
+)
+
 const tvSet = ref<{
   root: HTMLElement | null
   slotEl: HTMLElement | null

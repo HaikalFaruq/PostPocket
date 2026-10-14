@@ -2,6 +2,7 @@
 import { byId, letter as letterPresets } from '@postpocket/presets'
 import { PHOTO_FRONT, cardRatio } from '~/utils/letter-draft'
 import { LetterApiError } from '~/utils/letter-api'
+import { shownFromApi } from '~/utils/letter-view'
 import { sentHere } from '~/utils/sent-letters'
 
 /**
@@ -24,6 +25,7 @@ const { data: letter, error } = await useAsyncData(`surat-${slug}`, () =>
   }),
 )
 const missing = computed(() => !error.value && !letter.value)
+const shown = computed(() => (letter.value ? shownFromApi(letter.value) : null))
 if (import.meta.server && (missing.value || error.value)) {
   const event = useRequestEvent()
   if (event) setResponseStatus(event, missing.value ? 404 : 503)
@@ -145,7 +147,12 @@ const formatDate = (value: string | null | undefined) =>
       <div class="airmail w-full">
         <div class="relative h-[min(60dvh,540px)] w-full rounded-[3px] bg-canvas">
           <ClientOnly>
-            <ReceivedLetter v-model:open="open" v-model:reading="reading" :letter="letter" />
+            <ReceivedLetter
+              v-if="shown"
+              v-model:open="open"
+              v-model:reading="reading"
+              :letter="shown"
+            />
             <template #fallback>
               <div class="grid size-full place-items-center [container-type:size]">
                 <div class="rounded-[3px] shadow-raised" :style="placeholderStyle" />
@@ -183,6 +190,10 @@ const formatDate = (value: string | null | undefined) =>
             Bikin balasan
           </NuxtLink>
         </div>
+        <!-- Surat dari link tidak disimpan selamanya, jadi penerima bisa menyimpannya di HP. -->
+        <ClientOnly>
+          <KeepLetter v-if="!ownLetter" :letter="letter" />
+        </ClientOnly>
       </template>
 
       <p class="mt-6 max-w-sm text-center text-caption text-ink-muted">

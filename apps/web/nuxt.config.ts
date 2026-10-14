@@ -194,6 +194,9 @@ export default defineNuxtConfig({
     '/tv': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     '/pocket': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     '/pocket/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    // Kotak surat membaca surat tersimpan dari IndexedDB, jadi cukup di browser.
+    '/kotak': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    '/kotak/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // Surat penerima di-SSR supaya meta OG terbaca crawler WhatsApp, tapi tidak boleh diindeks.
     '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
   },
