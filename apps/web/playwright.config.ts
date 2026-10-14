@@ -5,6 +5,9 @@ const port = 4320
 // Gerbang Sprint 2 (e2e/live.spec.ts) jalan ke situs asli kalau LIVE_BASE_URL diisi, misalnya
 // https://postpocket.vercel.app. Tanpa itu, semua tes memakai build lokal dan mock API.
 const live = process.env.LIVE_BASE_URL
+// Tiap run live menyimpan hasilnya di folder sendiri, supaya trace run yang gagal tidak dihapus
+// run berikutnya. Nilainya diwariskan ke worker lewat env, jadi semua worker memakai folder sama.
+if (live) process.env.LIVE_RUN ??= new Date().toISOString().replace(/[:.]/g, '-')
 
 // Kamera palsu Chromium untuk uji Booth. WebKit tidak punya, jadi di sana diuji jalur tanpa kamera.
 const fakeCamera = {
@@ -13,7 +16,9 @@ const fakeCamera = {
 
 export default defineConfig({
   testDir: 'e2e',
-  ...(live ? { testMatch: '**/live.spec.ts' } : { testIgnore: '**/live.spec.ts' }),
+  ...(live
+    ? { testMatch: '**/live.spec.ts', outputDir: `test-results/live-${process.env.LIVE_RUN}` }
+    : { testIgnore: '**/live.spec.ts' }),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
