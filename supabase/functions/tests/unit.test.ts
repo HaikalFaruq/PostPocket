@@ -5,8 +5,8 @@ import { errorFields, routePattern } from '../_shared/errors.ts'
 import { chunks } from '../_shared/files.ts'
 import { ApiError, readJson } from '../_shared/http.ts'
 import { imageInfo, stripMetadata } from '../_shared/image.ts'
-import { ipPrefix, newSlug, sameHash, sha256 } from '../_shared/token.ts'
-import { parseCreateRequest } from '../_shared/validate.ts'
+import { ipPrefix, newInvite, newSlug, sameHash, sha256 } from '../_shared/token.ts'
+import { parseCreateBox, parseCreateRequest, parseUpdateBox } from '../_shared/validate.ts'
 import { content, design, jpeg, letterFixture, png, webp } from './fixtures.ts'
 
 const hasText = (file: Uint8Array, text: string) =>
@@ -131,17 +131,83 @@ Deno.test('parseCreateRequest: isi yang ditolak jadi 422', () => {
     [{ ...body, photos: [{ ...body.photos[0], key: 'p2' }] }, 'photo_mismatch'],
     [{ ...body, design: { ...design, illustration: 'upload' } }, 'cover_mismatch'],
     [{ ...body, cover: { type: 'image/jpeg', width: 10, height: 10, size: 10 } }, 'cover_mismatch'],
-    // Kontrak 0.3.0: `og` boleh kosong di skema, tapi tetap wajib untuk surat biasa, dan surat
-    // titipan kotak bareng ditolak sampai backend kotak bareng ada.
+    // Kontrak 0.3.0: `og` wajib untuk surat biasa dan kosong untuk surat titipan, dan surat
+    // titipan bukan balasan.
     [{ ...body, og: null }, 'og_mismatch'],
     [{ ...body, og: undefined }, 'og_mismatch'],
-    [{ ...body, og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }, 'box_not_found'],
-    [{ ...body, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }, 'box_not_found'],
+    [{ ...body, box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } }, 'og_mismatch'],
+    [
+      { ...body, og: null, replyTo: 'AbCdE12345', box: { invite: 'Ab3dE6gH9jKm', from: 'Budi' } },
+      'invalid_box',
+    ],
   ]
   for (const [input, code] of cases) {
     const error = rejects(input)
     assertEquals([error.status, error.code], [422, code], JSON.stringify(input))
   }
+})
+
+Deno.test('parseCreateRequest: surat titipan tanpa OG, nama pengirim dipangkas', () => {
+  const { body } = letterFixture()
+  const parsed = parseCreateRequest({
+    ...body,
+    og: null,
+    box: { invite: 'Ab3dE6gH9jKm', from: '  Budi  ' },
+  })
+  assertEquals(parsed.box, { invite: 'Ab3dE6gH9jKm', from: 'Budi' })
+  const shape = (input: unknown) => {
+    try {
+      parseCreateRequest(input)
+    } catch (error) {
+      return (error as ApiError).code
+    }
+  }
+  // Bentuk salah dari skema BoxEntry dan BoxText: 400.
+  assertEquals(
+    shape({ ...body, og: null, box: { invite: 'pendek', from: 'Budi' } }),
+    'invalid_request',
+  )
+  assertEquals(
+    shape({ ...body, og: null, box: { invite: 'Ab3dE6gH9jKm', from: '   ' } }),
+    'invalid_request',
+  )
+  assertEquals(
+    shape({ ...body, og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'a\nb' } }),
+    'invalid_request',
+  )
+  assertEquals(
+    shape({ ...body, og: null, box: { invite: 'Ab3dE6gH9jKm', from: 'x'.repeat(41) } }),
+    'invalid_request',
+  )
+})
+
+Deno.test('parseCreateBox dan parseUpdateBox', () => {
+  const code = (fn: () => unknown) => {
+    try {
+      fn()
+    } catch (error) {
+      return [(error as ApiError).status, (error as ApiError).code]
+    }
+  }
+  const box = { title: ' Ultah Rani ', to: 'Rani', design: 'par-avion', opensAt: null }
+  assertEquals(parseCreateBox(box), { ...box, title: 'Ultah Rani' })
+  assertEquals(
+    parseCreateBox({ ...box, opensAt: '2026-10-20T19:00:00+07:00' }).opensAt,
+    '2026-10-20T12:00:00.000Z',
+  )
+  assertEquals(code(() => parseCreateBox({ ...box, design: 'nggak-ada' })), [422, 'invalid_box'])
+  assertEquals(code(() => parseCreateBox({ ...box, extra: 1 })), [400, 'invalid_request'])
+  assertEquals(code(() => parseCreateBox({ title: 'X', to: 'Y', design: 'laut' })), [
+    400,
+    'invalid_request',
+  ])
+
+  assertEquals(parseUpdateBox({ openNow: true }), { openNow: true })
+  assertEquals(parseUpdateBox({ opensAt: null, to: ' Bima ' }), { opensAt: null, to: 'Bima' })
+  assertEquals(code(() => parseUpdateBox({})), [400, 'invalid_request'])
+  assertEquals(code(() => parseUpdateBox({ openNow: false })), [400, 'invalid_request'])
+  assertEquals(code(() => parseUpdateBox({ openNow: true, opensAt: null })), [422, 'invalid_box'])
+  assertEquals(code(() => parseUpdateBox({ design: 'nggak-ada' })), [422, 'invalid_box'])
 })
 
 Deno.test('parseCreateRequest: batas jumlah elemen sama dengan contentLimits', () => {
@@ -154,8 +220,9 @@ Deno.test('parseCreateRequest: batas jumlah elemen sama dengan contentLimits', (
   assertEquals([error.status, error.code], [422, 'invalid_content'])
 })
 
-Deno.test('newSlug 10 karakter base62', () => {
+Deno.test('newSlug 10 dan newInvite 12 karakter base62', () => {
   for (let i = 0; i < 50; i++) assert(/^[A-Za-z0-9]{10}$/.test(newSlug()))
+  for (let i = 0; i < 50; i++) assert(/^[A-Za-z0-9]{12}$/.test(newInvite()))
   assertNotEquals(newSlug(), newSlug())
 })
 
@@ -193,6 +260,14 @@ Deno.test('routePattern membuang id dan slug dari path', () => {
   assertEquals(routePattern('/l'), '/:other')
   assertEquals(routePattern('/l/abcdefghij/bukan'), '/:other')
   assertEquals(routePattern('/letters/a/publish/lagi'), '/:other')
+  assertEquals(routePattern('/boxes'), '/boxes')
+  assertEquals(routePattern('/boxes/0f8c6a52'), '/boxes/:id')
+  assertEquals(routePattern('/boxes/0f8c6a52/letters/1a2b'), '/boxes/:id/letters/:letterId')
+  assertEquals(routePattern('/boxes/invite/Ab3dE6gH9jKm'), '/boxes/invite/:invite')
+  assertEquals(routePattern('/k/AbCdE12345'), '/k/:slug')
+  assertEquals(routePattern('/k/AbCdE12345/open'), '/k/:slug/open')
+  assertEquals(routePattern('/boxes/a/letters'), '/:other')
+  assertEquals(routePattern('/boxes/a/letters/b/c'), '/:other')
 })
 
 Deno.test('errorFields hanya menyimpan nama dan kode yang cocok pola, tanpa pesan', () => {

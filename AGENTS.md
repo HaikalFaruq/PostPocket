@@ -86,7 +86,7 @@ Setiap mulai sesi, termasuk sesi AI agent:
 | --- | --- | --- |
 | `apps/web/` | Kall | Nuxt: semua halaman, kartu foil 3D, editor surat, Pocket, TV, Booth, IndexedDB |
 | `supabase/migrations/` | Bintang | Skema SQL dan RLS |
-| `supabase/functions/` | Bintang | Edge Functions `letters` dan `l` (lima endpoint surat), dan `cleanup` (job pembersihan) |
+| `supabase/functions/` | Bintang | Edge Functions `letters` dan `l` (lima endpoint surat), `boxes` dan `k` (kotak bareng), dan `cleanup` (job pembersihan) |
 | `docs/api/openapi.yaml` | Bintang menulis, Kall me-review | Kontrak API antara frontend dan backend |
 | `packages/presets/` | Kall | Preset desain dalam JSON. Backend hanya menyimpan id-nya |
 | `docs/` | Berdua | PRD, panduan peran, catatan referensi, lisensi aset |
@@ -131,8 +131,9 @@ Perintah backend memakai Supabase CLI lewat `npx supabase@2.120.0` (atau `supaba
 | `deno test tests/unit.test.ts` (dari `supabase/functions`) | Unit test Edge Functions, butuh Deno 2.9 |
 | `deno test -A tests/api.test.ts` (dari `supabase/functions`) | Test integrasi lima endpoint, butuh `API_URL` dan `PUBLISHABLE_KEY` |
 | `deno test -A tests/cleanup.test.ts` (dari `supabase/functions`) | Test integrasi job pembersihan, khusus stack lokal, butuh juga `SECRET_KEY` dari `supabase status` |
+| `deno test -A tests/boxes.test.ts` (dari `supabase/functions`) | Test integrasi kotak bareng, khusus stack lokal, butuh juga `SECRET_KEY` |
 | `scripts/bundle-contract.sh` | Bundel kontrak jadi JSON untuk validasi Edge Functions, wajib setelah `openapi.yaml` berubah |
-| `supabase functions deploy letters l cleanup` | Deploy Edge Functions ke proyek yang di-link |
+| `supabase functions deploy letters l boxes k cleanup` | Deploy Edge Functions ke proyek yang di-link |
 | `npx @redocly/cli@1 lint docs/api/openapi.yaml` | Validasi kontrak API |
 | `supabase stop` | Matikan stack lokal |
 

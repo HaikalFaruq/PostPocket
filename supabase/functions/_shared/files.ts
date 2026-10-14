@@ -1,4 +1,4 @@
-// Menghapus berkas surat. Dipakai DELETE /letters/{id} dan job pembersihan.
+// Menghapus berkas surat. Dipakai DELETE /letters/{id}, kotak bareng, dan job pembersihan.
 
 import { type AssetRow, BUCKET, check, db, ok } from './db.ts'
 
@@ -41,5 +41,19 @@ export async function deleteLetters(ids: string[]) {
     ) as Pick<AssetRow, 'id' | 'storage_path'>[]
     await removeAssets(assets)
     ok(await db().from('letters').delete().in('id', part))
+  }
+}
+
+/**
+ * Hapus kotak bareng beserta semua titipannya (termasuk draf) dan berkasnya. `letters.box_id`
+ * memakai `on delete restrict`, jadi titipan harus hilang dulu, baru kotaknya.
+ */
+export async function deleteBoxes(ids: string[]) {
+  for (const part of chunks(ids, IN_LIMIT)) {
+    const letters = check(
+      await db().from('letters').select('id').in('box_id', part),
+    ) as { id: string }[]
+    await deleteLetters(letters.map((letter) => letter.id))
+    ok(await db().from('boxes').delete().in('id', part))
   }
 }

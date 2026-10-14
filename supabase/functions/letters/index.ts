@@ -1,8 +1,10 @@
 // Fungsi `letters`: POST /letters, POST /letters/{id}/publish, DELETE /letters/{id}.
-// Kontrak: docs/api/openapi.yaml.
+// Kontrak: docs/api/openapi.yaml. Surat titipan kotak bareng (0.3.0) lewat jalur yang sama.
 
+import { BOX_LIMITS, boxError, boxLetters, boxReceipt, inviteUrl, usage } from '../_shared/box.ts'
 import {
   type AssetRow,
+  type BoxRow,
   BUCKET,
   check,
   clientIp,
@@ -20,6 +22,11 @@ import { type FileMeta, parseCreateRequest } from '../_shared/validate.ts'
 
 /** Batas awal pembuatan surat, dievaluasi selama beta (docs/backend.md). */
 const RATE_LIMIT = { bucket: 'create_letter', limit: 10, window: '1 hour' }
+/**
+ * Surat titipan punya bucket sendiri, per IP lintas kotak: teman-teman satu Wi-Fi tetap muat
+ * satu kotak penuh (20), tapi satu IP tidak bisa menimbun draf di banyak kotak.
+ */
+const BOX_RATE_LIMIT = { bucket: 'box_letter', limit: 30, window: '1 hour' }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -39,22 +46,23 @@ interface NewAsset {
   height: number
 }
 
+/** Surat biasa yang masih berlaku. Surat titipan dianggap tidak ada, sama seperti di `l`. */
 async function letterIdOf(slug: string): Promise<string | null> {
   const rows = check(
     await db().from('letters').select('id').eq('slug', slug).eq('status', 'sent')
-      .gt('expires_at', new Date().toISOString()).limit(1),
+      .is('box_id', null).gt('expires_at', new Date().toISOString()).limit(1),
   ) as { id: string }[]
   return rows[0]?.id ?? null
 }
 
-async function takeRateLimit(request: Request) {
+async function takeRateLimit(request: Request, limit = RATE_LIMIT) {
   const key = await rateKey(clientIp(request), secretKey())
   const retryAfter = check(
     await db().rpc('take_rate_limit', {
-      p_bucket: RATE_LIMIT.bucket,
+      p_bucket: limit.bucket,
       p_key: bytea(key),
-      p_limit: RATE_LIMIT.limit,
-      p_window: RATE_LIMIT.window,
+      p_limit: limit.limit,
+      p_window: limit.window,
     }),
   ) as number
   if (retryAfter > 0) {
@@ -64,6 +72,24 @@ async function takeRateLimit(request: Request) {
   }
 }
 
+/** Kotak tujuan surat titipan, kalau masih menerima titipan dan surat ini masih muat. */
+async function boxForEntry(invite: string, photos: number): Promise<BoxRow> {
+  const rows = check(
+    await db().from('boxes').select('*').eq('invite', invite)
+      .gt('expires_at', new Date().toISOString()).limit(1),
+  ) as BoxRow[]
+  const box = rows[0]
+  if (!box) throw new ApiError(422, 'box_not_found', 'kode titip tidak ada')
+  if (Date.parse(box.opens_at) <= Date.now()) {
+    throw new ApiError(422, 'box_closed', 'kotak sudah ditutup untuk titipan')
+  }
+  const used = usage(await boxLetters(box.id))
+  if (used.letters + 1 > BOX_LIMITS.letters || used.photos + photos > BOX_LIMITS.photos) {
+    throw new ApiError(422, 'box_full', 'kotak sudah penuh')
+  }
+  return box
+}
+
 async function createLetter(request: Request) {
   const body = parseCreateRequest(await readJson(request))
   let replyToId: string | null = null
@@ -71,7 +97,10 @@ async function createLetter(request: Request) {
     replyToId = await letterIdOf(body.replyTo)
     if (!replyToId) throw new ApiError(422, 'reply_not_found', 'replyTo tidak ditemukan')
   }
-  await takeRateLimit(request)
+  const box = body.box
+    ? await boxForEntry(body.box.invite, body.photos.length + (body.cover ? 1 : 0))
+    : null
+  await takeRateLimit(request, box ? BOX_RATE_LIMIT : RATE_LIMIT)
 
   const id = crypto.randomUUID()
   const asset = (kind: NewAsset['kind'], meta: FileMeta, key: string | null = null): NewAsset => ({
@@ -86,7 +115,8 @@ async function createLetter(request: Request) {
   const assets = [
     ...(body.cover ? [asset('cover', body.cover)] : []),
     ...body.photos.map((photo) => asset('photo', photo, photo.key)),
-    asset('og', body.og),
+    // Surat titipan tidak punya gambar OG.
+    ...(body.og ? [asset('og', body.og)] : []),
   ]
   const editToken = newEditToken()
   const draftExpiresAt = check(
@@ -97,6 +127,8 @@ async function createLetter(request: Request) {
       p_edit_token_hash: bytea(await sha256(editToken)),
       p_reply_to_id: replyToId,
       p_assets: assets,
+      p_box_id: box?.id ?? null,
+      p_from_name: body.box?.from ?? null,
     }),
   ) as string
 
@@ -119,7 +151,7 @@ async function createLetter(request: Request) {
     uploads: {
       cover: of('cover')[0]?.target ?? null,
       photos: Object.fromEntries(of('photo').map(({ item, target }) => [item.key, target])),
-      og: of('og')[0]!.target,
+      og: of('og')[0]?.target ?? null,
     },
   })
 }
@@ -137,15 +169,28 @@ async function ownedLetter(request: Request, id: string): Promise<LetterRow> {
   return letter
 }
 
-function published(
-  request: Request,
-  letter: Pick<LetterRow, 'slug' | 'published_at' | 'expires_at'>,
-) {
-  return {
+type Published = Pick<LetterRow, 'slug' | 'published_at' | 'expires_at' | 'box_id'>
+
+/**
+ * Respons publish. Untuk surat titipan, link-nya link titip kotak dan masa berlakunya ikut
+ * kotak (bisa bergeser selama kotak belum dibuka), plus ringkasan kotaknya.
+ */
+async function published(request: Request, letter: Published) {
+  const base = {
     slug: letter.slug,
     url: `${siteUrl(request)}/l/${letter.slug}`,
     publishedAt: new Date(letter.published_at!).toISOString(),
     expiresAt: new Date(letter.expires_at!).toISOString(),
+  }
+  if (!letter.box_id) return base
+  const box = (check(
+    await db().from('boxes').select('*').eq('id', letter.box_id).limit(1),
+  ) as BoxRow[])[0]!
+  return {
+    ...base,
+    url: inviteUrl(request, box),
+    expiresAt: new Date(box.expires_at).toISOString(),
+    box: boxReceipt(box),
   }
 }
 
@@ -194,7 +239,7 @@ async function verifyAsset(asset: AssetRow): Promise<number> {
 
 async function publishLetter(request: Request, id: string) {
   const letter = await ownedLetter(request, id)
-  if (letter.status === 'sent') return json(request, 409, published(request, letter))
+  if (letter.status === 'sent') return json(request, 409, await published(request, letter))
   if (Date.parse(letter.draft_expires_at) <= Date.now()) throw notFound('draf sudah kedaluwarsa')
 
   const assets = check(
@@ -209,14 +254,19 @@ async function publishLetter(request: Request, id: string) {
       p_id: id,
       p_slug: newSlug(),
       p_sizes: sizes,
-    }).select('slug, published_at, expires_at')
+      p_max_letters: BOX_LIMITS.letters,
+      p_max_photos: BOX_LIMITS.photos,
+    }).select('slug, published_at, expires_at, box_id')
     // Slug bentrok (sangat jarang): coba slug lain.
     if ((error as { code?: string } | null)?.code === '23505') continue
-    const rows = check({ data, error }) as Pick<LetterRow, 'slug' | 'published_at' | 'expires_at'>[]
-    if (rows[0]) return json(request, 200, published(request, rows[0]))
+    // Kotak sudah terbuka atau penuh (dicek ulang dengan baris kotak terkunci).
+    const rejected = boxError(error, 422)
+    if (rejected) throw rejected
+    const rows = check({ data, error }) as Published[]
+    if (rows[0]) return json(request, 200, await published(request, rows[0]))
     // Publish lain menang duluan.
     const latest = await ownedLetter(request, id)
-    if (latest.status === 'sent') return json(request, 409, published(request, latest))
+    if (latest.status === 'sent') return json(request, 409, await published(request, latest))
     throw notFound()
   }
   throw new Error('Gagal membuat slug unik')

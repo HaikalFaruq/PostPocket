@@ -9,12 +9,15 @@ const SLUG = /^[A-Za-z0-9]{10}$/
 
 const iso = (value: string | null) => (value === null ? null : new Date(value).toISOString())
 
-/** Surat yang sudah terbit dan belum kedaluwarsa. Draf dan surat lewat 30 hari jadi 404. */
+/**
+ * Surat yang sudah terbit dan belum kedaluwarsa. Draf, surat lewat 30 hari, dan surat titipan
+ * kotak bareng (isinya hanya lewat `GET /k/{slug}`) jadi 404.
+ */
 async function sentLetter(slug: string): Promise<LetterRow> {
   if (!SLUG.test(slug)) throw notFound()
   const rows = check(
     await db().from('letters').select('*').eq('slug', slug).eq('status', 'sent')
-      .gt('expires_at', new Date().toISOString()).limit(1),
+      .is('box_id', null).gt('expires_at', new Date().toISOString()).limit(1),
   ) as LetterRow[]
   if (!rows[0]) throw notFound('surat tidak ada atau sudah kedaluwarsa')
   return rows[0]

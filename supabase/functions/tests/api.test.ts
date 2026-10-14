@@ -232,6 +232,8 @@ Deno.test({
     assertEquals(preflight.status, 204)
     assertEquals(preflight.headers.get('access-control-allow-origin'), ORIGIN)
     assert(preflight.headers.get('access-control-allow-headers')!.includes('x-edit-token'))
+    // PATCH /boxes/{id} sejak kontrak 0.3.0.
+    assert(preflight.headers.get('access-control-allow-methods')!.includes('PATCH'))
 
     const evil = await fetch(`${API}/functions/v1/l/AAAAAAAAAA`, {
       headers: { apikey: KEY, origin: 'https://jahat.example' },

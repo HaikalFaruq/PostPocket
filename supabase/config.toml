@@ -439,6 +439,17 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/l/index.ts"
 
+# Kotak bareng (kontrak 0.3.0): pembuat dan halaman titip, lalu penerima.
+[functions.boxes]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/boxes/index.ts"
+
+[functions.k]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/k/index.ts"
+
 # Job pembersihan, dipanggil pg_cron lewat public.run_cleanup(). Diautentikasi sendiri dengan
 # token dari Vault atau secret key, bukan JWT.
 [functions.cleanup]

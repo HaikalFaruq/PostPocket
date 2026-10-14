@@ -1,10 +1,11 @@
 import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js'
+import kotak from '../../../packages/presets/kotak.json' with { type: 'json' }
 import letter from '../../../packages/presets/letter.json' with { type: 'json' }
 import { contentLimits } from '../../../packages/presets/src/letter-content.ts'
 import spec from './openapi.json' with { type: 'json' }
 import { ApiError, type ErrorDetail } from './http.ts'
 
-// Validasi body `POST /letters`. Bentuknya dicek langsung dengan skema dari
+// Validasi body `POST /letters`, `POST /boxes`, dan `PATCH /boxes/{id}`. Bentuknya dicek langsung dengan skema dari
 // docs/api/openapi.yaml (dibundel jadi openapi.json oleh `scripts/bundle-contract.sh`), lalu
 // aturan isi yang tidak bisa ditulis sebagai skema dicek di bawah dengan preset yang sama
 // dengan frontend.
@@ -36,7 +37,8 @@ export interface CreateLetterRequest {
   }
   cover?: FileMeta | null
   photos: (FileMeta & { key: string })[]
-  og: FileMeta
+  /** Wajib untuk surat biasa, kosong untuk surat titipan. */
+  og?: FileMeta | null
   replyTo?: string | null
   /** Surat titipan kotak bareng (kontrak 0.3.0). */
   box?: { invite: string; from: string } | null
@@ -48,6 +50,8 @@ ajv.addFormat('date-time', (value: string) => !Number.isNaN(Date.parse(value)))
 ajv.addFormat('uri', (value: string) => URL.canParse(value))
 ajv.addSchema({ $id: 'openapi', components: { schemas: spec.components.schemas } })
 const validateCreate = ajv.getSchema('openapi#/components/schemas/CreateLetterRequest')!
+const validateCreateBox = ajv.getSchema('openapi#/components/schemas/CreateBoxRequest')!
+const validateUpdateBox = ajv.getSchema('openapi#/components/schemas/UpdateBoxRequest')!
 
 interface KindSchema {
   const?: unknown
@@ -168,10 +172,92 @@ export function parseCreateRequest(raw: unknown): CreateLetterRequest {
   if ((body.design.illustration === 'upload') !== (body.cover != null)) {
     throw new ApiError(422, 'cover_mismatch', 'cover wajib hanya kalau illustration = upload')
   }
-  // Kontrak 0.3.0: `og` boleh kosong di skema, khusus surat titipan kotak bareng. Selama kotak
-  // bareng belum ada di backend, surat titipan ditolak seperti kotak yang tidak ada, dan surat
-  // biasa tetap wajib punya gambar OG.
-  if (body.box != null) throw new ApiError(422, 'box_not_found', 'kotak bareng belum tersedia')
-  if (body.og == null) throw new ApiError(422, 'og_mismatch', 'og wajib untuk surat biasa')
+  // Kontrak 0.3.0: surat titipan tidak punya gambar OG dan bukan balasan; surat biasa wajib OG.
+  if (body.box != null) {
+    if (body.og != null) {
+      throw new ApiError(422, 'og_mismatch', 'surat titipan tidak punya gambar OG')
+    }
+    if (body.replyTo != null) {
+      throw new ApiError(422, 'invalid_box', 'surat titipan tidak bisa berupa balasan')
+    }
+    const from = body.box.from.trim()
+    if (!storable(from)) throw new ApiError(422, 'invalid_box', 'nama pengirim tidak valid')
+    body.box = { invite: body.box.invite, from }
+  } else if (body.og == null) {
+    throw new ApiError(422, 'og_mismatch', 'og wajib untuk surat biasa')
+  }
   return body
+}
+
+export interface CreateBoxRequest {
+  title: string
+  to: string
+  design: string
+  opensAt: string | null
+}
+
+/** Field `PATCH /boxes/{id}` yang dikirim, sudah dipangkas. Kunci yang tidak dikirim tidak ada. */
+export interface UpdateBoxRequest {
+  title?: string
+  to?: string
+  design?: string
+  opensAt?: string | null
+  openNow?: true
+}
+
+/** Teks `BoxText` setelah dipangkas. Skema sudah menolak NUL, ganti baris, dan spasi saja. */
+function boxText(value: string, field: string): string {
+  const text = value.trim()
+  if (!storable(text)) {
+    throw new ApiError(422, 'invalid_box', `${field} memuat karakter tidak valid`)
+  }
+  return text
+}
+
+function checkFolder(design: string) {
+  if (!has(kotak.folders, design)) {
+    throw new ApiError(422, 'invalid_box', 'design tidak ada di preset kotak')
+  }
+}
+
+function parseBody<T>(raw: unknown, validate: typeof validateCreateBox, name: string): T {
+  if (!validate(raw)) {
+    throw new ApiError(
+      400,
+      'invalid_request',
+      `body tidak sesuai skema ${name}`,
+      contractDetails(validate.errors),
+    )
+  }
+  return raw as T
+}
+
+/** Body `POST /boxes`. Waktu `opensAt` dicek database dengan jam server. */
+export function parseCreateBox(raw: unknown): CreateBoxRequest {
+  const body = parseBody<CreateBoxRequest>(raw, validateCreateBox, 'CreateBoxRequest')
+  checkFolder(body.design)
+  return {
+    title: boxText(body.title, 'title'),
+    to: boxText(body.to, 'to'),
+    design: body.design,
+    opensAt: body.opensAt === null ? null : new Date(body.opensAt).toISOString(),
+  }
+}
+
+/** Body `PATCH /boxes/{id}`. `openNow` bersama `opensAt` ditolak `invalid_box`. */
+export function parseUpdateBox(raw: unknown): UpdateBoxRequest {
+  const body = parseBody<UpdateBoxRequest>(raw, validateUpdateBox, 'UpdateBoxRequest')
+  if (body.openNow && 'opensAt' in body) {
+    throw new ApiError(422, 'invalid_box', 'openNow dan opensAt tidak boleh bersamaan')
+  }
+  if (body.design !== undefined) checkFolder(body.design)
+  const patch: UpdateBoxRequest = {}
+  if (body.title !== undefined) patch.title = boxText(body.title, 'title')
+  if (body.to !== undefined) patch.to = boxText(body.to, 'to')
+  if (body.design !== undefined) patch.design = body.design
+  if ('opensAt' in body) {
+    patch.opensAt = body.opensAt == null ? null : new Date(body.opensAt).toISOString()
+  }
+  if (body.openNow) patch.openNow = true
+  return patch
 }
