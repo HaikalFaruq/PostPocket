@@ -70,11 +70,12 @@ Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karen
 
 ## Pembersihan file
 
-Job `pg_cron` `pembersihan-surat` jalan tiap jam di menit ke-7 dan menjalankan `public.run_cleanup()`. Fungsi SQL itu menghapus baris `rate_limit_hits` yang lebih tua dari 1 jam, lalu memanggil Edge Function `cleanup` lewat `pg_net`. Edge Function itu menghapus:
+Job `pg_cron` `pembersihan-surat` jalan tiap jam di menit ke-7 dan menjalankan `public.run_cleanup()`. Fungsi SQL itu menghapus baris `rate_limit_hits` yang lebih tua dari 1 jam dan baris fase 2 berstatus hapus yang lebih tua dari 30 hari (momen hanya kalau berkasnya sudah tidak ada), lalu memanggil Edge Function `cleanup` lewat `pg_net`. Edge Function itu menghapus:
 
 - draf yang tidak pernah di-publish setelah 24 jam, beserta filenya (diberi tenggang 10 menit supaya publish yang sedang berjalan tidak terpotong);
 - foto surat yang `photos_expire_at`-nya sudah lewat (7 hari setelah dibuka), beserta cover dan gambar OG kalau gambar depannya foto user, lalu mengisi `photos_deleted_at`;
-- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya.
+- surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya;
+- berkas di bucket `moments` yang tidak punya baris `moments` aktif (`orphan_moment_files()`): momennya sudah dihapus, atau user-nya sudah dihapus dan barisnya ikut terhapus cascade. Berkas selalu diunggah setelah barisnya ada (policy unggah), jadi berkas tanpa baris aktif pasti sampah.
 
 Satu putaran memproses paling banyak 1.000 surat per jenis; sisanya diambil putaran berikutnya. `GET /l/:slug` tidak menunggu job: surat jadi 404 begitu `expires_at` lewat, dan foto tidak dikembalikan lagi begitu `photos_expire_at` lewat. Jadi jeda sampai job jalan hanya memengaruhi kuota, tidak pernah terlihat penerima.
 
@@ -212,7 +213,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
 - Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key. Tabel fase 2 (`profiles`, `moments`, `pockets`, `albums`) beda: dibuka untuk `authenticated` dengan RLS per user, lihat [Rancangan skema fase 2](#rancangan-skema-fase-2).
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
-- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()` dan `run_cleanup()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
+- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()`, `run_cleanup()`, dan `orphan_moment_files()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -248,7 +249,8 @@ Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql
 
 - Selama beta, maksimal **100 momen aktif per user** (sekitar 50 MB). Trigger di `moments` menolak insert, atau update yang mengosongkan `deleted_at`, kalau user sudah punya 100 momen dengan `deleted_at is null`.
 - Kuota ini hanya berarti kalau setiap berkas punya baris. Karena itu policy unggah di bucket `moments` mensyaratkan baris `moments` milik user dengan `id` sama dengan nama berkas dan `deleted_at is null` (dicatat Kall). Satu baris, satu berkas: tanpa policy update, berkasnya juga tidak bisa ditimpa.
-- Momen yang dihapus berkasnya dihapus browser saat itu juga (policy hapus), dan job pembersihan harian menghapus berkas yang masih tertinggal untuk baris dengan `deleted_at`. Jadi hapus lalu tambah lagi hanya bisa menumpuk berkas paling lama sehari. Bagian job ini (dan membuang baris berstatus hapus setelah 30 hari) belum dibuat; menyusul sebelum sinkron dipakai.
+- Momen yang dihapus berkasnya dihapus browser saat itu juga (policy hapus), dan job pembersihan tiap jam menghapus berkas yang masih tertinggal tanpa baris aktif (lihat [Pembersihan file](#pembersihan-file)). Jadi hapus lalu tambah lagi hanya bisa menumpuk berkas paling lama sejam.
+- Momen yang dipulihkan (`deleted_at` dikosongkan) setelah job menghapus berkasnya tetap aktif tanpa berkas. Browser yang memulihkan momen harus mengunggah ulang fotonya; policy unggah menerimanya karena barisnya aktif lagi.
 - Storage menjawab `400` (bukan `403`) kalau unggah ditolak policy, dengan pesan `new row violates row-level security policy`.
 
 **Sinkron (bagian frontend, dicatat di sini supaya skemanya tidak salah dipakai)**

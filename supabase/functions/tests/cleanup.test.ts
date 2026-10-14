@@ -198,3 +198,84 @@ Deno.test({
     assertEquals((await call('DELETE', `/letters/${fresh.id}`, fresh.token)).status, 204)
   },
 })
+
+Deno.test({
+  name: 'cleanup: berkas momen yang dihapus dan berkas user yang dihapus ikut dibersihkan',
+  ignore,
+  async fn() {
+    // Dua user Pocket yang login, masing-masing satu momen dengan berkasnya.
+    const users = []
+    for (const name of ['aktif', 'pergi']) {
+      const email = `uji-${name}-${crypto.randomUUID()}@example.com`
+      const password = crypto.randomUUID()
+      const created = await admin().auth.admin.createUser({ email, password, email_confirm: true })
+      assert(!created.error, created.error?.message)
+      const client = createClient(API, KEY, { auth: { persistSession: false } })
+      const session = await client.auth.signInWithPassword({ email, password })
+      assert(!session.error, session.error?.message)
+      const owner = created.data.user!.id
+      const id = crypto.randomUUID()
+      const file = jpeg(400, 300)
+      const row = await client.from('moments').insert({
+        id,
+        day: '2026-10-14',
+        taken_at: new Date().toISOString(),
+        source: 'upload',
+        width: 400,
+        height: 300,
+        mime: 'image/jpeg',
+        size: file.length,
+      })
+      assert(!row.error, row.error?.message)
+      const path = `${owner}/${id}.jpg`
+      const uploaded = await client.storage.from('moments').upload(path, file, {
+        contentType: 'image/jpeg',
+      })
+      assert(!uploaded.error, uploaded.error?.message)
+      users.push({ client, owner, id, path })
+    }
+    const [active, gone] = users as [typeof users[0], typeof users[0]]
+    const exists = async (path: string) =>
+      !(await admin().storage.from('moments').download(path)).error
+
+    // Momen kedua milik user aktif dihapus dari browser (deleted_at), user kedua menghapus akun.
+    const second = crypto.randomUUID()
+    const file = jpeg(400, 300)
+    assert(
+      !(await active.client.from('moments').insert({
+        id: second,
+        day: '2026-10-14',
+        taken_at: new Date().toISOString(),
+        source: 'booth',
+        width: 400,
+        height: 300,
+        mime: 'image/jpeg',
+        size: file.length,
+      })).error,
+    )
+    const secondPath = `${active.owner}/${second}.jpg`
+    assert(
+      !(await active.client.storage.from('moments').upload(secondPath, file, {
+        contentType: 'image/jpeg',
+      })).error,
+    )
+    assert(
+      !(await active.client.from('moments').update({ deleted_at: new Date().toISOString() })
+        .eq('id', second)).error,
+    )
+    assert(!(await admin().auth.admin.deleteUser(gone.owner)).error)
+
+    const result = await cleanup()
+    assertEquals(result.status, 200, JSON.stringify(result.body))
+    assert(result.body.momentFiles >= 2, JSON.stringify(result.body))
+    assert(await exists(active.path), 'berkas momen aktif tetap ada')
+    assert(!(await exists(secondPath)), 'berkas momen yang dihapus sudah hilang')
+    assert(!(await exists(gone.path)), 'berkas user yang dihapus sudah hilang')
+    // Baris berstatus hapus tetap ada sampai 30 hari, supaya sampai ke perangkat lain.
+    const kept = await admin().from('moments').select('deleted_at').eq('id', second).single()
+    assert(kept.data?.deleted_at)
+
+    await admin().storage.from('moments').remove([active.path])
+    await admin().auth.admin.deleteUser(active.owner)
+  },
+})

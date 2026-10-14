@@ -5,7 +5,9 @@
 // - draf yang lewat draft_expires_at, beserta berkasnya;
 // - surat yang lewat expires_at (30 hari sejak publish), beserta berkasnya;
 // - foto surat yang lewat photos_expire_at (7 hari sejak dibuka), plus cover dan gambar OG
-//   kalau gambar depannya foto user, lalu mengisi photos_deleted_at.
+//   kalau gambar depannya foto user, lalu mengisi photos_deleted_at;
+// - berkas Pocket (bucket moments) yang tidak punya baris moments aktif: momennya sudah dihapus
+//   atau user-nya sudah dihapus. Baris berstatus hapus dibuang public.run_cleanup() setelah 30 hari.
 
 import { type AssetRow, check, db, type LetterRow, ok, secretKey } from '../_shared/db.ts'
 import { recordError } from '../_shared/errors.ts'
@@ -66,6 +68,15 @@ async function expiredPhotos(): Promise<string[]> {
   return ids
 }
 
+/** Berkas momen yang sudah tidak punya baris aktif (migrasi moments_cleanup). */
+async function orphanMomentFiles(): Promise<string[]> {
+  const names = check(
+    await db().rpc('orphan_moment_files', { p_limit: BATCH }),
+  ) as string[]
+  if (names.length) check(await db().storage.from('moments').remove(names))
+  return names
+}
+
 /** Ulangi satu jenis pembersihan sampai antreannya habis atau ROUNDS tercapai. */
 async function drain(step: () => Promise<string[]>): Promise<number> {
   let total = 0
@@ -87,6 +98,7 @@ Deno.serve(async (request) => {
       drafts: await drain(() => expiredLetters('draft')),
       letters: await drain(() => expiredLetters('sent')),
       photos: await drain(expiredPhotos),
+      momentFiles: await drain(orphanMomentFiles),
     }
     console.log('cleanup', JSON.stringify(result))
     return Response.json(result)
