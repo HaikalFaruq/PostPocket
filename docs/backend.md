@@ -188,7 +188,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 **Sprint 4 dan beta (minggu 8–10)**
 
-- [ ] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS. Rancangannya di [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi menyusul
+- [x] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS: [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi `phase2` dan test `phase2.test.sql`
 - [ ] Lingkungan beta
 - [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
 
@@ -210,7 +210,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Cover dan gambar OG dicatat sebagai baris `letter_assets` berjenis `cover` dan `og`, bukan kolom di `letters`, supaya semua berkas dibersihkan lewat satu tabel.
 - `letter_assets.letter_id` memakai `on delete restrict`: berkas di Storage dihapus lewat Storage API dulu, baru barisnya, lalu suratnya. Urutan lain gagal di database, jadi tidak ada file yatim.
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
-- Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key.
+- Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key. Tabel fase 2 (`profiles`, `moments`, `pockets`, `albums`) beda: dibuka untuk `authenticated` dengan RLS per user, lihat [Rancangan skema fase 2](#rancangan-skema-fase-2).
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
 - Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, serta `cleanup_token_valid()` dan `run_cleanup()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
@@ -220,7 +220,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 ## Rancangan skema fase 2
 
-Disetujui Kall di #47; migrasinya menyusul di PR sendiri. Sumbernya tabel fase 2 di PRD bagian Arsitektur, disesuaikan dengan data Pocket yang sudah jalan di browser (`apps/web/app/utils/memories.ts`), supaya sinkron nanti cuma memindahkan baris, bukan mengubah bentuk data.
+Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql`, ujinya `supabase/tests/database/phase2.test.sql`. Sumbernya tabel fase 2 di PRD bagian Arsitektur, disesuaikan dengan data Pocket yang sudah jalan di browser (`apps/web/app/utils/memories.ts`), supaya sinkron nanti cuma memindahkan baris, bukan mengubah bentuk data.
 
 **Prinsip**
 
@@ -248,7 +248,8 @@ Disetujui Kall di #47; migrasinya menyusul di PR sendiri. Sumbernya tabel fase 2
 
 - Selama beta, maksimal **100 momen aktif per user** (sekitar 50 MB). Trigger di `moments` menolak insert, atau update yang mengosongkan `deleted_at`, kalau user sudah punya 100 momen dengan `deleted_at is null`.
 - Kuota ini hanya berarti kalau setiap berkas punya baris. Karena itu policy unggah di bucket `moments` mensyaratkan baris `moments` milik user dengan `id` sama dengan nama berkas dan `deleted_at is null` (dicatat Kall). Satu baris, satu berkas: tanpa policy update, berkasnya juga tidak bisa ditimpa.
-- Momen yang dihapus berkasnya dihapus browser saat itu juga (policy hapus), dan job pembersihan harian menghapus berkas yang masih tertinggal untuk baris dengan `deleted_at`. Jadi hapus lalu tambah lagi hanya bisa menumpuk berkas paling lama sehari.
+- Momen yang dihapus berkasnya dihapus browser saat itu juga (policy hapus), dan job pembersihan harian menghapus berkas yang masih tertinggal untuk baris dengan `deleted_at`. Jadi hapus lalu tambah lagi hanya bisa menumpuk berkas paling lama sehari. Bagian job ini (dan membuang baris berstatus hapus setelah 30 hari) belum dibuat; menyusul sebelum sinkron dipakai.
+- Storage menjawab `400` (bukan `403`) kalau unggah ditolak policy, dengan pesan `new row violates row-level security policy`.
 
 **Sinkron (bagian frontend, dicatat di sini supaya skemanya tidak salah dipakai)**
 
@@ -359,7 +360,7 @@ Yang diperbaiki di review ini:
 - CORS juga tidak lagi menerima preview Vercel (dicatat Kall). Nama `<proyek>.vercel.app` bisa didaftarkan siapa saja, jadi proyek bernama `postpocket-x-haikalfaruqs-projects` cocok dengan pola preview dan halamannya bisa memakai browser pengunjung untuk membuat surat dari banyak IP. Preview cukup memakai mock API.
 - Body `POST /letters` dibaca bertahap dan dihentikan begitu lewat 100 KB, juga kalau `Content-Length` sudah lewat batas. Sebelumnya body dibaca utuh ke memori dulu, baru dicek.
 - Semua respons JSON membawa `X-Content-Type-Options: nosniff`.
-- Test pgTAP `security.test.sql` menjaga semua aturan akses di atas. Migrasi baru yang lupa `revoke`, lupa RLS, atau membuat view tanpa `security_invoker` akan gagal di CI.
+- Test pgTAP `security.test.sql` menjaga semua aturan akses di atas. Migrasi baru yang lupa `revoke`, lupa RLS, atau membuat view tanpa `security_invoker` akan gagal di CI. Sejak fase 2, test ini juga mendaftar persis hak `authenticated` (select, insert, update di tabel fase 2, tanpa delete) dan hanya menerima policy storage untuk `authenticated` di bucket `moments` yang memeriksa `auth.uid()`.
 
 Risiko yang diterima untuk rilis 1:
 

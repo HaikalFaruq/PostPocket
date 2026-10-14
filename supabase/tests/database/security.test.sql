@@ -3,21 +3,26 @@
 -- Jalankan: supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(8);
 
--- 1-2: tidak ada tabel atau view di public yang bisa disentuh publishable key atau user login
+-- 1-2: publishable key tidak menyentuh tabel atau view mana pun di public
 select is(
   (select coalesce(array_agg(c.relname::text order by c.relname), '{}')
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'p')
       and has_table_privilege('anon', c.oid, 'select, insert, update, delete, truncate, references, trigger')),
   '{}'::text[], 'anon tidak punya hak di tabel atau view mana pun di public');
+-- User login hanya menyentuh tabel fase 2, dan hanya select, insert, update (tanpa delete).
 select is(
-  (select coalesce(array_agg(c.relname::text order by c.relname), '{}')
+  (select coalesce(array_agg(c.relname || ':' || p.privilege order by c.relname, p.privilege), '{}')
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    cross join unnest(array['select', 'insert', 'update', 'delete', 'truncate', 'references',
+      'trigger']) as p(privilege)
     where n.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'p')
-      and has_table_privilege('authenticated', c.oid, 'select, insert, update, delete, truncate, references, trigger')),
-  '{}'::text[], 'authenticated tidak punya hak di tabel atau view mana pun di public');
+      and has_table_privilege('authenticated', c.oid, p.privilege)),
+  array['albums:insert', 'albums:select', 'albums:update', 'moments:insert', 'moments:select',
+    'moments:update', 'pockets:insert', 'pockets:select', 'pockets:update', 'profiles:select'],
+  'authenticated hanya punya select/insert/update di tabel fase 2 (profiles: select dan update display_name)');
 
 -- 3: semua tabel di public memakai RLS
 select is(
@@ -50,15 +55,27 @@ select ok(
     from storage.buckets where id = 'letter-assets'),
   'letter-assets: maksimal 500 KB, hanya gambar');
 
--- 7: tidak ada policy storage sama sekali untuk publishable key atau user login. Policy tanpa
--- `to` berlaku untuk role public (termasuk anon), dan policy umum seperti `using (true)` tidak
--- menyebut nama bucket, jadi yang dicek role-nya, bukan isinya.
+-- 7-8: storage tanpa policy untuk publishable key. Policy tanpa `to` berlaku untuk role public
+-- (termasuk anon), dan policy umum seperti `using (true)` tidak menyebut nama bucket, jadi yang
+-- dicek role-nya, bukan isinya. Untuk user login hanya policy bucket moments yang memeriksa
+-- auth.uid() (fase 2).
 select is(
   (select coalesce(array_agg(tablename || '.' || policyname order by tablename, policyname), '{}')
     from pg_policies
     where schemaname = 'storage'
-      and roles && array['public', 'anon', 'authenticated']::name[]),
-  '{}'::text[], 'storage tanpa policy untuk public, anon, atau authenticated');
+      and roles && array['public', 'anon']::name[]),
+  '{}'::text[], 'storage tanpa policy untuk public atau anon');
+select is(
+  (select coalesce(array_agg(tablename || '.' || policyname order by tablename, policyname), '{}')
+    from pg_policies
+    where schemaname = 'storage'
+      and 'authenticated' = any (roles)
+      and not (
+        tablename = 'objects'
+        and coalesce(qual, with_check) like '%bucket_id = ''moments''%'
+        and coalesce(qual, '') || coalesce(with_check, '') like '%auth.uid()%'
+      )),
+  '{}'::text[], 'policy storage untuk authenticated hanya di bucket moments dan memeriksa auth.uid()');
 
 select * from finish();
 rollback;
