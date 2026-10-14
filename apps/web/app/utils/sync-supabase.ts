@@ -29,13 +29,20 @@ export function supabaseBackend(client: SupabaseClient, userId: string): SyncBac
   const path = (id: string) => `${userId}/${id}.jpg`
   const now = () => new Date().toISOString()
 
-  async function read<Row>(table: string, since: string | null): Promise<Row[]> {
+  /**
+   * Semua baris `table` yang berubah sejak `since`, per halaman 1.000. Baris dari satu upsert
+   * punya `updated_at` yang sama persis, jadi urutannya dikunci juga dengan kolom unik `key`.
+   * Tanpa itu Postgres boleh mengurutkan baris yang sama waktunya secara berbeda di tiap halaman,
+   * dan begitu lewat 1.000 baris ada yang terlewat atau terbaca dua kali.
+   */
+  async function read<Row>(table: string, key: string, since: string | null): Promise<Row[]> {
     const rows: Row[] = []
     for (let from = 0; ; from += PAGE) {
       let query = client
         .from(table)
         .select('*')
         .order('updated_at', { ascending: true })
+        .order(key, { ascending: true })
         .range(from, from + PAGE - 1)
       if (since) query = query.gt('updated_at', since)
       const page = check(await query) as Row[]
@@ -46,10 +53,11 @@ export function supabaseBackend(client: SupabaseClient, userId: string): SyncBac
 
   return {
     async pull(since): Promise<RemoteChanges> {
+      // Kunci unik tiap tabel di bawah RLS (hanya baris milik user): id, atau hari untuk kantong.
       const [moments, pockets, albums] = await Promise.all([
-        read<MomentRow>('moments', since),
-        read<PocketRow>('pockets', since),
-        read<AlbumRow>('albums', since),
+        read<MomentRow>('moments', 'id', since),
+        read<PocketRow>('pockets', 'day', since),
+        read<AlbumRow>('albums', 'id', since),
       ])
       return { moments, pockets, albums }
     },
