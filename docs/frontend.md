@@ -14,6 +14,8 @@ pnpm dev       # http://localhost:3000
 
 Frontend hanya memakai URL proyek dan **publishable key** Supabase (aman dipakai di browser). Secret key tidak pernah masuk frontend, `.env`, atau commit.
 
+Edge Functions produksi tidak menerima origin `http://localhost:3000` (kontrak 0.2.3). Jadi untuk `pnpm dev`, aktifkan mock API di `.env` (`NUXT_MOCK_API=1` dan `NUXT_PUBLIC_API_BASE=/mock-api`), atau arahkan URL dan publishable key di `.env` ke stack Supabase lokal (`http://127.0.0.1:54321`, key dari `supabase status`), yang gateway-nya menjawab CORS dengan `*`. Kalau `.env` menunjuk ke Supabase produksi tanpa mock, halaman surat masih bisa dibuka karena SSR, tapi "Buat link" dan menandai surat dibuka gagal karena CORS. Untuk menguji backend asli, pakai tes live ke domain produksi ([Gerbang Sprint 2](#gerbang-sprint-2)).
+
 | Perintah | Fungsi |
 | --- | --- |
 | `pnpm dev` | Server development `apps/web` |
@@ -134,7 +136,7 @@ Untuk setiap foto, frontend mengirim `key` (khusus `photos`), `type`, `width`, `
 
 **Yang dibutuhkan halaman penerima dari `GET /l/:slug`**: `design`, `content`, URL cover, URL tiap foto per kunci, URL gambar OG, `openedAt`, `expiresAt`, dan `photosDeletedAt`. Setelah foto dihapus, URL-nya tidak dikirim lagi dan halaman menampilkan placeholder di slotnya. Kalau `og` bernilai `null` (cover dari foto user ikut dihapus), meta tag OG memakai gambar bawaan `/og-surat.jpg` dan kartu memakai sampul polos.
 
-**CORS** perlu mengizinkan `https://postpocket.vercel.app`, preview `https://postpocket-*-haikalfaruqs-projects.vercel.app`, dan `http://localhost:3000`.
+**CORS** diatur di bagian CORS `docs/api/openapi.yaml`. Sejak 0.2.3, `http://localhost:3000` tidak diterima di produksi, jadi `pnpm dev` memakai mock API atau stack Supabase lokal ([Mulai lokal](#mulai-lokal)).
 
 **Region fungsi.** Semua panggilan ke fungsi Supabase membawa `?forceFunctionRegion=ap-southeast-2` (kontrak 0.2.2, `useLetterApi`), termasuk SSR halaman surat dari Vercel `sin1`. DB dan Storage ada di Sydney; tanpa query ini fungsi jalan di Singapura dan setiap query bolak-balik ke Sydney (`GET /l/:slug` median sekitar 1,0 detik, dengan query sekitar 0,55 detik). Unggahan ke `signedUrl` dan mock lokal tidak memakainya.
 
