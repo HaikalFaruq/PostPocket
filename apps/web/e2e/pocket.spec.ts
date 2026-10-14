@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
+import type { MemoryData } from '../app/utils/memories'
 
 // Hari ini dibuat tetap supaya kalender dan judul bulan bisa dicek pasti.
 const TODAY = '2026-10-10'
@@ -482,4 +483,96 @@ test('foto HEIC bisa dipilih dan tampil, juga di browser yang tidak membuka HEIC
 
   await openPocket(page)
   await expect(page.getByTestId('line-photo')).toHaveCount(1)
+})
+
+/** Satu nilai idb-keyval (database `keyval-store`) langsung dari IndexedDB. */
+async function stored(page: Page, key: string): Promise<unknown> {
+  return page.evaluate(
+    (key) =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open('keyval-store')
+        open.onupgradeneeded = () => open.result.createObjectStore('keyval')
+        open.onerror = () => reject(open.error)
+        open.onsuccess = () => {
+          const request = open.result.transaction('keyval').objectStore('keyval').get(key)
+          request.onsuccess = () => {
+            open.result.close()
+            resolve(request.result)
+          }
+          request.onerror = () => reject(request.error)
+        }
+      }),
+    key,
+  )
+}
+
+test('kenangan dari sebelum UUID pindah ke UUID tanpa memindah fotonya', async ({ page }) => {
+  // Data versi lama: id momen dan album 6 karakter acak, foto disimpan di kunci id lama.
+  await page.goto('/')
+  await page.evaluate(async (day) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 600
+    canvas.height = 450
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = 'hsl(140 60% 55%)'
+    ctx.fillRect(0, 0, 600, 450)
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((value) => resolve(value!), 'image/jpeg'),
+    )
+    const bytes = await blob.arrayBuffer()
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = indexedDB.open('keyval-store')
+      open.onupgradeneeded = () => open.result.createObjectStore('keyval')
+      open.onsuccess = () => resolve(open.result)
+      open.onerror = () => reject(open.error)
+    })
+    const tx = db.transaction('keyval', 'readwrite')
+    const store = tx.objectStore('keyval')
+    store.put({ bytes, type: 'image/jpeg', width: 600, height: 450 }, 'postpocket:moment:m1lama')
+    const moment = {
+      id: 'm1lama',
+      day,
+      takenAt: `${day}T08:00:00.000Z`,
+      source: 'upload',
+      width: 600,
+      height: 450,
+    }
+    store.put(
+      {
+        version: 1,
+        moments: { m1lama: moment },
+        days: { [day]: { day, moments: ['m1lama'], savedAt: `${day}T09:00:00.000Z` } },
+        albums: [{ id: 'a1lama', title: 'Liburan', color: '#ff8fa3', moments: ['m1lama'] }],
+      },
+      'postpocket:memories',
+    )
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve
+      tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+  }, TODAY)
+
+  // Fotonya tetap tampil dari kunci lamanya.
+  await openPocket(page)
+  await expect(page.getByTestId('line-photo')).toHaveCount(1)
+  await expect(page.getByTestId('line-photo').locator('img')).toHaveAttribute('src', /^blob:/)
+
+  // Id momen dan album jadi UUID, termasuk di kantong dan album; id lama jadi photoKey.
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+  const data = (await stored(page, 'postpocket:memories')) as MemoryData
+  const [id] = Object.keys(data.moments)
+  expect(id).toMatch(uuid)
+  expect(data.moments[id!]).toMatchObject({ id, photoKey: 'm1lama' })
+  expect(data.days[TODAY]!.moments).toEqual([id])
+  expect(data.albums[0]!.id).toMatch(uuid)
+  expect(data.albums[0]!.moments).toEqual([id])
+
+  // Menghapus kantongnya ikut menghapus foto di kunci lama.
+  await page.getByRole('button', { name: 'Ganti desain kantong' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Hapus kantong' }).click()
+  await dialog.getByRole('button', { name: 'Hapus', exact: true }).click()
+  await expect(page).toHaveURL(/\/pocket$/)
+  await expect.poll(() => stored(page, 'postpocket:moment:m1lama')).toBeUndefined()
 })
