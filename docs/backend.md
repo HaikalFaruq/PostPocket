@@ -292,7 +292,7 @@ Login fase 2 hanya lewat Google (keputusan #47). Kall membuat OAuth client di Go
 Bintang mengundang email Kall ke organisasi Supabase dulu (Organization → Team), lalu:
 
 - Sign In / Providers → Google: aktifkan, isi Client ID dan Client Secret (Kall).
-- Sign In / Providers → Email: matikan pendaftaran baru. Sampai sekarang pendaftaran email di produksi masih terbuka (dicek lewat `/auth/v1/settings`), dan PostPocket tidak memakainya.
+- Sign In / Providers → Email: matikan provider Email ("Enable Email provider"). Jangan pakai "Allow new users to sign up" di pengaturan umum, karena itu ikut menutup pendaftaran lewat Google. Sampai sekarang provider email di produksi masih nyala (dicek lewat `/auth/v1/settings`), dan PostPocket tidak memakainya.
 - URL Configuration: Site URL `https://postpocket.vercel.app`, Redirect URLs `https://postpocket.vercel.app/**`. Preview Vercel dan localhost tidak didaftarkan, sama seperti CORS: REST Supabase menerima origin mana pun, jadi redirect ke localhost membuat `pnpm dev` bisa login dan menulis tabel fase 2 di produksi. Login saat development lewat stack lokal, yang Site URL-nya sudah `http://localhost:3000` di `config.toml` dan callback-nya `http://127.0.0.1:54321/auth/v1/callback` (sudah didaftarkan di Google).
 
 **3. Cek setelah setup**
@@ -303,7 +303,7 @@ curl -s https://rmyfkdtqcltawmssollb.supabase.co/auth/v1/settings -H "apikey: <p
 
 Hasilnya harus `external.google: true` dan `external.email: false`.
 
-**Lokal.** `supabase/config.toml` sudah mengaktifkan Google dengan client ID dan secret dari env (`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`, `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` di `supabase/.env`, yang di-ignore git) dan menutup pendaftaran email. Tanpa env itu stack tetap jalan, hanya tombol Google yang gagal. Test lokal tetap membuat user lewat `auth.admin.createUser` dan login dengan password.
+**Lokal.** `supabase/config.toml` sudah mengaktifkan Google dengan client ID dan secret dari env (`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`, `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` di `supabase/.env`, yang di-ignore git). Tanpa env itu stack tetap jalan, hanya tombol Google yang gagal. Provider email tetap nyala di lokal, karena test integrasi membuat user lewat `auth.admin.createUser` lalu login dengan password; `[auth.email] enable_signup = false` mematikan provider-nya, bukan cuma pendaftaran.
 
 **Data dari Google.** Supabase menyimpan nama, email, dan foto profil Google di `auth.users` (`raw_user_meta_data`). `profiles.display_name` sengaja tidak diisi dari situ. `/privasi` perlu menjelaskan ini sebelum login dibuka (checklist Kall).
 

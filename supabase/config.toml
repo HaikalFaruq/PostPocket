@@ -219,9 +219,10 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-# Login PostPocket hanya Google (docs/backend.md, Login Google). Daftar lewat email ditutup, tapi
-# admin.createUser + password tetap jalan untuk test lokal.
-enable_signup = false
+# Provider email tetap nyala di stack lokal: test integrasi login dengan password
+# (auth.admin.createUser). Mematikannya di sini mematikan login password, bukan cuma pendaftaran.
+# Di produksi provider Email dimatikan lewat dashboard (docs/backend.md, Login Google).
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
