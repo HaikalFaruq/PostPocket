@@ -332,6 +332,8 @@ defineExpose({
   flex: none;
   vertical-align: top;
   color: var(--color-ink);
+  /* Halaman induknya boleh rata tengah; isi folder tetap rata kiri. */
+  text-align: left;
   -webkit-tap-highlight-color: transparent;
   isolation: isolate;
 }
