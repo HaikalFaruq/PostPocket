@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { byId, letter, pocket } from '@postpocket/presets'
+import { byId, letter } from '@postpocket/presets'
+import booth from '~/utils/hairline/booth'
+import pocket from '~/utils/hairline/pocket'
+import surat from '~/utils/hairline/surat'
 
 // Crawler WhatsApp hanya membaca URL gambar OG yang absolut.
 const site = useRequestURL().origin
@@ -24,147 +27,190 @@ const open = ref(false)
 const version = useRuntimeConfig().public.appVersion
 const kotakBareng = !!useRuntimeConfig().public.kotakBareng
 
-// Modul lain ditampilkan sebagai bendanya: kantong jajan Pocket dan strip foto Booth.
-const packet = pocket.packetColors[0]!
-const heart = byId(letter.stickers, 'heart')
-// Satu foto contoh dengan empat filter Booth, seperti strip sungguhan.
-const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(-18deg)']
+/**
+ * Tiga modul, dari kiri ke kanan seperti perjalanan sebuah kenangan: ditulis jadi surat, disimpan
+ * di kantong, dan difoto di booth. Masing-masing dibuka dengan bendanya sebagai figur garis
+ * Hairline yang bergerak sendiri dan menjawab sentuhan.
+ */
+const modules = [
+  {
+    id: 'surat',
+    figure: surat,
+    title: 'Surat',
+    text: 'Tulis kartu foil 3D, lalu kirim lewat satu link. Penerimanya tinggal mengetuk kartunya.',
+    to: '/letter/new',
+    action: 'Tulis surat',
+    tags: ['kartu foil 3D', 'kirim lewat link'],
+  },
+  {
+    id: 'pocket',
+    figure: pocket,
+    title: 'Pocket',
+    text: 'Simpan satu hal kecil setiap hari di kantong berstiker, lalu buka lagi kapan saja.',
+    to: '/pocket',
+    action: 'Buka Pocket',
+    tags: ['satu kantong', 'setiap hari'],
+  },
+  {
+    id: 'booth',
+    figure: booth,
+    title: 'Photo Booth',
+    text: 'Empat jepretan berfilter retro, langsung jadi strip foto untuk disimpan atau dikirim.',
+    to: '/tv?booth=1',
+    action: 'Foto di Booth',
+    tags: ['empat jepretan', 'jadi strip foto'],
+  },
+] as const
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-dvh max-w-6xl flex-col px-4 sm:px-6">
-    <header class="flex items-center gap-2.5 py-5">
-      <img src="/favicon.svg" alt="" class="size-7" />
-      <p class="text-[20px] leading-none font-bold tracking-[-0.03em]">PostPocket</p>
-    </header>
-
-    <main class="grid flex-1 gap-10 pb-10 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-16">
-      <!-- Pembuka: surat contoh dalam amplop par avion, yang bisa langsung dibuka. -->
-      <figure class="lg:order-2">
-        <div class="airmail">
-          <div
-            class="relative h-[clamp(240px,40dvh,440px)] rounded-[3px] bg-canvas lg:h-[min(58dvh,520px)]"
+  <div class="flex min-h-dvh flex-col overflow-x-clip">
+    <!-- Pembungkus selebar layar: kerumunan di atas footer ikut selebar layar, tanpa membuat
+         halaman bisa digeser ke samping. Isi halaman tetap dalam kolom max-w-6xl. -->
+    <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 sm:px-6">
+      <header class="flex items-center gap-2.5 py-5">
+        <NuxtLink to="/" class="flex items-center gap-2.5">
+          <img src="/favicon.svg" alt="" class="size-7" />
+          <span class="text-[19px] leading-none font-bold tracking-[-0.03em]">PostPocket</span>
+        </NuxtLink>
+        <span class="text-caption text-ink-muted">beta</span>
+        <nav aria-label="Menu" class="ml-auto flex items-center gap-5 text-body text-ink-muted">
+          <NuxtLink
+            to="/letter/new"
+            class="hidden min-h-11 items-center hover:text-ink sm:inline-flex"
+            >Surat</NuxtLink
           >
-            <ClientOnly>
-              <FoilCard
-                v-model:open="open"
-                :art="example.art"
-                :foil-mask="example.foil"
-                :foil="foil"
-                :paper="paper"
-                :ratio="example.ratio"
-                label="Contoh surat"
-              >
-                <template #inside>
-                  <p>Untukmu,</p>
-                  <p>hari ini seru banget. Makasih udah nemenin!</p>
-                  <p class="mt-[6cqw] text-right">Kall</p>
-                </template>
-              </FoilCard>
-              <template #fallback>
-                <div class="grid size-full place-items-center">
-                  <div
-                    class="aspect-[0.72] h-[72%] rounded-[3px]"
-                    :style="{ backgroundColor: paper.color }"
-                  />
-                </div>
-              </template>
-            </ClientOnly>
-          </div>
-        </div>
-        <figcaption class="mt-3 text-center text-caption text-ink-muted">
-          Contoh surat. Ketuk untuk membuka, geser untuk memutar.
-        </figcaption>
-      </figure>
+          <NuxtLink to="/pocket" class="hidden min-h-11 items-center hover:text-ink sm:inline-flex"
+            >Pocket</NuxtLink
+          >
+          <NuxtLink
+            to="/tv?booth=1"
+            class="hidden min-h-11 items-center hover:text-ink sm:inline-flex"
+            >Booth</NuxtLink
+          >
+          <NuxtLink to="/kotak" class="inline-flex min-h-11 items-center hover:text-ink">
+            Kotak surat
+          </NuxtLink>
+        </nav>
+      </header>
 
-      <div class="lg:order-1">
-        <h1
-          class="text-[38px] leading-[0.95] font-bold tracking-[-0.035em] text-balance sm:text-[60px]"
+      <main class="flex-1">
+        <section class="flex flex-col items-center pt-2 text-center sm:pt-6">
+          <!-- Pembuka: surat contoh dalam amplop par avion, yang bisa langsung dibuka. -->
+          <figure class="w-full max-w-[400px]">
+            <div class="airmail">
+              <div class="relative h-[clamp(240px,38dvh,360px)] rounded-[3px] bg-canvas">
+                <ClientOnly>
+                  <FoilCard
+                    v-model:open="open"
+                    :art="example.art"
+                    :foil-mask="example.foil"
+                    :foil="foil"
+                    :paper="paper"
+                    :ratio="example.ratio"
+                    label="Contoh surat"
+                  >
+                    <template #inside>
+                      <p>Untukmu,</p>
+                      <p>hari ini seru banget. Makasih udah nemenin!</p>
+                      <p class="mt-[6cqw] text-right">PostPocket</p>
+                    </template>
+                  </FoilCard>
+                  <template #fallback>
+                    <div class="grid size-full place-items-center">
+                      <div
+                        class="aspect-[0.72] h-[72%] rounded-[3px]"
+                        :style="{ backgroundColor: paper.color }"
+                      />
+                    </div>
+                  </template>
+                </ClientOnly>
+              </div>
+            </div>
+            <figcaption class="mt-3 text-caption text-ink-muted">
+              Contoh surat. Ketuk untuk membuka, geser untuk memutar.
+            </figcaption>
+          </figure>
+
+          <h1
+            class="mt-10 max-w-[14ch] text-[40px] leading-[1.02] font-bold tracking-[-0.035em] text-balance sm:text-[58px]"
+          >
+            Kenangan kecil, dikirim jadi
+            <span class="font-letter text-[1.16em] leading-none font-normal tracking-normal"
+              >surat</span
+            >.
+          </h1>
+          <p class="mt-4 max-w-[34rem] text-[16px] leading-relaxed text-pretty text-ink-muted">
+            Tulis kartu foil 3D, simpan satu momen setiap hari, dan foto bareng di booth. Semua
+            dibuka lewat satu link, tanpa daftar dan tanpa aplikasi.
+          </p>
+        </section>
+
+        <!-- Surat, Pocket, lalu Photo Booth: satu pita berpanel, bukan tiga kartu yang sama. -->
+        <section
+          class="mt-14 rounded-card bg-surface inset-ring inset-ring-line-soft"
+          aria-label="Surat, Pocket, dan Photo Booth"
         >
-          Kenangan kecil, dikirim jadi surat.
-        </h1>
-        <p class="mt-4 max-w-md text-[16px] leading-relaxed text-pretty text-ink-muted">
-          Tulis kartu foil 3D, lalu kirim lewat satu link. Penerimanya tinggal mengetuk kartunya,
-          tanpa daftar dan tanpa aplikasi.
-        </p>
-        <NuxtLink
-          to="/letter/new"
-          class="mt-6 inline-flex h-12 items-center rounded-control bg-ink px-7 text-[15px] font-semibold text-white transition-colors hover:bg-ink/90"
-        >
-          Tulis surat
+          <ul class="grid divide-y divide-line-soft md:grid-cols-3 md:divide-x md:divide-y-0">
+            <li
+              v-for="item in modules"
+              :key="item.id"
+              class="flex flex-col items-center px-4 pt-3 pb-3 text-center"
+              :data-testid="`modul-${item.id}`"
+            >
+              <HairlineFigure :figure="item.figure" class="w-full max-w-[380px]" />
+              <h2 class="text-[21px] font-bold tracking-[-0.02em]">{{ item.title }}</h2>
+              <p class="mt-1.5 max-w-[32ch] text-pretty text-ink-muted">{{ item.text }}</p>
+              <TagButton :to="item.to" :label="item.action" :tags="item.tags" />
+            </li>
+          </ul>
+        </section>
+
+        <NuxtLink to="/kotak" class="group mx-auto mt-8 flex max-w-md items-center gap-4 py-2">
+          <span class="grid w-14 shrink-0 place-items-center">
+            <span class="w-12 -rotate-3 transition-transform group-hover:rotate-0">
+              <FolderMini />
+            </span>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[17px] font-bold tracking-[-0.02em]">Kotak surat</span>
+            <span class="mt-0.5 block text-ink-muted">
+              {{
+                kotakBareng
+                  ? 'Simpan surat yang kamu terima, atau kumpulkan surat dari teman-teman untuk satu orang.'
+                  : 'Surat yang kamu simpan dari link, tetap bisa dibuka walau link-nya sudah mati.'
+              }}
+            </span>
+          </span>
+          <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
         </NuxtLink>
 
-        <ul class="mt-12 max-w-md divide-y divide-line-soft border-y border-line-soft">
-          <li>
-            <NuxtLink to="/pocket" class="group flex items-center gap-4 py-4">
-              <span class="grid w-14 shrink-0 place-items-center">
-                <span class="w-12 -rotate-6 transition-transform group-hover:-rotate-2">
-                  <SnackPacket :color="packet.color" :sticker="heart" mini />
-                </span>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-[17px] font-bold tracking-[-0.02em]">Pocket</span>
-                <span class="mt-0.5 block text-ink-muted">
-                  Simpan satu hal kecil setiap hari di kantong berstiker.
-                </span>
-              </span>
-              <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
-            </NuxtLink>
-          </li>
-          <li>
-            <NuxtLink to="/tv?booth=1" class="group flex items-center gap-4 py-4">
-              <span class="grid w-14 shrink-0 place-items-center">
-                <span
-                  class="booth-mini w-8 rotate-6 transition-transform group-hover:rotate-2"
-                  aria-hidden="true"
-                >
-                  <img
-                    v-for="filter in shots"
-                    :key="filter"
-                    src="/samples/contoh-foto.svg"
-                    alt=""
-                    class="booth-mini__shot"
-                    :style="{ filter }"
-                  />
-                </span>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-[17px] font-bold tracking-[-0.02em]">Booth</span>
-                <span class="mt-0.5 block text-ink-muted">
-                  Empat jepretan berfilter retro, langsung jadi strip foto.
-                </span>
-              </span>
-              <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
-            </NuxtLink>
-          </li>
-          <li>
-            <NuxtLink to="/kotak" class="group flex items-center gap-4 py-4">
-              <span class="grid w-14 shrink-0 place-items-center">
-                <span class="w-12 -rotate-3 transition-transform group-hover:rotate-0">
-                  <FolderMini />
-                </span>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-[17px] font-bold tracking-[-0.02em]">Kotak surat</span>
-                <span class="mt-0.5 block text-ink-muted">
-                  {{
-                    kotakBareng
-                      ? 'Simpan surat yang kamu terima, atau kumpulkan surat dari teman-teman untuk satu orang.'
-                      : 'Surat yang kamu simpan dari link, tetap bisa dibuka walau link-nya sudah mati.'
-                  }}
-                </span>
-              </span>
-              <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
-            </NuxtLink>
-          </li>
-        </ul>
-      </div>
-    </main>
+        <InstallCard class="mx-auto mt-6 max-w-md" />
 
-    <InstallCard class="mb-6 max-w-md" />
+        <section class="mt-20 text-center" aria-labelledby="crowd-title">
+          <h2
+            id="crowd-title"
+            class="mx-auto max-w-[22ch] text-[24px] leading-tight font-bold tracking-[-0.025em] text-balance sm:text-[28px]"
+          >
+            Untuk siapa pun yang mau kamu kirimi surat.
+          </h2>
+          <p class="mx-auto mt-2 max-w-md text-pretty text-ink-muted">
+            Teman sekelas, keluarga, atau orang yang baru kamu kenal hari ini. Mereka cukup membuka
+            satu link.
+          </p>
+          <span
+            class="mx-auto mt-6 block h-12 w-px bg-linear-to-b from-transparent to-ink/30"
+            aria-hidden="true"
+          />
+        </section>
+      </main>
+    </div>
+
+    <!-- Kerumunan dan garis tanahnya selebar layar; isi footer kembali ke kolom max-w-6xl. -->
+    <CrowdStreet class="h-[180px] w-full border-b border-line sm:h-[220px]" />
 
     <footer
-      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-soft py-5 text-caption text-ink-muted"
+      class="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-5 text-caption text-ink-muted sm:px-6"
     >
       <p>Versi beta ({{ version }}). Foto, kantong, dan draf suratmu tersimpan di perangkat ini.</p>
       <nav aria-label="Tentang PostPocket" class="flex gap-4">
@@ -179,23 +225,3 @@ const shots = ['none', 'grayscale(1)', 'sepia(0.75)', 'saturate(1.6) hue-rotate(
     </footer>
   </div>
 </template>
-
-<style scoped>
-/* Strip Booth mini: empat jepretan dalam bingkai putih. */
-.booth-mini {
-  display: grid;
-  gap: 3px;
-  padding: 4px 4px 9px;
-  background-color: var(--color-white);
-  border-radius: 2px;
-  box-shadow: 0 6px 12px -6px rgb(24 32 74 / 0.45);
-}
-
-.booth-mini__shot {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 1px;
-}
-</style>

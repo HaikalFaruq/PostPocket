@@ -4,3 +4,4 @@ public/illustrations
 public/samples
 playwright-report
 test-results
+app/utils/hairline/kernel.js

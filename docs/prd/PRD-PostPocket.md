@@ -72,7 +72,7 @@ Putaran balasan adalah mesin pertumbuhan: setiap penerima surat diajak membuat s
 
 | Rute | Isi |
 | --- | --- |
-| `/` | Beranda: tiga pintu masuk (Booth, Pocket, Letter) + contoh surat |
+| `/` | Beranda: contoh surat, lalu tiga pintu masuk (Surat, Pocket, Photo Booth) sebagai figur garis yang bergerak, dan pintu ke Kotak surat |
 | `/letter/new` | Editor surat |
 | `/l/:slug` | Halaman penerima surat |
 | `/pocket` | Kalender bulanan + modal simpan hari |

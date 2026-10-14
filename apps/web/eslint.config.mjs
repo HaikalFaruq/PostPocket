@@ -2,6 +2,8 @@
 import withNuxt from './.nuxt/eslint.config.mjs'
 
 export default withNuxt(
+  // Mesin gambar Hairline disalin apa adanya dari sumbernya (lihat docs/assets.md).
+  { ignores: ['app/utils/hairline/kernel.js'] },
   {
     files: ['app/components/**/*.vue'],
     rules: {

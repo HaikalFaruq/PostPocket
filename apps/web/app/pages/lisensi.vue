@@ -52,6 +52,19 @@ useSeoMeta({
       tautan di atas.
     </p>
 
+    <h2>Beranda dan Kotak surat</h2>
+    <p>
+      Figur garis Surat, Pocket, dan Photo Booth digambar sendiri di atas mesin
+      <a href="https://github.com/lucasmarkes/hairline" target="_blank" rel="noopener">Hairline</a>
+      karya Lucas Marques, dengan lisensi MIT. Kerumunan di atas footer memakai
+      <a href="https://www.openpeeps.com/" target="_blank" rel="noopener">Open Peeps</a>
+      karya Pablo Stanley (CC0), dengan gerakan yang diadaptasi dari Skiper 39 karya
+      <a href="https://skiper-ui.com/" target="_blank" rel="noopener">Skiper UI</a>. Tombol bertag
+      diadaptasi dari Offer Button karya positronx, dan folder kaca Kotak surat dari Glassmorphism
+      Folder Cards karya Kedhareswer Naidu, keduanya di
+      <a href="https://21st.dev/" target="_blank" rel="noopener">21st.dev</a> dengan lisensi MIT.
+    </p>
+
     <h2>Kerangka aplikasi</h2>
     <p>
       Nuxt, Vue, Vue Router, Pinia, VueUse, Reka UI, Motion for Vue, Tailwind CSS, dan Workbox
