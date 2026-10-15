@@ -14,6 +14,20 @@ test('Beranda dibuka dengan contoh surat yang bisa dibuka, lalu Pocket dan Booth
   await expect(card).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('logo P-amplop di header bernama PostPocket dan kembali ke Beranda', async ({ page }) => {
+  await page.goto('/privasi')
+  const home = page.getByRole('banner').getByRole('link', { name: 'PostPocket', exact: true })
+  await expect(home.getByRole('img', { name: 'PostPocket' })).toBeVisible()
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg')
+  await home.click()
+  await expect(page).toHaveURL(/\/$/)
+  // Di Beranda, "beta" sejajar dengan garis dasar wordmark, bukan dengan tengah logo yang batangnya
+  // menggantung di bawah.
+  const logo = await page.getByRole('banner').getByRole('img', { name: 'PostPocket' }).boundingBox()
+  const beta = await page.getByRole('banner').getByText('beta', { exact: true }).boundingBox()
+  expect(beta!.y + beta!.height).toBeLessThan(logo!.y + logo!.height * 0.75)
+})
+
 test('Tulis surat membuka editor surat', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('link', { name: 'Tulis surat' }).click()

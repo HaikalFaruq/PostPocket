@@ -12,10 +12,13 @@
 import { readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
+import { brandLockupSvg } from '../app/utils/brand-logo.ts'
 
 const publicFile = (path) => fileURLToPath(new URL(`../public/${path}`, import.meta.url))
 const svg = (path) =>
   `data:image/svg+xml;base64,${readFileSync(publicFile(path)).toString('base64')}`
+// Lockup logo (app/utils/brand-logo.ts): P-amplop dan wordmark yang sudah jadi garis.
+const logo = `data:image/svg+xml;base64,${Buffer.from(brandLockupSvg()).toString('base64')}`
 
 // Sama dengan --color-canvas, --color-ink, --color-post-red, kertas krem, dan foil emas di preset.
 const canvas = '#f1f4f8'
@@ -80,8 +83,8 @@ function page({ title, note, visual }) {
     background: ${canvas};
   }
   .copy { padding-left: 74px; }
-  .brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 700; letter-spacing: -0.03em; }
-  .brand img { width: 56px; height: 56px; }
+  .brand { display: flex; }
+  .brand img { height: 52px; width: auto; }
   h1 { margin: 40px 0 0; max-width: 580px; font-size: 70px; line-height: 0.98; font-weight: 700; letter-spacing: -0.035em; }
   p { margin: 22px 0 0; font-size: 30px; font-weight: 500; color: rgb(24 32 74 / 0.66); }
   .card {
@@ -116,7 +119,7 @@ function page({ title, note, visual }) {
   .folder-front small { margin-top: 6px; font-size: 22px; font-weight: 500; color: rgb(24 32 74 / 0.66); }
 </style></head><body><div class="sheet">
   <div class="copy">
-    <div class="brand"><img src="${svg('favicon.svg')}" alt="">PostPocket</div>
+    <div class="brand"><img src="${logo}" alt="PostPocket"></div>
     <h1>${title}</h1>
     <p>${note}</p>
   </div>

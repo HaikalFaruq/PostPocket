@@ -14,7 +14,7 @@ PostPocket tempat anak muda Indonesia menyimpan momen kecil per hari, lalu mengi
 | Putih | `#FFFFFF` | Kartu, lembar, dan kolom isian |
 | Tinta | `#18204A` | Teks dan tombol utama: biru-hitam pulpen, bukan hitam |
 | Merah pos | `#E23B3B` | Hanya di garis par avion dan cap pos di halaman salah alamat (404) |
-| Emas foil | dari preset foil | Hanya di kartu dan tanda merek |
+| Emas foil | dari preset foil; `#D9B45A` di logo | Hanya di kartu dan tutup amplop di logo |
 
 Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 
@@ -27,6 +27,53 @@ Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 **Satu hal yang berani.** Garis par avion merah-biru hanya membingkai surat: kartu contoh di Beranda dan halaman surat penerima. Bagian lain dibuat tenang.
 
 **Beranda bergaris tipis.** Sejak 15 Oktober 2026 Beranda memakai gaya [Hairline](https://hairline.lucasmarkes.com), pilihan Kall: figur isometrik dari satu garis tinta di atas putih, satu garis terang sebagai satu-satunya sorotan, dan kisi titik yang memudar di belakangnya. Modul tetap dibuka dengan bendanya (aturan 1), hanya digambar sebagai garis: surat dan amplop, kantong jajan di tali jemuran, bilik foto. Tiga panelnya satu pita bersekat, bukan tiga kartu yang sama. Kerumunan Open Peeps di atas footer diwarnai tinta yang sama dan berjalan pelan, supaya tidak mengalahkan isi halaman.
+
+## Logo
+
+Sejak 15 Oktober 2026 logonya **P-amplop**: huruf P yang mangkuknya amplop, dengan tutup amplop emas sebagai lubangnya. Arahnya dipilih Kall dari tiga konsep (huruf P, amplop di kantong, dan segel lilin) yang dibuat dengan skill [logo-design](https://github.com/kaankiziltug/logo-design-skill). Alasannya: paling tegas, paling kuat di 16 px dan sebagai ikon aplikasi, dan berbeda dari logo P dan amplop yang sudah ada (Pinterest, Patreon, Gmail).
+
+**Bentuk.** Kotak simbol 160 × 184:
+- batang selebar 44;
+- mangkuk 160 × 120, sudut kanannya 36 dan sudut lainnya 8;
+- tutup amplop 80 × 30 (sisi 3 : 4 : 5), mulai tepat di tepi dalam batang;
+- untuk ukuran di bawah 24 px, termasuk favicon, ada potongan kecil dengan tutup yang lebih dalam dan lebar.
+
+Wordmark-nya Gantari ExtraBold yang sudah dijadikan garis, dengan tracking −0,02 em dan kern optis di Po, tP, ck, dan ke. Jangan mengetik ulang "PostPocket" dengan font sebagai pengganti logo.
+
+**Lockup.**
+- Horizontal: huruf kapital wordmark rata atas dengan P, berjarak 40. Batang P menggantung di bawah garis dasar seperti ekor huruf, jadi teks di sampingnya (misalnya "beta" dan menu di Beranda) disejajarkan dengan garis dasar wordmark.
+- Bertumpuk: P 1,5× di tengah atas.
+- Dengan tagline (header Pocket): wordmark di separuh atas tinggi P, tagline di separuh bawahnya.
+
+**Warna.**
+
+| Versi | Tampilan | Kontras |
+| --- | --- | --- |
+| Utama | P tinta `#18204A` dengan tutup emas `#D9B45A` | Emas di atas tinta 7,9:1; tinta di atas kanvas 14:1 |
+| Satu warna | Tinta saja, tutupnya tetap lubang | |
+| Terbalik | P putih dengan tutup emas, di atas tinta | |
+
+Emas hanya ada di dalam P, tidak pernah langsung di atas kanvas atau putih.
+
+**Latar.** Seperti Beranda: kanvas `#F1F4F8` atau putih, dan tinta untuk versi terbalik. Ikon aplikasi, favicon, layar pembuka PWA, dan gambar OG memakai kanvas. Di OG, logo duduk di kanvas di dalam bingkai par avion. Jangan di atas foto, gradien, atau pola.
+
+**Jarak dan ukuran.** Ruang kosong di sekeliling logo minimal selebar batangnya. Ukuran minimum: simbol 16 px (pakai potongan kecil di bawah 24 px) dan lockup horizontal 24 px tingginya.
+
+**Jangan:**
+- ditarik atau diputar;
+- diberi bayangan, gradien, atau garis tepi;
+- diganti warnanya di luar tiga versi di atas;
+- tutupnya dibuang atau P-nya dipakai tanpa tutup amplop;
+- wordmark-nya diganti font lain.
+
+**Berkas.**
+- Sumber geometri: `apps/web/app/utils/brand-logo.ts`.
+- Master SVG di `docs/brand/`: simbol, lockup horizontal, dan wordmark dalam versi utama, satu warna, terbalik, dan putih, plus lockup bertumpuk dan ikon.
+- Di aplikasi, logo dipakai lewat komponen `BrandLogo`.
+- Setelah geometri berubah, jalankan dari `apps/web`:
+  - `node scripts/brand.mjs` untuk master dan favicon;
+  - `node scripts/pwa-icons.mjs` untuk ikon PWA;
+  - `node scripts/og-images.mjs` untuk gambar OG.
 
 ## Aturan
 

@@ -6,11 +6,8 @@ defineProps<{ title: string; lead?: string }>()
 <template>
   <div class="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 sm:px-6">
     <header class="flex items-center gap-2 py-4">
-      <NuxtLink
-        to="/"
-        class="inline-flex items-center gap-2 text-[15px] font-bold tracking-[-0.02em]"
-      >
-        <img src="/favicon.svg" alt="" class="size-6" /> PostPocket
+      <NuxtLink to="/" class="inline-flex items-center">
+        <BrandLogo class="h-6" />
       </NuxtLink>
     </header>
     <main class="info-page flex-1 pt-4 pb-16">

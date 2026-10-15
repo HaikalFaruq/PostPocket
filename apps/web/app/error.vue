@@ -23,12 +23,8 @@ const reload = () => window.location.reload()
 <template>
   <div class="flex min-h-dvh flex-col bg-canvas px-4 sm:px-6" data-testid="error-page">
     <header class="mx-auto flex w-full max-w-3xl items-center gap-2 py-4">
-      <a
-        href="/"
-        class="inline-flex min-h-11 items-center gap-2 text-[17px] font-bold tracking-[-0.025em]"
-        @click="home"
-      >
-        <img src="/favicon.svg" alt="" class="size-6" /> PostPocket
+      <a href="/" class="inline-flex min-h-11 items-center" @click="home">
+        <BrandLogo class="h-6" />
       </a>
     </header>
     <main class="flex flex-1 flex-col items-center justify-center pb-16 text-center">
