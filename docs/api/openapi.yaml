@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PostPocket API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Kontrak API antara frontend (`apps/web`) dan backend (Supabase Edge Functions). Server
     melayani surat yang dikirim dan kotak bareng; Pocket, TV, dan Booth tetap di browser
@@ -79,6 +79,8 @@ info:
       `supabase.functions.invoke`). Tanpa header ini, atau kalau isinya bukan publishable key
       proyek, server menjawab `401` dengan kode `unauthorized`.
     - `X-Edit-Token`: khusus publish dan hapus surat, serta semua endpoint `/boxes/{id}`.
+    - `Authorization: Bearer <access token>`: sesi login Google, khusus `DELETE /account` (0.4.0).
+      Dikirim otomatis oleh `supabase.functions.invoke` selama user login.
 
     **CORS**
 
@@ -116,6 +118,8 @@ tags:
     description: |
       Kotak bareng: membuat dan mengelola kotak (fungsi `boxes`), dan membukanya sebagai penerima
       (fungsi `k`). Surat titipan dibuat lewat `POST /letters` dengan `box`.
+  - name: Akun
+    description: Akun login Google untuk cadangan Pocket (fase 2). Fungsi `account`.
 
 paths:
   /letters:
@@ -509,6 +513,47 @@ paths:
         '409':
           $ref: '#/components/responses/BoxConflict'
 
+  /account:
+    delete:
+      tags: [Akun]
+      operationId: deleteAccount
+      summary: Hapus akun beserta semua cadangan Pocket
+      description: |
+        0.4.0. Menghapus akun yang sedang login dan semua datanya di server, langsung dan tanpa
+        masa tunggu:
+
+        1. semua berkas di bucket `moments` milik user (`<user_id>/…`), lewat Storage API;
+        2. akun di Supabase Auth, yang ikut menghapus baris `profiles`, `moments`, `pockets`, dan
+           `albums` miliknya (`on delete cascade`).
+
+        Kalau langkah 2 gagal setelah langkah 1, server menjawab `500` dan request boleh diulang
+        (idempoten selama akunnya masih ada). Berkas yang tertinggal juga dibersihkan job
+        pembersihan tiap jam, karena berkas tanpa baris `moments` aktif dianggap sampah.
+
+        Tidak menyentuh surat dan kotak bareng: keduanya tidak terikat ke akun dan tetap dihapus
+        lewat `X-Edit-Token` masing-masing atau habis masa berlakunya. Data di perangkat
+        (IndexedDB) juga tidak disentuh.
+
+        Setelah `204`, sesi di browser sudah tidak berlaku. Frontend keluar di perangkat itu
+        (`signOut()`). Perangkat lain yang masih login keluar sendiri saat token-nya diperbarui
+        (paling lama 1 jam). Sampai itu, sinkron di sana ditolak: access token-nya masih sah,
+        tapi baris baru gagal di foreign key ke `auth.users` dan unggahan ditolak policy Storage,
+        jadi tidak ada berkas yatim baru.
+      security:
+        - publishableKey: []
+          userSession: []
+      responses:
+        '204':
+          description: Akun dan semua cadangannya dihapus.
+        '401':
+          description: |
+            Header `Authorization` tidak ada, bukan access token proyek ini, sudah kedaluwarsa,
+            atau akunnya sudah dihapus (`unauthorized`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     publishableKey:
@@ -523,6 +568,11 @@ components:
       description: |
         Token dari respons `POST /letters` (surat) atau `POST /boxes` (kotak bareng). Disimpan di
         browser pengirim atau pembuat kotak.
+    userSession:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token sesi login Google dari Supabase Auth (0.4.0).
 
   parameters:
     LetterId:
