@@ -271,10 +271,10 @@ Aturannya:
 
 **Uji.**
 - `test/sync.test.ts` menguji aturan gabung dan `runSync` dengan server palsu.
-- `e2e/sinkron.spec.ts` menguji dua perangkat, hapus, kuota, unggah ulang, ganti akun, hapus akun, dan tombol Google ke stack Supabase lokal. Stack di CI tidak menjalankan Edge Functions, jadi tes hapus akun menjawab `DELETE /account` dari dalam tes: tesnya memeriksa header, menghapus berkas dan akunnya lewat admin API sesuai kontrak, lalu menjawab 204. Butuh Docker:
+- `e2e/sinkron.spec.ts` menguji dua perangkat, hapus, kuota, unggah ulang, ganti akun, hapus akun, dan tombol Google ke stack Supabase lokal. Tes hapus akun memanggil fungsi `account` sungguhan dan hanya membuat jawaban 503 pertama sendiri, jadi stack-nya dijalankan dengan Edge Functions. Butuh Docker:
 
 ```sh
-npx supabase@2.120.0 start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta,edge-runtime
+npx supabase@2.120.0 start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta
 eval "$(npx supabase@2.120.0 status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY)=')"
 export API_URL PUBLISHABLE_KEY SECRET_KEY
 SYNC_E2E=1 pnpm --filter @postpocket/web exec playwright test --project=android --project=iphone

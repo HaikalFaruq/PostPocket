@@ -76,8 +76,9 @@ jobs:
         with:
           version: 2.120.0
 
+      # Dengan edge-runtime, supaya tes hapus akun memanggil fungsi `account` sungguhan.
       - name: Jalankan stack Supabase lokal
-        run: supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta,edge-runtime
+        run: supabase start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta
 
       - name: Pasang browser Playwright
         working-directory: apps/web

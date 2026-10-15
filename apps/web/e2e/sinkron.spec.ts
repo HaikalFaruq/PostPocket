@@ -85,41 +85,28 @@ const CORS = {
 }
 
 /**
- * `DELETE /account` (kontrak 0.4.0) dijawab dari tes, karena stack lokal di CI tidak menjalankan
- * Edge Functions. `answer` menerima "<metode> <apikey cocok> <id user dari token>" dan
- * mengembalikan status jawabannya.
+ * Panggilan `DELETE /account` diteruskan ke fungsi `account` di stack lokal (kontrak 0.4.0) dan
+ * dicatat sebagai "<metode> <apikey cocok> <id user dari token>". Dengan `failFirst`, panggilan
+ * pertama dijawab 503 oleh tes, seperti gangguan sesaat di gateway.
  */
-async function answerAccount(page: Page, answer: (call: string) => Promise<number>) {
+async function watchAccount(page: Page, failFirst = false) {
+  const calls: string[] = []
   await page.route(
     (url) => url.pathname.endsWith('/functions/v1/account'),
     async (route) => {
       const request = route.request()
-      if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS })
+      if (request.method() === 'OPTIONS') return route.continue()
       const token = request.headers().authorization?.replace(/^Bearer /, '') ?? ''
       const claims = token.split('.')[1]
       const sub = claims ? JSON.parse(Buffer.from(claims, 'base64url').toString()).sub : ''
-      const code = await answer(`${request.method()} ${request.headers().apikey === KEY} ${sub}`)
-      if (code === 204) return route.fulfill({ status: 204, headers: CORS })
-      return route.fulfill({
-        status: code,
-        headers: CORS,
-        json: { error: { code: code === 401 ? 'unauthorized' : 'internal', message: 'uji' } },
-      })
+      calls.push(`${request.method()} ${request.headers().apikey === KEY} ${sub}`)
+      if (failFirst && calls.length === 1) {
+        return route.fulfill({ status: 503, headers: CORS, body: 'Service Unavailable' })
+      }
+      return route.continue()
     },
   )
-}
-
-/** Yang dikerjakan fungsi `account` sesuai kontrak: hapus berkas cadangan, lalu akunnya. */
-async function deleteLikeServer(user: Account) {
-  const files = await serverFiles(user)
-  if (files.length) {
-    const removed = await admin.storage
-      .from('moments')
-      .remove(files.map((name) => `${user.id}/${name}`))
-    if (removed.error) throw removed.error
-  }
-  const deleted = await admin.auth.admin.deleteUser(user.id)
-  if (deleted.error) throw deleted.error
+  return calls
 }
 
 async function synced(page: Page, photos: number) {
@@ -286,14 +273,8 @@ test('hapus akun: cadangannya hilang dari server, kenangan di HP tetap, dan akun
   await phoneB.goto('/pocket')
   await synced(phoneB, 1)
 
-  // Percobaan pertama dijawab 503. Yang kedua dikerjakan seperti fungsi `account`.
-  const calls: string[] = []
-  await answerAccount(phoneA, async (call) => {
-    calls.push(call)
-    if (calls.length === 1) return 503
-    await deleteLikeServer(user)
-    return 204
-  })
+  // Percobaan pertama dijawab 503 oleh tes. Yang kedua sampai ke fungsi `account`.
+  const calls = await watchAccount(phoneA, true)
   const card = phoneA.getByTestId('backup-card')
   const dialog = phoneA.getByTestId('delete-account')
   await card.getByTestId('delete-account-open').click()
@@ -317,6 +298,7 @@ test('hapus akun: cadangannya hilang dari server, kenangan di HP tetap, dan akun
   expect(calls).toEqual([`DELETE true ${user.id}`, `DELETE true ${user.id}`])
   expect(await serverMoments(user)).toEqual([])
   expect(await serverFiles(user)).toEqual([])
+  expect((await admin.auth.admin.getUserById(user.id)).data.user).toBeNull()
 
   // Akun Google yang sama masuk lagi dan mendapat id baru. Tidak ada pertanyaan soal akun lama,
   // dan kenangan di HP A langsung tercadang ke akun barunya.
@@ -332,7 +314,7 @@ test('hapus akun: cadangannya hilang dari server, kenangan di HP tetap, dan akun
   await expect(phoneB.getByTestId('backup-card')).not.toContainText('Gabungkan ke akun ini?')
 })
 
-test('hapus akun dijawab 401: perangkat ini keluar dan diberi tahu sesinya sudah berakhir', async ({
+test('akun yang sudah terhapus tapi jawaban 204-nya hilang: 401, lalu perangkat ini keluar dengan kabar', async ({
   browser,
 }) => {
   const user = await account()
@@ -340,14 +322,15 @@ test('hapus akun dijawab 401: perangkat ini keluar dan diberi tahu sesinya sudah
   await googleOn(phone)
   await phone.goto('/pocket')
   await synced(phone, 0)
-  await answerAccount(phone, async () => 401)
+  // Hapus sebelumnya sudah selesai di server, tapi jawabannya tidak sampai ke perangkat ini.
+  await admin.auth.admin.deleteUser(user.id)
+  const calls = await watchAccount(phone)
   const card = phone.getByTestId('backup-card')
   await card.getByTestId('delete-account-open').click()
   await phone.getByTestId('delete-account-confirm').click()
   await expect(card.getByTestId('backup-notice')).toContainText('Sesi login sudah berakhir')
   await expect(card.getByRole('button', { name: 'Masuk dengan Google' })).toBeVisible()
-  // Server tidak menghapus apa pun di tes ini, jadi akunnya masih ada.
-  expect((await admin.auth.admin.getUserById(user.id)).data.user?.id).toBe(user.id)
+  expect(calls).toEqual([`DELETE true ${user.id}`])
 })
 
 test('belum login: tombol Google membuka login Supabase dan kembali ke Pocket', async ({
