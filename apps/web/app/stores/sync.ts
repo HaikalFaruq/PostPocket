@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { get, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
+import { deleteAccount } from '~/utils/account-api'
+import { LetterApiError } from '~/utils/letter-api'
 import { withNewIds } from '~/utils/memories'
+import { asksBeforeMerging } from '~/utils/sync'
 import { runSync, type SyncProgress } from '~/utils/sync-run'
 import { backedUpCount, supabaseBackend } from '~/utils/sync-supabase'
 
@@ -52,6 +55,9 @@ export const useSync = defineStore('sync', () => {
   const backedUp = ref<number | null>(null)
   /** Email akun lain yang sebelumnya tersinkron di perangkat ini, menunggu konfirmasi user. */
   const otherAccount = ref<string | null>(null)
+  /** Kabar setelah akun dihapus, tampil di kartu Cadangan sampai user masuk lagi. */
+  const notice = ref('')
+  const accountApi = useAccountApiOptions()
 
   /** Cadangan bisa dipakai: Google sudah dinyalakan, atau user sudah login. */
   const available = computed(() => configured && (googleEnabled.value || !!user.value))
@@ -62,6 +68,8 @@ export const useSync = defineStore('sync', () => {
   let running = false
   let again = false
   let confirmedSwitch = false
+  /** Akun sedang dihapus: jangan mulai sinkron yang akan ditolak server. */
+  let removing = false
 
   async function readState(): Promise<SyncState | null> {
     try {
@@ -130,6 +138,7 @@ export const useSync = defineStore('sync', () => {
     await start()
     if (!client) return
     error.value = ''
+    notice.value = ''
     const { error: problem } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${location.origin}/pocket?masuk=1` },
@@ -144,6 +153,45 @@ export const useSync = defineStore('sync', () => {
     setUser(null)
     otherAccount.value = null
     confirmedSwitch = false
+  }
+
+  /**
+   * Hapus akun beserta semua cadangannya di server (`DELETE /account`, kontrak 0.4.0), lalu keluar
+   * di perangkat ini. Kenangan di perangkat ini tetap ada.
+   *
+   * Catatan sinkron (`postpocket:sync`) sengaja tidak dihapus. Akun Google yang sama yang masuk
+   * lagi tidak ditanya soal akun lama (`asksBeforeMerging`), tapi akun lain tetap ditanya dulu
+   * sebelum kenangan di perangkat ini digabung ke cadangannya.
+   *
+   * 401 juga dianggap selesai: sesinya sudah tidak berlaku, misalnya karena jawaban 204 dari
+   * percobaan sebelumnya hilang di jalan. Error lain dilempar, dan user tetap masuk.
+   */
+  async function removeAccount() {
+    if (!client || !user.value || syncing.value) return
+    removing = true
+    clearTimeout(timer)
+    try {
+      let message =
+        'Akunmu sudah dihapus beserta semua cadangannya. Kenangan di perangkat ini tetap ada.'
+      try {
+        const { data } = await client.auth.getSession()
+        const token = data.session?.access_token
+        if (!token) throw new LetterApiError('unauthorized', 'tidak ada sesi', 401)
+        await deleteAccount(accountApi, token)
+      } catch (problem) {
+        if (!(problem instanceof LetterApiError && problem.status === 401)) throw problem
+        message =
+          'Sesi login sudah berakhir, jadi kamu dikeluarkan. Kalau akunnya masih ada, masuk lagi lalu hapus dari sini.'
+      }
+      await client.auth.signOut({ scope: 'local' })
+      setUser(null)
+      otherAccount.value = null
+      confirmedSwitch = false
+      lastSyncedAt.value = null
+      notice.value = message
+    } finally {
+      removing = false
+    }
   }
 
   /** Sinkron sebentar lagi, supaya beberapa perubahan beruntun cukup dikirim sekali. */
@@ -161,7 +209,7 @@ export const useSync = defineStore('sync', () => {
   }
 
   async function syncNow() {
-    if (!client || !user.value) return
+    if (!client || !user.value || removing) return
     if (running) {
       again = true
       return
@@ -177,10 +225,10 @@ export const useSync = defineStore('sync', () => {
       const data = memories.data
       const hasLocal =
         Object.keys(data.moments).length + Object.keys(data.days).length + data.albums.length > 0
-      if (!mine && state?.userId && hasLocal) {
+      if (asksBeforeMerging(state, current, hasLocal)) {
         // Perangkat ini sebelumnya tersinkron ke akun lain: jangan campur tanpa persetujuan.
         if (!confirmedSwitch) {
-          otherAccount.value = state.email || 'akun lain'
+          otherAccount.value = state?.email || 'akun lain'
           return
         }
         // Id di cadangan unik untuk semua akun, jadi kenangan akun lama dikirim sebagai salinan
@@ -252,9 +300,11 @@ export const useSync = defineStore('sync', () => {
     lastSyncedAt,
     backedUp,
     otherAccount,
+    notice,
     start,
     signIn,
     signOut,
+    removeAccount,
     syncNow,
     confirmSwitch,
   }

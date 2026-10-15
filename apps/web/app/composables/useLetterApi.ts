@@ -21,6 +21,20 @@ export function useApiOptions(): ApiOptions {
   }
 }
 
+/**
+ * Alamat fungsi yang memakai sesi login (`DELETE /account`). Selalu fungsi Supabase, juga saat
+ * `NUXT_PUBLIC_API_BASE` diisi: mock lokal hanya meniru endpoint surat dan kotak, sedangkan sesinya
+ * milik Supabase.
+ */
+export function useAccountApiOptions(): ApiOptions {
+  const config = useRuntimeConfig().public
+  return {
+    base: `${config.supabaseUrl}/functions/v1`,
+    apiKey: config.supabasePublishableKey,
+    region: FUNCTION_REGION,
+  }
+}
+
 /** Klien API surat. */
 export function useLetterApi(): LetterApi {
   return createLetterApi(useApiOptions())

@@ -8,6 +8,7 @@ import {
   type PocketDay,
 } from '../app/utils/memories'
 import {
+  asksBeforeMerging,
   mergeRemote,
   pullSince,
   pushPlan,
@@ -146,6 +147,27 @@ describe('mergeRemote', () => {
     expect(next.days['2026-10-02']).toBeDefined()
     expect(Object.keys(next.pending!.moments)).toEqual([id(1)])
     expect(Object.keys(next.pending!.days).sort()).toEqual(['2026-10-01', DAY])
+  })
+})
+
+describe('asksBeforeMerging', () => {
+  const synced = { userId: 'akun-lama', email: 'rani@example.com' }
+
+  it('tidak bertanya kalau belum pernah tersinkron, akunnya sama, atau perangkatnya kosong', () => {
+    expect(asksBeforeMerging(null, { id: 'baru', email: 'budi@example.com' }, true)).toBe(false)
+    expect(asksBeforeMerging(synced, { id: 'akun-lama', email: 'rani@example.com' }, true)).toBe(
+      false,
+    )
+    expect(asksBeforeMerging(synced, { id: 'baru', email: 'budi@example.com' }, false)).toBe(false)
+  })
+
+  it('akun lain bertanya dulu sebelum kenangan di perangkat ini digabung', () => {
+    expect(asksBeforeMerging(synced, { id: 'baru', email: 'budi@example.com' }, true)).toBe(true)
+    expect(asksBeforeMerging(synced, { id: 'baru', email: '' }, true)).toBe(true)
+  })
+
+  it('email yang sama dengan id baru (akun lama sudah dihapus) tidak bertanya', () => {
+    expect(asksBeforeMerging(synced, { id: 'baru', email: 'rani@example.com' }, true)).toBe(false)
   })
 })
 

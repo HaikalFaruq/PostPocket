@@ -4,7 +4,7 @@ import { useIntervalFn, useNow } from '@vueuse/core'
 /**
  * Cadangan Pocket di bawah kalender. Tanpa Supabase atau sebelum login Google dinyalakan, isinya
  * tetap pengingat bahwa kenangan hanya ada di perangkat ini. Setelah login: akun, status sinkron,
- * dan jumlah foto tercadang (kuota beta 100 foto).
+ * jumlah foto tercadang (kuota beta 100 foto), dan Hapus akun.
  */
 const sync = useSync()
 const route = useRoute()
@@ -14,6 +14,8 @@ const card = ref<HTMLElement | null>(null)
 const now = useNow({ scheduler: (update) => useIntervalFn(update, 30_000) })
 
 const loginFailed = ref('')
+const deleting = ref(false)
+const signedOutTitle = ref<HTMLElement | null>(null)
 
 onMounted(async () => {
   // Kembali dari login Google: Supabase menambahkan ?code=… (atau ?error=… kalau gagal).
@@ -73,7 +75,22 @@ const tone = computed(() => {
     aria-labelledby="backup-title"
   >
     <template v-if="!sync.user">
-      <h2 id="backup-title" class="text-body font-semibold">Cadangkan kenanganmu</h2>
+      <h2
+        id="backup-title"
+        ref="signedOutTitle"
+        tabindex="-1"
+        class="text-body font-semibold focus:outline-none"
+      >
+        Cadangkan kenanganmu
+      </h2>
+      <p
+        v-if="sync.notice"
+        class="mt-2 rounded-control bg-pocket-today px-3 py-2 text-caption"
+        role="status"
+        data-testid="backup-notice"
+      >
+        {{ sync.notice }}
+      </p>
       <p class="mt-1 text-caption text-pocket-muted">
         Sekarang foto dan kantongmu hanya ada di perangkat ini. Masuk dengan Google supaya tercadang
         dan bisa dibuka di HP lain. Surat tetap bisa dibuat tanpa akun.
@@ -145,13 +162,36 @@ const tone = computed(() => {
           Keluar
         </button>
       </div>
+      <button
+        type="button"
+        class="mt-1 inline-flex min-h-10 items-center text-caption text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
+        :disabled="sync.syncing"
+        data-testid="delete-account-open"
+        @click="deleting = true"
+      >
+        Hapus akun
+      </button>
     </template>
+
+    <!-- Di luar tampilan akun, supaya dialognya tetap bisa menutup dengan rapi setelah akunnya
+         terhapus dan kartunya kembali ke tampilan belum masuk. -->
+    <DeleteAccountDialog v-model:open="deleting" @removed="signedOutTitle?.focus()" />
   </section>
 
   <p
     v-else
     class="mx-auto mt-6 max-w-md rounded-[16px] bg-surface/70 px-4 py-3 text-center text-caption text-pocket-ink"
   >
+    <!-- Kartu Cadangan bisa langsung hilang setelah akun dihapus, misalnya kalau pengaturan login
+         Google belum terbaca karena Pocket dibuka saat offline. Kabarnya tetap tampil di sini. -->
+    <span
+      v-if="sync.notice"
+      class="mb-1 block font-semibold"
+      role="status"
+      data-testid="backup-notice"
+    >
+      {{ sync.notice }}
+    </span>
     Foto dan kantongmu hanya tersimpan di perangkat ini. Kalau data browser dihapus, isinya ikut
     hilang.
   </p>
