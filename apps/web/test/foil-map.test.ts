@@ -54,6 +54,17 @@ describe('shadowMask', () => {
     expect(at(mask, img, 1, 1)).toBe(255)
     expect(at(mask, img, 8, 1)).toBe(0)
   })
+
+  it('ilustrasi yang lowong: hanya bagian tergelap gambarnya yang jadi foil', () => {
+    // 10% kanvas bergambar: setengah hijau tua, setengah hijau muda, sisanya kertas transparan.
+    const img = raster(20, 10, (x, y) =>
+      y > 0 ? [0, 0, 0, 0] : x < 10 ? [40, 80, 50, 255] : [180, 210, 180, 255],
+    )
+    const mask = shadowMask(img)
+    expect(at(mask, img, 2, 0)).toBeGreaterThan(200)
+    expect(at(mask, img, 15, 0)).toBe(0)
+    expect(at(mask, img, 5, 5)).toBe(0)
+  })
 })
 
 describe('edgeMask', () => {

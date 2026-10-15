@@ -5,7 +5,7 @@ Setiap aset yang masuk repo dicatat di sini (PRD bagian Risiko: lisensi aset tid
 | Aset | Lokasi | Sumber | Lisensi |
 | --- | --- | --- | --- |
 | Font Gantari (Lafontype), Delicious Handrawn (Agung Rohmat), VT323 | Diunduh saat build oleh `@nuxt/fonts`. Garis huruf "PostPocket" untuk tanda tangan splash disimpan di `apps/web/app/utils/brand-signature.ts` | Google Fonts | SIL Open Font License 1.1 |
-| Ilustrasi depan kartu (padang bunga, ranting, malam berbintang) dan tanda sampul belakang | `apps/web/public/illustrations/` | Dibuat sendiri, hasil `apps/web/scripts/illustrations.mjs` | Milik sendiri |
+| Ilustrasi depan kartu (padang bunga, ranting, malam berbintang, ulang tahun, Lebaran), masing-masing dalam empat bentuk kartu, dan tanda sampul belakang | `apps/web/public/illustrations/` | Dibuat sendiri, hasil `apps/web/scripts/illustrations.mjs` | Milik sendiri |
 | Ikon garis (chevron, tutup, kamera, dan lainnya) | `apps/web/app/utils/icons.ts` | Digambar sendiri | Milik sendiri |
 | Ikon bunga di swatch warna foil | `apps/web/app/components/letter/FoilSwatchIcon.vue` | Digambar sendiri (SVG) | Milik sendiri |
 | Logo P-amplop (simbol, wordmark, lockup) dan favicon | `docs/brand/`, `apps/web/app/utils/brand-logo.ts`, `apps/web/public/favicon.svg` | Digambar sendiri dengan skill [logo-design](https://github.com/kaankiziltug/logo-design-skill) (MIT, hanya dipakai sebagai alat, tidak ada berkasnya yang disalin). Wordmark dari huruf Gantari ExtraBold yang dijadikan garis, hasil `apps/web/scripts/brand.mjs` | Milik sendiri; huruf Gantari SIL Open Font License 1.1 |

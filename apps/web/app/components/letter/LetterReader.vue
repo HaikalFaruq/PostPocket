@@ -90,6 +90,7 @@ useBackToClose(open, () => {
   position: absolute;
   inset: 0;
   font-family: var(--font-letter);
+  word-spacing: var(--letter-word-spacing);
   font-size: 8cqw;
   line-height: 1.25;
 }

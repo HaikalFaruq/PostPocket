@@ -7,10 +7,16 @@ import {
   type PhotoElement,
 } from './letter-content'
 import {
+  PAGE_MARGIN,
   applyTemplate,
+  elementBounds,
   fitPhoto,
   freeSpot,
+  photoBox,
+  reflowTemplate,
+  slotOf,
   templateElements,
+  textRooms,
   tidyStickers,
   templateForPhotos,
 } from './letter-template'
@@ -52,12 +58,70 @@ describe('templateElements', () => {
   }
 
   it('foto mengisi kotaknya di halaman mana pun', () => {
-    // Kotak photo-1 versi tall: 0.74 lebar × 0.44 tinggi halaman.
+    // Kotak photo-1 versi tall: 0.72 lebar × 0.42 tinggi halaman.
     for (const ratio of [0.72, 1]) {
       const [photo] = templateElements(template('photo-1'), ratio)
-      expect(photo?.kind === 'photo' && photo.aspect).toBeCloseTo((0.74 / 0.44) * ratio, 3)
+      expect(photo?.kind === 'photo' && photo.aspect).toBeCloseTo((0.72 / 0.42) * ratio, 3)
     }
   })
+
+  for (const item of letter.templates) {
+    for (const ratio of ratios) {
+      it(`${item.id} di halaman ${ratio}: foto tidak bertumpuk, teks punya ruang sendiri`, () => {
+        // Slot foto diisi: slot kosong tidak membatasi ruang teks, karena tidak ikut terkirim.
+        const elements = templateElements(item, ratio).map((e) =>
+          e.kind === 'photo' ? { ...e, photo: `f-${e.id}` } : e,
+        )
+        const photos = elements
+          .filter((e) => e.kind === 'photo')
+          .map((e) => elementBounds(e, ratio))
+        // Setelah diputar, setiap foto tetap di halaman dengan jarak dari tepinya.
+        for (const box of photos) {
+          expect(box.left).toBeGreaterThanOrEqual(0.03)
+          expect(box.right).toBeLessThanOrEqual(0.97)
+          expect(box.top).toBeGreaterThanOrEqual(0.03)
+          expect(box.bottom).toBeLessThanOrEqual(0.97)
+        }
+        // Dua foto mana pun terpisah celah minimal 2% halaman, ke samping atau ke bawah.
+        for (let i = 0; i < photos.length; i++) {
+          for (let j = i + 1; j < photos.length; j++) {
+            const a = photos[i]!
+            const b = photos[j]!
+            const apart = Math.max(
+              b.left - a.right,
+              a.left - b.right,
+              b.top - a.bottom,
+              a.top - b.bottom,
+            )
+            expect(apart, `foto ${i} dan ${j}`).toBeGreaterThanOrEqual(0.02)
+          }
+        }
+        // Ruang teksnya cukup untuk beberapa baris dan tidak menyentuh foto mana pun.
+        const text = elements.find((e) => e.kind === 'text')!
+        const room = textRooms({ version: 1, elements }, ratio)[text.id]!
+        expect(room).toBeGreaterThanOrEqual(0.2)
+        const band = {
+          left: text.x - text.width / 2,
+          right: text.x + text.width / 2,
+          top: text.y - room / 2,
+          bottom: text.y + room / 2,
+        }
+        expect(band.top).toBeGreaterThanOrEqual(PAGE_MARGIN - 1e-9)
+        expect(band.bottom).toBeLessThanOrEqual(1 - PAGE_MARGIN + 1e-9)
+        expect(band.left).toBeGreaterThanOrEqual(0.03)
+        expect(band.right).toBeLessThanOrEqual(0.97)
+        for (const box of photos) {
+          const apart = Math.max(
+            box.left - band.right,
+            band.left - box.right,
+            box.top - band.bottom,
+            band.top - box.bottom,
+          )
+          expect(apart).toBeGreaterThan(0)
+        }
+      })
+    }
+  }
 
   it('halaman landscape memakai tata letak wide dengan huruf mengikuti sisi pendek', () => {
     const tall = templateElements(template('text'), 0.75)[0]
@@ -89,8 +153,8 @@ describe('applyTemplate', () => {
     const next = applyTemplate(content, template('photo-1'), 0.75)
     const byIdIn = (id: string) => next.elements.find((e) => e.id === id)
     // Foto pertama dan teks pindah ke slot template.
-    expect(byIdIn('b')).toMatchObject({ photo: 'f1', x: 0.5, y: 0.35, rotation: -2 })
-    expect(byIdIn('a')).toMatchObject({ text: 'Halo', x: 0.5, y: 0.8, align: 'center' })
+    expect(byIdIn('b')).toMatchObject({ photo: 'f1', x: 0.5, y: 0.31, rotation: -2 })
+    expect(byIdIn('a')).toMatchObject({ text: 'Halo', x: 0.5, y: 0.765, align: 'center' })
     // Foto kedua tidak kebagian slot, jadi tetap di tempat; stiker juga.
     expect(byIdIn('c')).toMatchObject({ photo: 'f2', x: 0.7, y: 0.6 })
     expect(byIdIn('s')).toMatchObject({ x: 0.9, y: 0.1, rotation: 10 })
@@ -134,15 +198,15 @@ describe('fitPhoto', () => {
     expect(strip.width).toBeLessThan(slot.width)
     const box = bounds(strip, 0.72)
     expect(box.top).toBeGreaterThanOrEqual(0)
-    // Lebih tinggi dari kotak template, tapi tidak sampai ke slot teks di bawahnya (y 0.8).
-    expect(box.bottom - box.top).toBeGreaterThan(0.44)
+    // Lebih tinggi dari kotak template, tapi tidak sampai ke slot teks di bawahnya (y 0.765).
+    expect(box.bottom - box.top).toBeGreaterThan(0.42)
     expect(box.bottom).toBeLessThan(0.7)
   })
 
   it('foto landscape selebar slot, foto tegak setinggi kotak template', () => {
     expect(fitPhoto(slot, 4 / 3, 0.72).width).toBeCloseTo(slot.width, 4)
     const tall = fitPhoto(slot, 3 / 4, 0.72)
-    expect((tall.width / tall.aspect) * 0.72).toBeCloseTo(0.44, 3)
+    expect((tall.width / tall.aspect) * 0.72).toBeCloseTo(0.42, 3)
   })
 
   it('rasio foto di luar batas kontrak dipotong ke batasnya', () => {
@@ -171,6 +235,7 @@ describe('freeSpot', () => {
       x: 0.5,
       y: 0.5,
       coversText: false,
+      coversPhoto: false,
     })
   })
 
@@ -214,6 +279,40 @@ describe('freeSpot', () => {
     }
   })
 
+  it('enam stiker di halaman berfoto tidak saling menumpuk', () => {
+    for (const ratio of [0.75, 1]) {
+      let elements: unknown[] = templateElements(template('photo-1'), ratio).map((e) =>
+        e.kind === 'photo' ? { ...e, photo: 'f1' } : { ...e, text: 'Halo, apa kabar? '.repeat(6) },
+      )
+      for (let i = 0; i < 6; i++) {
+        const content = normalizeContent({ elements })
+        const spot = freeSpot(content, 0.22, 0.22 * ratio, ratio, () => 0.5)
+        const sticker = { kind: 'sticker', id: `s${i}`, ...spot, width: 0.22, rotation: 0 }
+        elements = [...elements, { ...sticker, sticker: 'heart' }]
+      }
+      const stickers = normalizeContent({ elements })
+        .elements.filter((e) => e.kind === 'sticker')
+        .map((e) => elementBounds(e, ratio))
+      for (let a = 0; a < stickers.length; a++) {
+        for (let b = a + 1; b < stickers.length; b++) {
+          expect(overlap(stickers[a]!, stickers[b]!), `${ratio}: stiker ${a} dan ${b}`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('teks baru tidak ditaruh di atas foto, walau harus berbagi ruang dengan teks lain', () => {
+    for (const ratio of [0.75, 1]) {
+      const content = normalizeContent({
+        elements: templateElements(template('photo-1'), ratio).map((e) =>
+          e.kind === 'photo' ? { ...e, photo: 'f1' } : { ...e, text: 'Halo dari Bandung' },
+        ),
+      })
+      const spot = freeSpot(content, 0.7, 2 * 0.06 * 1.25 * ratio, ratio, () => 0.5, 'text')
+      expect(spot.coversPhoto, String(ratio)).toBe(false)
+    }
+  })
+
   it('stiker kedua tidak menumpuk di atas stiker pertama', () => {
     const first = {
       kind: 'sticker',
@@ -240,6 +339,37 @@ function textBounds(element: LetterElement, ratio: number) {
 }
 
 describe('tidyStickers', () => {
+  it('tulisan panjang dihitung setinggi ruangnya saja, jadi stiker tidak dipindah ke atasnya', () => {
+    const elements = templateElements(template('photo-2'), 1).map((element) =>
+      element.kind === 'photo'
+        ? { ...element, photo: `f-${element.id}` }
+        : { ...element, text: 'Terima kasih untuk semuanya. '.repeat(20) },
+    )
+    const text = elements.find((element) => element.kind === 'text')!
+    const heart = {
+      kind: 'sticker',
+      id: 's',
+      x: 0.2,
+      y: 0.75,
+      width: 0.22,
+      rotation: 0,
+      sticker: 'heart',
+    }
+    const content = normalizeContent({ elements: [...elements, heart] })
+    const room = textRooms(content, 1)[text.id]!
+    for (const seed of [0, 0.5, 0.99]) {
+      const moved = tidyStickers(content, 1, () => seed).elements.find((e) => e.id === 's')!
+      const half = 0.11
+      const apart = Math.max(
+        text.y - room / 2 - (moved.y + half),
+        moved.y - half - (text.y + room / 2),
+        text.x - text.width / 2 - (moved.x + half),
+        moved.x - half - (text.x + text.width / 2),
+      )
+      expect(apart).toBeGreaterThanOrEqual(0)
+    }
+  })
+
   it('stiker yang menutupi pesan dipindah, stiker lain tetap', () => {
     const [text] = templateElements(template('text'), 0.75)
     const message = { ...text!, id: 't', text: 'Halo Rara, selamat ulang tahun!' }
@@ -268,5 +398,164 @@ describe('tidyStickers', () => {
     expect([moved.x, moved.y]).not.toEqual([message.x, message.y])
     expect(moved).toMatchObject({ rotation: 5, sticker: 'heart' })
     expect(next.elements[2]).toEqual(content.elements[2])
+  })
+})
+
+describe('elementBounds', () => {
+  it('kotak foto yang diputar lebih lebar dan lebih tinggi dari kotak aslinya', () => {
+    const photo = normalizeContent({
+      elements: [
+        { kind: 'photo', id: 'p', x: 0.5, y: 0.5, width: 0.4, rotation: 0, photo: 'f', aspect: 1 },
+      ],
+    }).elements[0]!
+    const flat = elementBounds(photo, 0.75)
+    expect(flat.right - flat.left).toBeCloseTo(0.4)
+    expect(flat.bottom - flat.top).toBeCloseTo(0.3)
+    const turned = elementBounds({ ...photo, rotation: 45 }, 0.75)
+    // Persegi yang diputar 45°: lebar dan tingginya kali √2.
+    expect(turned.right - turned.left).toBeCloseTo(0.4 * Math.SQRT2)
+    expect(turned.bottom - turned.top).toBeCloseTo(0.3 * Math.SQRT2)
+  })
+
+  it('tinggi teks dari hasil ukur kalau ada, kalau tidak satu baris', () => {
+    const text = templateElements(template('text'), 0.75)[0]!
+    expect(elementBounds(text, 0.75, 0.4).bottom - elementBounds(text, 0.75, 0.4).top).toBeCloseTo(
+      0.4,
+    )
+    const line = elementBounds(text, 0.75)
+    expect(line.bottom - line.top).toBeCloseTo(0.075 * 1.2 * 0.75)
+  })
+})
+
+describe('textRooms', () => {
+  const content = (elements: unknown[]) => normalizeContent({ elements })
+  const text = (id: string, x: number, y: number, width = 0.8) => ({
+    kind: 'text',
+    id,
+    x,
+    y,
+    width,
+    rotation: 0,
+    text: 'Halo',
+    size: 0.06,
+    align: 'center',
+  })
+  const photo = (id: string, x: number, y: number, width: number, aspect: number) => ({
+    kind: 'photo',
+    id,
+    x,
+    y,
+    width,
+    rotation: 0,
+    photo: `f-${id}`,
+    aspect,
+  })
+
+  it('halaman tanpa penghalang: sampai tepi halaman yang terdekat', () => {
+    expect(textRooms(content([text('t', 0.5, 0.5)]), 0.75).t).toBeCloseTo(1 - 2 * PAGE_MARGIN)
+    expect(textRooms(content([text('t', 0.5, 0.8)]), 0.75).t).toBeCloseTo(2 * (0.2 - PAGE_MARGIN))
+  })
+
+  it('berhenti sebelum foto di atasnya', () => {
+    // Foto 0.6 × 0.6 lebar halaman di halaman 0.75: setinggi 0.45, dari 0.1 sampai 0.55.
+    const rooms = textRooms(content([photo('p', 0.5, 0.325, 0.6, 1), text('t', 0.5, 0.72)]), 0.75)
+    expect(rooms.t).toBeCloseTo(2 * (0.72 - 0.55 - 0.025))
+  })
+
+  it('foto di samping teks atau yang sengaja menimpa titik tengahnya tidak membatasi', () => {
+    const beside = textRooms(
+      content([photo('p', 0.2, 0.5, 0.3, 0.5), text('t', 0.75, 0.5, 0.4)]),
+      1.3333,
+    )
+    expect(beside.t).toBeCloseTo(1 - 2 * PAGE_MARGIN)
+    const caption = textRooms(
+      content([photo('p', 0.5, 0.5, 0.8, 1), text('t', 0.5, 0.5, 0.6)]),
+      0.75,
+    )
+    expect(caption.t).toBeCloseTo(1 - 2 * PAGE_MARGIN)
+  })
+
+  it('dua teks yang bertumpuk berbagi ruang di titik tengah di antaranya', () => {
+    const rooms = textRooms(content([text('a', 0.5, 0.3), text('b', 0.5, 0.6)]), 0.75)
+    expect(rooms.a).toBeCloseTo(2 * (0.15 - 0.0125))
+    expect(rooms.b).toBeCloseTo(2 * (0.15 - 0.0125))
+    // Ruang keduanya tidak saling bertemu.
+    expect(0.3 + rooms.a! / 2).toBeLessThan(0.6 - rooms.b! / 2)
+  })
+})
+
+describe('photoBox', () => {
+  const photo1 = template('photo-1')
+  const slot = templateElements(photo1, 0.72)[0] as PhotoElement
+
+  it('mengganti foto berkali-kali tidak membuat bingkainya terus mengecil', () => {
+    let frame: PhotoElement = { ...slot, photo: 'f1' }
+    const areas: number[] = []
+    for (const aspect of [3 / 4, 4 / 3, 3 / 4, 4 / 3, 1 / 3, 4 / 3]) {
+      frame = fitPhoto(photoBox(frame, photo1, 0.72), aspect, 0.72)
+      areas.push(frame.width * (frame.width / frame.aspect))
+    }
+    // Foto 4:3 berikutnya sama besar dengan yang pertama.
+    expect(areas[3]).toBeCloseTo(areas[1]!, 4)
+    expect(areas[5]).toBeCloseTo(areas[1]!, 4)
+  })
+
+  it('bingkai yang sudah dipindah memakai persegi seukuran sisi terpanjangnya', () => {
+    const moved = { ...slot, photo: 'f1', x: 0.4, width: 0.4, aspect: 0.8 }
+    expect(photoBox(moved, photo1, 0.72)).toMatchObject({ width: 0.5, aspect: 1 })
+    // Slot kosong yang dipindah tetap memakai bingkainya sendiri.
+    expect(photoBox({ ...moved, photo: null }, photo1, 0.72)).toMatchObject({
+      width: 0.4,
+      aspect: 0.8,
+    })
+  })
+
+  it('slotOf hanya mengenali elemen yang belum dipindah', () => {
+    expect(slotOf(slot, photo1, 0.72)?.kind).toBe('photo')
+    expect(slotOf({ ...slot, x: 0.45 }, photo1, 0.72)).toBeUndefined()
+  })
+})
+
+describe('reflowTemplate', () => {
+  const photo1 = template('photo-1')
+  const [photo, text] = templateElements(photo1, 0.75) as [PhotoElement, LetterElement]
+  const [wide, wideText] = templateElements(photo1, 1.3333) as [PhotoElement, LetterElement]
+
+  it('teks dan foto pindah ke slot tata letak baru, dengan rata dan ukuran huruf pilihan user', () => {
+    if (text.kind !== 'text' || wideText.kind !== 'text') throw new Error('bukan teks')
+    const content = normalizeContent({
+      elements: [
+        { ...photo, photo: 'f1', width: 0.5, aspect: 0.75, rotation: 6 },
+        { ...text, text: 'Halo', align: 'right', size: text.size * 1.15 },
+        { kind: 'sticker', id: 's', x: 0.9, y: 0.1, width: 0.2, rotation: 0, sticker: 'heart' },
+      ],
+    })
+    const next = reflowTemplate(content, photo1, 0.75, 1.3333)
+    const moved = (id: string) => next.elements.find((element) => element.id === id)
+    expect(moved(photo.id)).toMatchObject({
+      photo: 'f1',
+      x: wide.x,
+      y: wide.y,
+      width: wide.width,
+      rotation: wide.rotation,
+    })
+    expect(moved(text.id)).toMatchObject({ x: wideText.x, y: wideText.y, align: 'right' })
+    const size = moved(text.id)!.kind === 'text' ? (moved(text.id) as typeof text).size : 0
+    expect(size).toBeCloseTo(wideText.size * 1.15, 3)
+    expect(moved('s')).toEqual(content.elements[2])
+  })
+
+  it('foto yang sempat digeser tetap disusun ke slot baru, supaya tidak menimpa tulisan', () => {
+    const content = normalizeContent({
+      elements: [
+        { ...photo, photo: 'f1', x: 0.47, y: 0.33 },
+        { ...text, text: 'Halo' },
+      ],
+    })
+    const next = reflowTemplate(content, photo1, 0.75, 1.3333)
+    expect(next.elements.find((element) => element.id === photo.id)).toMatchObject({
+      x: wide.x,
+      y: wide.y,
+    })
   })
 })

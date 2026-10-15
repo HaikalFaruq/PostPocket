@@ -1,4 +1,10 @@
-import { byId, letter, type LetterContent, type LetterDesign } from '@postpocket/presets'
+import {
+  byId,
+  illustrationArt,
+  letter,
+  type LetterContent,
+  type LetterDesign,
+} from '@postpocket/presets'
 import type { BoxLetter } from './box-api'
 import type { Letter } from './letter-api'
 import { PHOTO_FRONT } from './letter-draft'
@@ -50,8 +56,12 @@ export function shownFromBox(titipan: BoxLetter, photosDeleted: boolean): ShownL
   }
 }
 
-/** Gambar depan surat untuk lembarnya di folder kaca: ilustrasi, atau foto depan dari user. */
+/**
+ * Gambar depan surat untuk lembarnya di folder kaca: ilustrasi dalam komposisi untuk bentuk
+ * kartunya, atau foto depan dari user.
+ */
 export function letterFront(design: LetterDesign, coverUrl: string | null | undefined) {
   if (design.illustration === PHOTO_FRONT) return coverUrl ?? null
-  return byId(letter.illustrations, design.illustration)?.art ?? null
+  const illustration = byId(letter.illustrations, design.illustration)
+  return illustration ? illustrationArt(illustration, design.shape).art : null
 }

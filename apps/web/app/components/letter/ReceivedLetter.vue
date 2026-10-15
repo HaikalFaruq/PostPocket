@@ -59,6 +59,7 @@ const ratio = computed(() => cardRatio(props.letter.design, props.letter.cover))
   position: absolute;
   inset: auto 10% 12% 10%;
   font-family: var(--font-letter);
+  word-spacing: var(--letter-word-spacing);
   font-size: 11cqw;
   line-height: 1.1;
   text-align: center;

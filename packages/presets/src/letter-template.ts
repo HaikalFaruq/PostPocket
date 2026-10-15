@@ -5,6 +5,7 @@ import {
   normalizeContent,
   type LetterContent,
   type LetterElement,
+  type PhotoElement,
 } from './letter-content'
 
 function round(value: number): number {
@@ -82,6 +83,79 @@ export function applyTemplate(
   return normalizeContent({ version: 1, elements: [...placed, ...kept] })
 }
 
+/** Slot template yang titik tengahnya sama dengan `element`, yaitu slot yang belum dipindah. */
+function homeSlot(element: LetterElement, slots: readonly LetterElement[]): number {
+  return slots.findIndex(
+    (slot) =>
+      slot.kind === element.kind &&
+      Math.abs(slot.x - element.x) < 1e-3 &&
+      Math.abs(slot.y - element.y) < 1e-3,
+  )
+}
+
+/** Slot template tempat `element` berada, selama elemen itu belum dipindah dari slotnya. */
+export function slotOf(
+  element: LetterElement,
+  template: Template,
+  pageRatio: number,
+): LetterElement | undefined {
+  const slots = templateElements(template, pageRatio)
+  return slots[homeSlot(element, slots)]
+}
+
+/** Foto di template satu foto boleh lebih tinggi dari kotaknya (`fitPhoto` dengan `grow`). */
+export function photoGrow(template: Template): number {
+  return template.photos === 1 ? 1.4 : 1
+}
+
+/**
+ * Kotak tempat foto baru dimuat (`fitPhoto`) di bingkai `element`: kotak slot template kalau
+ * bingkainya masih di slotnya, persegi seukuran sisi terpanjangnya kalau bingkai itu sudah berisi
+ * foto dan sudah dipindah, atau bingkainya sendiri. Jadi mengganti foto berkali-kali tidak membuat
+ * bingkainya terus mengecil.
+ */
+export function photoBox<T extends PhotoElement>(
+  element: T,
+  template: Template | undefined,
+  pageRatio: number,
+): T {
+  const slot = template && slotOf(element, template, pageRatio)
+  if (slot?.kind === 'photo') return { ...element, width: slot.width, aspect: slot.aspect }
+  if (element.photo === null) return element
+  return { ...element, width: Math.max(element.width, element.width / element.aspect), aspect: 1 }
+}
+
+/**
+ * Susun isi surat untuk halaman berasio baru, misalnya setelah bentuk kartu diganti. Posisi lama
+ * tidak berlaku di halaman yang bentuknya lain (ukuran foto dihitung dari rasio halaman), jadi
+ * semua teks dan foto berisi mengisi slot template di tata letak rasio baru, seperti
+ * `applyTemplate`. Rata teks dan perbesaran hurufnya (A+, A−) terhadap slotnya tetap. Bingkai foto
+ * mendapat kotak slot barunya; muatkan fotonya dengan `fitPhoto`.
+ */
+export function reflowTemplate(
+  content: LetterContent,
+  template: Template,
+  fromRatio: number,
+  toRatio: number,
+): LetterContent {
+  const before = templateElements(template, fromRatio)
+  const placed = applyTemplate(content, template, toRatio)
+  const sources = new Map(content.elements.map((element) => [element.id, element]))
+  const texts = placed.elements.filter((element) => element.kind === 'text')
+  const slotTexts = before.filter((element) => element.kind === 'text')
+  const elements = placed.elements.map((element): LetterElement => {
+    if (element.kind !== 'text') return element
+    const source = sources.get(element.id)
+    const slot = slotTexts[texts.indexOf(element)]
+    if (source?.kind !== 'text' || slot?.kind !== 'text') return element
+    // Teks berisi ke-n mengisi slot teks ke-n, jadi perbesarannya dihitung dari slot itu.
+    const { min, max } = contentLimits.size
+    const size = round(Math.min(max, Math.max(min, element.size * (source.size / slot.size))))
+    return { ...element, align: source.align, size }
+  })
+  return normalizeContent({ version: 1, elements })
+}
+
 /** Template dengan slot foto paling sedikit yang masih cukup untuk `count` foto. */
 export function templateForPhotos(templates: readonly Template[], count: number): Template | null {
   const fitting = templates.filter((item) => item.photos >= Math.max(1, count))
@@ -115,8 +189,83 @@ export function fitPhoto<T extends { y: number; width: number; aspect: number }>
   return { ...element, width: round(clamped), aspect: round(aspect) }
 }
 
-/** Kotak elemen sebelum diputar, dalam pecahan lebar dan tinggi halaman. Tinggi teks diperkirakan. */
-function elementBox(element: LetterElement, pageRatio: number) {
+/** Jarak minimal tulisan dari tepi halaman, pecahan tinggi halaman. */
+export const PAGE_MARGIN = 0.03
+/** Jarak antara tulisan dan foto atau tulisan lain di atas dan bawahnya. */
+const TEXT_GAP = 0.025
+
+/**
+ * Kotak pembatas elemen setelah diputar, dalam pecahan lebar (`left`, `right`) dan tinggi (`top`,
+ * `bottom`) halaman. Tinggi teks tidak bisa dihitung tanpa huruf, jadi teks memakai `textHeight`
+ * (pecahan tinggi halaman) kalau ada, atau tinggi satu baris.
+ */
+export function elementBounds(element: LetterElement, pageRatio: number, textHeight?: number) {
+  const ratio = pageRatio > 0 && Number.isFinite(pageRatio) ? pageRatio : 0.75
+  // Tinggi sebelum diputar, pecahan tinggi halaman.
+  let height: number
+  if (element.kind === 'photo') height = (element.width / element.aspect) * ratio
+  else if (element.kind === 'sticker') height = element.width * ratio
+  else height = textHeight ?? element.size * 1.2 * ratio
+  const angle = (Math.abs(element.rotation) * Math.PI) / 180
+  const cos = Math.abs(Math.cos(angle))
+  const sin = Math.abs(Math.sin(angle))
+  const halfWidth = (element.width * cos + (height / ratio) * sin) / 2
+  const halfHeight = (element.width * ratio * sin + height * cos) / 2
+  return {
+    left: element.x - halfWidth,
+    right: element.x + halfWidth,
+    top: element.y - halfHeight,
+    bottom: element.y + halfHeight,
+  }
+}
+
+/**
+ * Tinggi maksimal setiap blok teks (pecahan tinggi halaman), dengan id teks sebagai kunci. Teks
+ * tumbuh sama jauh ke atas dan ke bawah dari titik tengahnya, jadi ruangnya dua kali jarak ke
+ * penghalang terdekat: tepi halaman, foto yang sejajar dengannya, atau titik tengah antara dia dan
+ * teks lain. Tampilan memperkecil huruf tulisan yang lebih panjang dari ruangnya, jadi tulisan
+ * tidak pernah menabrak foto atau teks lain, dan tidak keluar halaman. Foto atau teks yang sengaja
+ * ditaruh menimpa titik tengah tulisan (misalnya keterangan di atas foto) tidak dihitung, begitu
+ * juga stiker. Penghalangnya hanya isi yang ikut terkirim (`isFilledElement`): slot foto kosong dan
+ * teks kosong tidak sampai ke penerima, jadi pengirim dan penerima mendapat ruang yang sama.
+ */
+export function textRooms(content: LetterContent, pageRatio: number): Record<string, number> {
+  const rooms: Record<string, number> = {}
+  const texts = content.elements.filter((e) => e.kind === 'text')
+  const filledTexts = texts.filter(isFilledElement)
+  const photos = content.elements
+    .filter((e) => e.kind === 'photo' && isFilledElement(e))
+    .map((e) => elementBounds(e, pageRatio))
+  for (const text of texts) {
+    const left = text.x - text.width / 2
+    const right = text.x + text.width / 2
+    const beside = (box: { left: number; right: number }) =>
+      Math.min(right, box.right) - Math.max(left, box.left) > 0.005
+    let up = text.y - PAGE_MARGIN
+    let down = 1 - PAGE_MARGIN - text.y
+    for (const box of photos) {
+      if (!beside(box)) continue
+      if (box.bottom <= text.y) up = Math.min(up, text.y - box.bottom - TEXT_GAP)
+      else if (box.top >= text.y) down = Math.min(down, box.top - text.y - TEXT_GAP)
+    }
+    for (const other of filledTexts) {
+      if (other === text || other.y === text.y) continue
+      if (!beside({ left: other.x - other.width / 2, right: other.x + other.width / 2 })) continue
+      const half = Math.abs(other.y - text.y) / 2 - TEXT_GAP / 2
+      if (other.y < text.y) up = Math.min(up, half)
+      else down = Math.min(down, half)
+    }
+    rooms[text.id] = round(Math.max(0, 2 * Math.min(up, down)))
+  }
+  return rooms
+}
+
+/**
+ * Kotak elemen sebelum diputar, dalam pecahan lebar dan tinggi halaman. Tinggi teks diperkirakan,
+ * paling tinggi sebesar ruangnya (`room`, dari `textRooms()`), karena tulisan yang lebih panjang
+ * diperkecil supaya muat di sana.
+ */
+function elementBox(element: LetterElement, pageRatio: number, room?: number) {
   let height: number
   if (element.kind === 'photo') height = (element.width / element.aspect) * pageRatio
   else if (element.kind === 'sticker') height = element.width * pageRatio
@@ -132,6 +281,7 @@ function elementBox(element: LetterElement, pageRatio: number) {
           .reduce((sum, line) => sum + Math.max(1, Math.ceil(Array.from(line).length / perLine)), 0)
       : 2
     height = lines * element.size * 1.25 * pageRatio
+    if (room !== undefined) height = Math.min(height, Math.max(room, element.size * pageRatio))
   }
   return {
     left: element.x - element.width / 2,
@@ -153,20 +303,38 @@ interface Spot {
 
 const EPSILON = 1e-4
 
-/** Urutan tempat: tulisan tidak pernah kalah, lalu foto, lalu stiker lain, lalu dekat tengah. */
-function rank(a: Spot, b: Spot): number {
-  for (const key of ['text', 'photo', 'sticker'] as const) {
-    if (Math.abs(a[key] - b[key]) > EPSILON) return a[key] - b[key]
+/** Jenis elemen yang dicarikan tempat; menentukan apa yang paling dihindari. */
+export type Placing = 'sticker' | 'photo' | 'text'
+
+/**
+ * Nilai tempat, dibandingkan berurutan, makin kecil makin baik. Stiker dan foto: tulisan tidak
+ * pernah ditutup, lalu foto dan stiker lain sesedikit mungkin (stiker di atas stiker lain dihitung
+ * dua kali, karena stiker di bawahnya hilang). Teks: foto tidak pernah ditabrak, lalu stiker, baru
+ * teks lain, karena teks yang berdekatan berbagi ruang (`textRooms`) tanpa bertumpuk. Terakhir,
+ * yang lebih dekat ke tengah halaman.
+ */
+function score(spot: Spot, placing: Placing): number[] {
+  return placing === 'text'
+    ? [spot.photo, spot.sticker, spot.text]
+    : [spot.text, spot.photo + 2 * spot.sticker]
+}
+
+function rank(placing: Placing) {
+  return (a: Spot, b: Spot): number => {
+    const [x, y] = [score(a, placing), score(b, placing)]
+    for (let i = 0; i < x.length; i++) {
+      if (Math.abs(x[i]! - y[i]!) > EPSILON) return x[i]! - y[i]!
+    }
+    return a.distance - b.distance
   }
-  return a.distance - b.distance
 }
 
 /**
  * Titik tengah untuk elemen baru selebar `width` (pecahan lebar halaman) dan setinggi `height`
- * (pecahan tinggi halaman). Tempat yang tidak menutupi tulisan selalu dipilih lebih dulu, baru
- * yang paling sedikit menutupi foto, lalu stiker lain; halaman kosong tetap mendapat tengah
- * halaman, dan tempat yang sama baiknya dipilih acak lewat `random`. `coversText` bernilai
- * benar kalau semua tempat menutupi tulisan, supaya pemanggil bisa mencoba ukuran lebih kecil.
+ * (pecahan tinggi halaman). Yang dihindari bergantung pada jenisnya (`placing`, lihat `score`);
+ * halaman kosong tetap mendapat tengah halaman, dan tempat yang sama baiknya dipilih acak lewat
+ * `random`. `coversText` dan `coversPhoto` bernilai benar kalau tempat terbaiknya pun menutupi
+ * tulisan atau foto, supaya pemanggil bisa mencoba ukuran lebih kecil.
  */
 export function freeSpot(
   content: LetterContent,
@@ -174,15 +342,19 @@ export function freeSpot(
   height: number,
   pageRatio: number,
   random: () => number = Math.random,
-): { x: number; y: number; coversText: boolean } {
+  placing: Placing = 'sticker',
+): { x: number; y: number; coversText: boolean; coversPhoto: boolean } {
+  const rooms = textRooms(content, pageRatio)
   const boxes = content.elements.map((element) => ({
-    box: elementBox(element, pageRatio),
+    box: elementBox(element, pageRatio, rooms[element.id]),
     kind: element.kind,
   }))
   const within = (value: number, half: number) =>
     half >= 0.48 ? 0.5 : Math.min(1 - half - 0.02, Math.max(half + 0.02, value))
-  const spots = [0.2, 0.5, 0.8].flatMap((x) =>
-    [0.14, 0.32, 0.5, 0.68, 0.86].map((y): Spot => {
+  // Kisi 5 × 7 sampai dekat tepi halaman, jadi celah kecil di antara foto dan di pinggir tulisan
+  // panjang pun ikut dicoba.
+  const spots = [0.12, 0.31, 0.5, 0.69, 0.88].flatMap((x) =>
+    [0.08, 0.22, 0.36, 0.5, 0.64, 0.78, 0.92].map((y): Spot => {
       const spot: Spot = {
         x: within(x, width / 2),
         y: within(y, height / 2),
@@ -200,16 +372,20 @@ export function freeSpot(
       return spot
     }),
   )
-  spots.sort(rank)
+  spots.sort(rank(placing))
+  const top = score(spots[0]!, placing)
   const best = spots.filter(
     (spot) =>
-      Math.abs(spot.text - spots[0]!.text) <= EPSILON &&
-      Math.abs(spot.photo - spots[0]!.photo) <= EPSILON &&
-      Math.abs(spot.sticker - spots[0]!.sticker) <= EPSILON &&
+      score(spot, placing).every((value, i) => Math.abs(value - top[i]!) <= EPSILON) &&
       spot.distance <= spots[0]!.distance + 1e-6,
   )
   const pick = best[Math.min(best.length - 1, Math.floor(random() * best.length))]!
-  return { x: round(pick.x), y: round(pick.y), coversText: pick.text > EPSILON }
+  return {
+    x: round(pick.x),
+    y: round(pick.y),
+    coversText: pick.text > EPSILON,
+    coversPhoto: pick.photo > EPSILON,
+  }
 }
 
 function overlaps(a: ReturnType<typeof elementBox>, b: ReturnType<typeof elementBox>): boolean {
@@ -229,7 +405,8 @@ export function tidyStickers(
   random: () => number = Math.random,
 ): LetterContent {
   const settled: LetterElement[] = content.elements.filter((element) => element.kind !== 'sticker')
-  const blockers = settled.map((element) => elementBox(element, pageRatio))
+  const rooms = textRooms(content, pageRatio)
+  const blockers = settled.map((element) => elementBox(element, pageRatio, rooms[element.id]))
   const elements = content.elements.map((element) => {
     if (element.kind !== 'sticker') return element
     const box = elementBox(element, pageRatio)

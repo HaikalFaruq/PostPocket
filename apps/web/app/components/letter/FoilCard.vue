@@ -375,19 +375,45 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
   mix-blend-mode: soft-light;
 }
 
-/* Bingkai foil: cincin tipis dengan gradien logam yang sama. */
+/*
+ * Bingkai foil: dua garis, tebal di luar dan tipis di dalam, dengan gradien logam yang sama.
+ * Bentuknya dari clip-path evenodd dengan empat persegi bersarang, bukan mask-composite: begitu
+ * `-webkit-mask` menimpa `mask`, Chrome menggabung kedua lapisan topengnya dan seluruh bidang di
+ * dalam bingkai ikut jadi foil. Jaraknya dalam cqmin, jadi sama di keempat sisi kartu.
+ */
 .foil-border {
+  --rule: max(1.5px, 0.8cqmin);
+  --gap: max(1.5px, 0.9cqmin);
+  --hair: max(1px, 0.35cqmin);
+  --in-1: var(--rule);
+  --in-2: calc(var(--rule) + var(--gap));
+  --in-3: calc(var(--rule) + var(--gap) + var(--hair));
   position: absolute;
-  inset: 4.5%;
-  padding: 2px;
+  inset: 4cqmin;
   overflow: hidden;
-  mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
+  clip-path: polygon(
+    evenodd,
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 0,
+    var(--in-1) var(--in-1),
+    var(--in-1) calc(100% - var(--in-1)),
+    calc(100% - var(--in-1)) calc(100% - var(--in-1)),
+    calc(100% - var(--in-1)) var(--in-1),
+    var(--in-1) var(--in-1),
+    var(--in-2) var(--in-2),
+    calc(100% - var(--in-2)) var(--in-2),
+    calc(100% - var(--in-2)) calc(100% - var(--in-2)),
+    var(--in-2) calc(100% - var(--in-2)),
+    var(--in-2) var(--in-2),
+    var(--in-3) var(--in-3),
+    var(--in-3) calc(100% - var(--in-3)),
+    calc(100% - var(--in-3)) calc(100% - var(--in-3)),
+    calc(100% - var(--in-3)) var(--in-3),
+    var(--in-3) var(--in-3)
+  );
 }
 
 .foil-content {
@@ -395,6 +421,7 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
   inset: 0;
   padding: 10cqw 9cqw;
   font-family: var(--font-letter);
+  word-spacing: var(--letter-word-spacing);
   font-size: 8cqw;
   line-height: 1.25;
 }

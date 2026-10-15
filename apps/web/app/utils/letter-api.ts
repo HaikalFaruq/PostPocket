@@ -164,6 +164,9 @@ export function errorMessage(error: unknown): string {
     case 'upload_missing':
     case 'upload_invalid':
       return 'Foto gagal terunggah. Coba lagi.'
+    case 'invalid_design':
+      // Misalnya desain baru yang belum dikenal server yang sedang berjalan.
+      return 'Desain kartu ini belum bisa dikirim. Pilih gambar depan lain, atau coba lagi nanti.'
     case 'reply_not_found':
       return 'Surat yang mau dibalas sudah tidak tersedia.'
     case 'not_found':

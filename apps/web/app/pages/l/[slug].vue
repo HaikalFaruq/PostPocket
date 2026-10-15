@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { byId, letter as letterPresets } from '@postpocket/presets'
+import { byId, illustrationArt, letter as letterPresets } from '@postpocket/presets'
 import { PHOTO_FRONT, cardRatio } from '~/utils/letter-draft'
 import { LetterApiError, transient } from '~/utils/letter-api'
 import { shownFromApi } from '~/utils/letter-view'
@@ -56,8 +56,10 @@ const frontImages = computed(() => {
   if (!design) return []
   if (design.illustration === PHOTO_FRONT)
     return letter.value?.cover ? [letter.value.cover.url] : []
-  const art = byId(letterPresets.illustrations, design.illustration)
-  return art ? [art.art, art.foil].filter((href): href is string => !!href) : []
+  const illustration = byId(letterPresets.illustrations, design.illustration)
+  if (!illustration) return []
+  const front = illustrationArt(illustration, design.shape)
+  return [front.art, front.foil]
 })
 // Pengganti kartu selama JavaScript dimuat: ukuran dan warna kertasnya sama dengan kartu nanti,
 // jadi pergantiannya tidak terlihat seperti kedipan.

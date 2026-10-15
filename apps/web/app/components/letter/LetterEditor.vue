@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { byId, contentLimits, letter, type LetterElement } from '@postpocket/presets'
+import { byId, contentLimits, letter, textRooms, type LetterElement } from '@postpocket/presets'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { MESSAGE_LIMIT } from '~/utils/letter-draft'
 import {
+  keptInPage,
   moved,
   pinched,
   pointerAngle,
@@ -29,18 +30,41 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const { width: stageWidth, height: stageHeight } = useElementSize(stage)
 useScrollLock(document.body, true)
 
-const pageStyle = computed(() => {
-  const width = Math.max(
-    120,
-    Math.min(stageWidth.value - 32, (stageHeight.value - 32) * draft.ratio, 560),
-  )
-  return {
-    width: `${width}px`,
-    height: `${width / draft.ratio}px`,
-    backgroundColor: paper.value.color,
-    color: paper.value.textColor,
+const pageWidth = computed(() =>
+  Math.max(120, Math.min(stageWidth.value - 32, (stageHeight.value - 32) * draft.ratio, 560)),
+)
+const pageStyle = computed(() => ({
+  width: `${pageWidth.value}px`,
+  height: `${pageWidth.value / draft.ratio}px`,
+  backgroundColor: paper.value.color,
+  color: paper.value.textColor,
+}))
+
+// Ruang tiap blok teks, sama dengan di kartu: tulisan yang terlalu panjang diperkecil hurufnya,
+// bukan menabrak foto atau keluar halaman.
+const rooms = computed(() => textRooms(draft.content, draft.ratio))
+function maxHeight(id: string): number | undefined {
+  const room = rooms.value[id]
+  return room === undefined ? undefined : (room * pageWidth.value) / draft.ratio
+}
+/** Skala huruf tiap blok teks setelah disesuaikan dengan ruangnya, dan yang tetap tidak muat. */
+const fits = ref<Record<string, { scale: number; overflow: boolean }>>({})
+function onFit(id: string, scale: number, overflow: boolean) {
+  const current = fits.value[id]
+  if (current?.scale !== scale || current.overflow !== overflow) {
+    fits.value = { ...fits.value, [id]: { scale, overflow } }
   }
-})
+}
+const selectedFit = computed(() => (selected.value ? fits.value[selected.value.id] : undefined))
+const shrunk = computed(() => (selectedFit.value?.scale ?? 1) < 0.98)
+/** Keterangan untuk tulisan yang dipilih kalau hurufnya diperkecil, atau tetap tidak muat. */
+const fitNote = computed(() =>
+  selectedFit.value?.overflow
+    ? 'Tulisan ini belum muat walau hurufnya sudah sekecil mungkin. Pendekkan tulisannya, pindahkan ke tempat yang lebih lapang, atau perkecil fotonya.'
+    : shrunk.value
+      ? 'Hurufnya diperkecil supaya tulisan ini muat di ruangnya, tanpa menabrak foto atau keluar halaman.'
+      : '',
+)
 
 const selectedId = ref<string | null>(null)
 const selected = computed(() => draft.content.elements.find((e) => e.id === selectedId.value))
@@ -53,16 +77,12 @@ const counts = computed(() => {
   for (const element of draft.content.elements) total[element.kind]++
   return total
 })
-const filledPhotos = computed(
-  () => draft.content.elements.filter((e) => e.kind === 'photo' && e.photo).length,
-)
 const canAddPhoto = computed(
   () =>
     counts.value.photo < contentLimits.photo ||
     draft.content.elements.some((e) => e.kind === 'photo' && !e.photo),
 )
 
-const templateOptions = letter.templates.map((item) => ({ value: item.id, label: item.label }))
 const template = computed({
   get: () => draft.design.template,
   set: (id: string) => draft.setTemplate(id),
@@ -102,6 +122,8 @@ function focusText() {
 interface Gesture {
   kind: 'move' | 'scale' | 'rotate'
   start: LetterElement
+  /** Tinggi blok teks sebelum diputar, pecahan tinggi halaman. */
+  textHeight?: number
   x: number
   y: number
   cx: number
@@ -111,6 +133,30 @@ interface Gesture {
   moved: boolean
 }
 let gesture: Gesture | null = null
+
+/** Tinggi blok teks di layar sebelum diputar, sebagai pecahan tinggi halaman. */
+function textHeightOf(element: LetterElement): number | undefined {
+  if (element.kind !== 'text' || !page.value) return undefined
+  const item = page.value.querySelector<HTMLElement>(`[data-id="${element.id}"]`)
+  return item ? item.offsetHeight / page.value.offsetHeight : undefined
+}
+
+/**
+ * Perubahan `patch` untuk `element`, dengan ukuran dan titik tengah yang menjaga seluruh elemen
+ * tetap di halaman. Foto dan stiker yang jadi lebih lebar dari halaman setelah diputar ikut
+ * diperkecil. `growth` adalah perubahan ukuran sejak `textHeight` diukur.
+ */
+function inPage(
+  element: LetterElement,
+  patch: Partial<LetterElement>,
+  textHeight?: number,
+  growth = 1,
+) {
+  let next = { ...element, ...patch } as LetterElement
+  if (next.kind !== 'text') next = { ...next, ...scaled(next, 1, draft.ratio) }
+  const height = textHeight === undefined ? undefined : textHeight * growth
+  return { ...patch, width: next.width, ...keptInPage(next, draft.ratio, height) }
+}
 
 function begin(event: PointerEvent, element: LetterElement, kind: Gesture['kind']) {
   if (event.button !== 0) return
@@ -125,6 +171,7 @@ function begin(event: PointerEvent, element: LetterElement, kind: Gesture['kind'
   gesture = {
     kind,
     start: { ...element },
+    textHeight: textHeightOf(element),
     x: event.clientX,
     y: event.clientY,
     cx,
@@ -140,6 +187,7 @@ function begin(event: PointerEvent, element: LetterElement, kind: Gesture['kind'
 // kedua boleh mendarat di luar elemen tanpa melepas pilihan.
 interface Pinch {
   start: LetterElement
+  textHeight?: number
   distance: number
   angle: number
   x: number
@@ -165,7 +213,7 @@ function onStagePointerDown(event: PointerEvent) {
   event.stopPropagation()
   event.preventDefault()
   gesture = null
-  pinch = { start: { ...element }, ...pinchNow() }
+  pinch = { start: { ...element }, textHeight: textHeightOf(element), ...pinchNow() }
 }
 
 function onPointerMove(event: PointerEvent) {
@@ -176,15 +224,18 @@ function onPointerMove(event: PointerEvent) {
     if (pointers.size < 2 || !page.value) return
     const now = pinchNow()
     const rect = page.value.getBoundingClientRect()
-    draft.updateElement(
-      pinch.start.id,
-      pinched(pinch.start, {
+    const patch = pinched(
+      pinch.start,
+      {
         factor: now.distance / pinch.distance,
         turn: now.angle - pinch.angle,
         dx: (now.x - pinch.x) / rect.width,
         dy: (now.y - pinch.y) / rect.height,
-      }),
+      },
+      draft.ratio,
     )
+    const growth = patch.width / pinch.start.width
+    draft.updateElement(pinch.start.id, inPage(pinch.start, patch, pinch.textHeight, growth))
     return
   }
   if (!gesture || !page.value) return
@@ -192,18 +243,19 @@ function onPointerMove(event: PointerEvent) {
   const dy = event.clientY - gesture.y
   if (!gesture.moved && Math.hypot(dx, dy) < 4) return
   gesture.moved = true
-  const { start } = gesture
+  const { start, textHeight } = gesture
   if (gesture.kind === 'move') {
     const rect = page.value.getBoundingClientRect()
-    draft.updateElement(start.id, moved(start, dx / rect.width, dy / rect.height))
+    const patch = moved(start, dx / rect.width, dy / rect.height)
+    draft.updateElement(start.id, inPage(start, patch, textHeight))
   } else if (gesture.kind === 'scale') {
     const distance = Math.hypot(event.clientX - gesture.cx, event.clientY - gesture.cy)
-    draft.updateElement(start.id, scaled(start, distance / gesture.distance))
+    const patch = scaled(start, distance / gesture.distance, draft.ratio)
+    draft.updateElement(start.id, inPage(start, patch, textHeight, patch.width / start.width))
   } else {
     const angle = pointerAngle(gesture.cx, gesture.cy, event.clientX, event.clientY)
-    draft.updateElement(start.id, {
-      rotation: snappedRotation(start.rotation + angle - gesture.angle),
-    })
+    const patch = { rotation: snappedRotation(start.rotation + angle - gesture.angle) }
+    draft.updateElement(start.id, inPage(start, patch, textHeight))
   }
 }
 
@@ -240,7 +292,8 @@ function onItemKeydown(event: KeyboardEvent, element: LetterElement) {
     event.preventDefault()
     const step = event.shiftKey ? 0.05 : 0.01
     select(element.id)
-    draft.updateElement(element.id, moved(element, nudge[0] * step, nudge[1] * step))
+    const patch = moved(element, nudge[0] * step, nudge[1] * step)
+    draft.updateElement(element.id, inPage(element, patch, textHeightOf(element)))
   } else if (event.key === 'Delete' || event.key === 'Backspace') {
     event.preventDefault()
     remove(element.id)
@@ -294,9 +347,13 @@ function remove(id: string) {
 }
 
 function resizeText(factor: number) {
-  if (selected.value?.kind === 'text') {
-    draft.updateElement(selected.value.id, textSized(selected.value, factor))
-  }
+  const element = selected.value
+  if (element?.kind !== 'text') return
+  const patch = textSized(element, factor)
+  draft.updateElement(
+    element.id,
+    inPage(element, patch, textHeightOf(element), patch.size / element.size),
+  )
 }
 
 let photoSlot: string | undefined
@@ -402,6 +459,8 @@ onMounted(() => dialog.value?.focus())
             "
             text-placeholder="Tulis sesuatu…"
             photo-placeholder="Tambah foto"
+            :max-height="maxHeight(element.id)"
+            @fit="(scale, overflow) => onFit(element.id, scale, overflow)"
           />
           <template v-if="element.id === selectedId">
             <span
@@ -424,6 +483,8 @@ onMounted(() => dialog.value?.focus())
     <footer
       class="border-t border-line-soft bg-surface px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))]"
     >
+      <!-- Selalu ada di halaman, jadi pembaca layar mengumumkan saat huruf tulisan diperkecil. -->
+      <p class="sr-only" role="status">{{ fitNote }}</p>
       <div class="mx-auto max-w-xl space-y-3">
         <p
           v-if="error"
@@ -443,6 +504,9 @@ onMounted(() => dialog.value?.focus())
             </IconButton>
           </div>
           <template v-if="selected.kind === 'text'">
+            <p v-if="fitNote" class="text-caption text-ink-muted" data-testid="text-shrunk">
+              {{ fitNote }}
+            </p>
             <textarea
               ref="textField"
               v-model="selectedText"
@@ -461,10 +525,12 @@ onMounted(() => dialog.value?.focus())
               >
                 A−
               </button>
+              <!-- Tulisan yang sudah diperkecil supaya muat tidak bisa diperbesar lagi. -->
               <button
                 type="button"
                 class="tool"
                 aria-label="Huruf lebih besar"
+                :disabled="shrunk"
                 @click="resizeText(1.15)"
               >
                 A+
@@ -490,7 +556,11 @@ onMounted(() => dialog.value?.focus())
         </div>
 
         <template v-else>
-          <PillGroup v-model="template" label="Template isi surat" :options="templateOptions" />
+          <PillGroup
+            v-model="template"
+            label="Template isi surat"
+            :options="draft.templateChoices"
+          />
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
@@ -508,7 +578,9 @@ onMounted(() => dialog.value?.focus())
             >
               <Icon name="camera" :size="15" />
               {{ busy ? 'Menyiapkan foto…' : 'Foto' }}
-              <span class="text-ink-subtle">{{ filledPhotos }}/{{ contentLimits.photo }}</span>
+              <span class="text-ink-subtle"
+                >{{ draft.filledPhotos }}/{{ contentLimits.photo }}</span
+              >
             </button>
             <button
               type="button"

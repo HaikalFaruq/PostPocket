@@ -49,12 +49,22 @@ export function thresholdForShare(values: Float32Array, share: number, fromTop: 
   return fromTop ? 0 : max
 }
 
-/** Bayangan: bagian tergelap gambar (sekitar `share`) jadi foil, dengan tepi halus. */
+/**
+ * Bayangan: bagian tergelap gambar (sekitar `share` dari bagian yang bergambar) jadi foil, dengan
+ * tepi halus. Ambangnya hanya dihitung dari piksel yang bergambar, dan latar transparan tidak
+ * pernah jadi foil: di ilustrasi yang lowong, 22% piksel tergelap seluruh kanvas bisa jatuh di
+ * kertas kosong, dan seluruh kartu jadi foil.
+ */
 export function shadowMask(img: Raster, { share = 0.22, soft = 14 } = {}): Uint8ClampedArray {
+  const { data } = img
   const luma = lumaMap(img)
-  const t = thresholdForShare(luma, share, false)
+  const drawn = luma.filter((_, i) => data[i * 4 + 3]! >= 128)
+  const t = thresholdForShare(drawn.length ? drawn : luma, share, false)
   const out = new Uint8ClampedArray(luma.length)
-  for (let i = 0; i < luma.length; i++) out[i] = smoothstep(t + soft, t, luma[i]!) * 255
+  for (let i = 0; i < luma.length; i++) {
+    if (data[i * 4 + 3]! < 128) continue
+    out[i] = smoothstep(t + soft, t, luma[i]!) * 255
+  }
   return out
 }
 
