@@ -47,6 +47,10 @@ const LINES = [
 const REST = 0.28,
   PEN = 46,
   PR = 2.3
+// Tiap baris kecuali yang terakhir: 65% jatahnya untuk menulis, sisanya pulpen terangkat dan
+// kembali ke awal baris berikutnya, jadi pulpennya tidak pernah melompat saat ganti baris.
+const WRITE = 0.65,
+  LIFT = 6
 const ease = (t) => t * t * (3 - 2 * t)
 const norm = (v) => {
   const l = Math.hypot(...v)
@@ -78,13 +82,21 @@ function pen(P, tip, d) {
         sn = Math.sin(a) * r
       return P(...tip.map((c, i) => c + d[i] * t + e1[i] * cs + e2[i] * sn))
     })
-  const half = (pts) => {
-    const lo = pts.reduce((m, q, i) => (q[1] > pts[m][1] ? i : m), 0)
-    return [0, 1, 2, 3, 4].map((k) => pts[(lo + k + 14) % 16])
+  // Lipatan: busur 90° di sisi bawah cincin. Sudut terbawahnya dihitung langsung (proyeksinya
+  // linear di cos dan sin), bukan dipilih dari 16 titik cincin, jadi lipatannya tidak meloncat satu
+  // ruas saat pulpennya miring.
+  const half = (t) => {
+    const at = (cs, sn) => P(...tip.map((c, i) => c + d[i] * t + e1[i] * cs + e2[i] * sn))
+    const o = at(0, 0)[1],
+      lo = Math.atan2(at(0, PR)[1] - o, at(PR, 0)[1] - o)
+    return [-2, -1, 0, 1, 2].map((k) => {
+      const a = lo + (k * Math.PI) / 8
+      return at(Math.cos(a) * PR, Math.sin(a) * PR)
+    })
   }
   return {
     sil: poly(hull([P(...tip), ...ring(7), ...ring(PEN)])),
-    crease: open(half(ring(13))) + open(half(ring(PEN - 9))),
+    crease: open(half(13)) + open(half(PEN - 9)),
   }
 }
 
@@ -126,7 +138,10 @@ function mount({ stage, svg, read }, value) {
     stampIn = mk('path', { class: 'nf dash' }, env)
   const flap = mk('path', { class: 'sil' }, g)
 
-  const p = spring(REST, { eps: 0.002 })
+  // Satu pegas menggerakkan cerita lima tahap. Dengan kekakuan bawaan (k 100), pointer yang pergi dari
+  // ujung kanan memutar mundur seluruh ceritanya dalam kurang dari setengah detik dan tutup amplopnya
+  // menyentak; pegas teredam kritis yang sedikit lebih lunak memutarnya dengan tenang.
+  const p = spring(REST, { k: 60, c: 15.5, eps: 0.002 })
   let drawn = NaN,
     painted = ''
 
@@ -134,8 +149,10 @@ function mount({ stage, svg, read }, value) {
     const w = clamp(v / 0.5, 0, 1) * LINES.length
     const q = ease(clamp((v - 0.5) / 0.25, 0, 1)),
       s = clamp((v - 0.75) / 0.25, 0, 1)
-    const fold = ease(clamp(s / 0.45, 0, 1)) * Math.PI,
-      go = ease(clamp((s - 0.35) / 0.65, 0, 1))
+    // Tutupnya menutup di 60% pertama tahap oper, amplopnya mulai dioper di separuh kedua: rentang
+    // yang lebar dan bertumpuk ini membuat lipatannya tidak menyentak saat pointer bergerak cepat.
+    const fold = ease(clamp(s / 0.6, 0, 1)) * Math.PI,
+      go = ease(clamp((s - 0.4) / 0.6, 0, 1))
     const [ox, oy, oz, yaw] = [go * reach, -go * reach * 0.5, go * reach * 0.7, -14 * go]
     const ecx = (ENV[0] + ENV[2]) / 2,
       ecy = (ENV[1] + ENV[3]) / 2
@@ -150,8 +167,10 @@ function mount({ stage, svg, read }, value) {
     const [cr, ci] = inside ? cardRings.map((r) => spin(r, ecx, ecy, yaw, ox, oy)) : cardRings
     put(cardEl, prism(P, front, cr, ci, cz, cz + CT))
     const k = Math.min(LINES.length - 1, Math.floor(w))
+    const last = LINES.length - 1
+    const written = (i) => clamp((w - i) / (i < last ? WRITE : 1), 0, 1)
     LINES.forEach(([y, len], i) => {
-      const f = inside ? 0 : clamp(w - i, 0, 1)
+      const f = inside ? 0 : written(i)
       rules[i].setAttribute(
         'd',
         f > 0 ? seg(P(LX + cx, y + cy, cz + CT), P(LX + cx + len * f, y + cy, cz + CT)) : '',
@@ -159,9 +178,19 @@ function mount({ stage, svg, read }, value) {
       rules[i].classList.toggle('hi', v < 0.5 && i === k)
     })
 
-    // Pulpen: berdiri di ujung baris, lalu diletakkan di meja saat kartunya diambil.
-    const [ty, len] = LINES[k]
-    const at = [lerp(LX + len * clamp(w - k, 0, 1), 18, q), lerp(ty, 86, q), lerp(CT, PR, q)]
+    // Pulpen: berdiri di ujung baris, terangkat ke awal baris berikutnya, lalu diletakkan di meja
+    // saat kartunya diambil.
+    const u = clamp(w - k, 0, 1)
+    let px = LX + LINES[k][1] * written(k),
+      py = LINES[k][0],
+      lift = 0
+    if (k < last && u > WRITE) {
+      const r = ease((u - WRITE) / (1 - WRITE))
+      px = lerp(LX + LINES[k][1], LX, r)
+      py = lerp(LINES[k][0], LINES[k + 1][0], r)
+      lift = Math.sin(Math.PI * r) * LIFT
+    }
+    const at = [lerp(px, 18, q), lerp(py, 86, q), lerp(CT + lift, PR, q)]
     put(penEl, pen(P, at, norm(UP.map((c, i) => lerp(c, DOWN[i], q)))))
     place(tip, P(...at))
     tip.setAttribute('class', v < 0.5 ? 'dot' : 'dot off')
