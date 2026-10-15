@@ -1,7 +1,15 @@
-import { contentLimits, letter, normalizeContent, type LetterElement } from '@postpocket/presets'
+import {
+  contentLimits,
+  elementBounds,
+  letter,
+  normalizeContent,
+  textRooms,
+  type LetterElement,
+} from '@postpocket/presets'
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  keptInPage,
   moved,
   pinched,
   pointerAngle,
@@ -10,7 +18,12 @@ import {
   textSized,
   uniqueId,
 } from '../app/utils/letter-gesture'
-import { describeElement, elementStyle } from '../app/utils/letter-page'
+import {
+  MIN_TEXT_SCALE,
+  describeElement,
+  elementStyle,
+  fittedScale,
+} from '../app/utils/letter-page'
 
 const [text, photo, sticker] = normalizeContent({
   elements: [
@@ -39,6 +52,76 @@ describe('scaled', () => {
     expect(next.width).toBe(contentLimits.width.max)
     expect(next.size).toBeCloseTo(0.06 * (contentLimits.width.max / 0.5))
     expect(scaled(photo, 0.01)).toEqual({ width: contentLimits.width.min })
+  })
+})
+
+describe('keptInPage', () => {
+  const inside = (element: LetterElement, ratio: number, textHeight?: number) => {
+    const box = elementBounds(element, ratio, textHeight)
+    return box.left >= -1e-9 && box.right <= 1 + 1e-9 && box.top >= -1e-9 && box.bottom <= 1 + 1e-9
+  }
+
+  it('foto yang digeser ke pojok berhenti di tepi halaman, termasuk setelah diputar', () => {
+    const corner = { ...photo, ...moved(photo, -1, 1) }
+    const next = { ...corner, ...keptInPage(corner, 0.75) }
+    expect(inside(next, 0.75)).toBe(true)
+    // Menempel di tepi kiri dan bawah, tidak ditarik ke tengah.
+    const box = elementBounds(next, 0.75)
+    expect(box.left).toBeCloseTo(0, 6)
+    expect(box.bottom).toBeCloseTo(1, 6)
+  })
+
+  it('teks memakai tingginya hasil ukur, dengan jarak dari tepi seperti ruangnya', () => {
+    const low = { ...text, y: 0.98 }
+    const next = { ...low, ...keptInPage(low, 0.75, 0.3) }
+    expect(next.y).toBeCloseTo(0.82)
+    expect(inside(next, 0.75, 0.3)).toBe(true)
+    // Di posisi itu ruangnya pas setinggi teksnya, jadi hurufnya tidak ikut diperkecil.
+    const room = textRooms({ version: 1, elements: [next] }, 0.75)[next.id]!
+    expect(room).toBeCloseTo(0.3)
+  })
+
+  it('elemen yang lebih besar dari halaman diletakkan di tengah', () => {
+    const huge = { ...sticker, width: 1, x: 0.9 }
+    expect(keptInPage(huge, 1.3333)).toEqual({ x: 0.5, y: 0.5 })
+  })
+})
+
+describe('scaled di dalam halaman', () => {
+  it('foto dan stiker berhenti membesar di tepi halaman', () => {
+    for (const ratio of [0.72, 1, 1.3333]) {
+      for (const element of [photo, sticker]) {
+        const next = { ...element, ...scaled(element, 10, ratio) }
+        const box = elementBounds(next, ratio)
+        expect(box.right - box.left).toBeLessThanOrEqual(1 + 1e-9)
+        expect(box.bottom - box.top).toBeLessThanOrEqual(1 + 1e-9)
+      }
+    }
+  })
+
+  it('tanpa rasio halaman tetap memakai batas kontrak', () => {
+    expect(scaled(photo, 10).width).toBe(contentLimits.width.max)
+  })
+})
+
+describe('fittedScale', () => {
+  // Tinggi tulisan kira-kira sebanding kuadrat skalanya: baris makin pendek dan makin banyak.
+  const heightAt = (full: number) => (scale: number) => full * scale * scale
+
+  it('tulisan yang muat tidak diperkecil', () => {
+    expect(fittedScale(200, heightAt(150))).toBe(1)
+  })
+
+  it('tulisan yang terlalu tinggi diperkecil sampai muat', () => {
+    const scale = fittedScale(100, heightAt(400))
+    expect(scale).toBeLessThan(1)
+    expect(heightAt(400)(scale)).toBeLessThanOrEqual(100.5)
+    // Sedekat mungkin dengan skala terbesar yang muat (0.5).
+    expect(scale).toBeGreaterThan(0.49)
+  })
+
+  it('tidak pernah lebih kecil dari batas bawahnya', () => {
+    expect(fittedScale(10, heightAt(10_000))).toBe(MIN_TEXT_SCALE)
   })
 })
 

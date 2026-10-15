@@ -1,4 +1,10 @@
-import { contentLimits, type LetterElement, type TextElement } from '@postpocket/presets'
+import {
+  PAGE_MARGIN,
+  contentLimits,
+  elementBounds,
+  type LetterElement,
+  type TextElement,
+} from '@postpocket/presets'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -9,10 +15,48 @@ export function moved(element: LetterElement, dx: number, dy: number) {
   return { x: clamp(element.x + dx, 0, 1), y: clamp(element.y + dy, 0, 1) }
 }
 
-/** Perbesar atau perkecil elemen. Blok teks ikut membesarkan hurufnya dengan faktor yang sama. */
-export function scaled(element: LetterElement, factor: number): { width: number; size?: number } {
+/**
+ * Titik tengah yang menjaga seluruh elemen, setelah diputar, tetap di dalam halaman. Tinggi teks
+ * bergantung pada huruf, jadi diambil dari `textHeight` (pecahan tinggi halaman) hasil ukur layar.
+ * Teks juga dijaga sejauh `PAGE_MARGIN` dari tepi atas dan bawah, batas yang sama dengan ruangnya
+ * (`textRooms()`); tanpa itu, teks yang didorong ke tepi terus mengecil.
+ */
+export function keptInPage(
+  element: LetterElement,
+  pageRatio: number,
+  textHeight?: number,
+): { x: number; y: number } {
+  const box = elementBounds(element, pageRatio, textHeight)
+  const within = (value: number, half: number) => (half >= 0.5 ? 0.5 : clamp(value, half, 1 - half))
+  const margin = element.kind === 'text' ? PAGE_MARGIN : 0
+  return {
+    x: within(element.x, (box.right - box.left) / 2),
+    y: within(element.y, (box.bottom - box.top) / 2 + margin),
+  }
+}
+
+/** Lebar terbesar foto atau stiker yang, setelah diputar, masih muat di halaman berasio `pageRatio`. */
+function widestInPage(element: LetterElement, pageRatio: number): number {
+  if (element.kind === 'text') return contentLimits.width.max
+  const aspect = element.kind === 'photo' ? element.aspect : 1
+  const angle = (Math.abs(element.rotation) * Math.PI) / 180
+  const cos = Math.abs(Math.cos(angle))
+  const sin = Math.abs(Math.sin(angle))
+  return Math.min(1 / (cos + sin / aspect), 1 / (pageRatio * (sin + cos / aspect)))
+}
+
+/**
+ * Perbesar atau perkecil elemen. Blok teks ikut membesarkan hurufnya dengan faktor yang sama.
+ * Dengan `pageRatio`, foto dan stiker berhenti membesar begitu menyentuh tepi halaman.
+ */
+export function scaled(
+  element: LetterElement,
+  factor: number,
+  pageRatio?: number,
+): { width: number; size?: number } {
   const { width: range } = contentLimits
-  const width = clamp(element.width * factor, range.min, range.max)
+  const widest = pageRatio ? Math.max(range.min, widestInPage(element, pageRatio)) : range.max
+  const width = clamp(element.width * factor, range.min, Math.min(range.max, widest))
   if (element.kind !== 'text') return { width }
   const applied = width / element.width
   const size = clamp(element.size * applied, contentLimits.size.min, contentLimits.size.max)
@@ -45,9 +89,10 @@ export function snappedRotation(degrees: number, tolerance = 4): number {
 export function pinched(
   start: LetterElement,
   pinch: { factor: number; turn: number; dx: number; dy: number },
+  pageRatio?: number,
 ) {
   return {
-    ...scaled(start, pinch.factor),
+    ...scaled(start, pinch.factor, pageRatio),
     rotation: snappedRotation(start.rotation + pinch.turn),
     ...moved(start, pinch.dx, pinch.dy),
   }

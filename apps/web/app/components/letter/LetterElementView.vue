@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { byId, letter, type LetterElement } from '@postpocket/presets'
+import { fittedScale } from '~/utils/letter-page'
 
 /**
  * Tampilan satu elemen isi surat. Dipakai halaman surat di kartu dan di editor, jadi yang dilihat
@@ -8,23 +9,81 @@ import { byId, letter, type LetterElement } from '@postpocket/presets'
 const props = defineProps<{
   element: LetterElement
   photoUrl?: string | null
-  /** Pengganti blok teks kosong, hanya di editor. */
+  /** Pengganti blok teks kosong, misalnya di editor. */
   textPlaceholder?: string
   /** Keterangan slot foto kosong atau foto yang sudah dihapus. */
   photoPlaceholder?: string
+  /**
+   * Tinggi maksimal blok teks dalam piksel (`textRooms()` kali tinggi halaman). Tulisan yang lebih
+   * tinggi dari ini diperkecil hurufnya sampai muat.
+   */
+  maxHeight?: number
+}>()
+
+const emit = defineEmits<{
+  /** Skala huruf blok teks setelah disesuaikan dengan ruangnya: 1 berarti tidak diperkecil. */
+  fit: [scale: number]
 }>()
 
 const sticker = computed(() =>
   props.element.kind === 'sticker' ? byId(letter.stickers, props.element.sticker) : undefined,
 )
+
+const textEl = ref<HTMLElement | null>(null)
+const scale = ref(1)
+
+/**
+ * Ukur tinggi tulisan di layar, lalu cari skala huruf terbesar yang masih muat. Ukuran huruf
+ * memakai `cqw`, jadi skala yang sama berlaku di kartu, editor, dan tampilan baca.
+ */
+function refit() {
+  const el = textEl.value
+  const element = props.element
+  if (!el || element.kind !== 'text') return
+  const sizeAt = (value: number) => `${element.size * value * 100}cqw`
+  // Ruang 0 juga batas: tulisannya diperkecil sekecil-kecilnya, bukan dibiarkan menabrak.
+  const next =
+    props.maxHeight !== undefined
+      ? fittedScale(props.maxHeight, (value) => {
+          el.style.fontSize = sizeAt(value)
+          return el.offsetHeight
+        })
+      : 1
+  // Ukuran akhir ditulis langsung, karena Vue tidak menulis ulang gaya yang nilainya tidak berubah.
+  el.style.fontSize = sizeAt(next)
+  scale.value = next
+  emit('fit', next)
+}
+
+// Sumbernya dipisah, jadi pengukuran hanya diulang kalau salah satu nilainya berubah, bukan
+// setiap kali isi surat diperbarui (misalnya saat elemen lain digeser).
+watch(
+  [
+    () => (props.element.kind === 'text' ? props.element.text : null),
+    () => (props.element.kind === 'text' ? props.element.size : null),
+    () => props.element.width,
+    () => props.maxHeight,
+    () => props.textPlaceholder,
+  ],
+  () => nextTick(refit),
+)
+onMounted(() => {
+  refit()
+  // Huruf tulisan tangan dimuat belakangan; ukurannya baru benar setelah hurufnya siap.
+  document.fonts?.ready.then(refit)
+  document.fonts?.addEventListener?.('loadingdone', refit)
+})
+onBeforeUnmount(() => document.fonts?.removeEventListener?.('loadingdone', refit))
 </script>
 
 <template>
   <p
     v-if="element.kind === 'text'"
+    ref="textEl"
     class="letter-text"
     :class="{ 'letter-text--empty': !element.text }"
-    :style="{ fontSize: `${element.size * 100}cqw`, textAlign: element.align }"
+    :style="{ fontSize: `${element.size * scale * 100}cqw`, textAlign: element.align }"
+    :data-fit="scale < 1 ? scale.toFixed(2) : undefined"
     v-text="element.text || textPlaceholder"
   />
   <div

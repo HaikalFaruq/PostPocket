@@ -137,8 +137,8 @@ async function keepTitipThrough(reset: () => Promise<void>) {
 
 /**
  * Surat baru berisi foto ini di template "1 foto + teks", lalu kartunya dibuka. Bingkainya
- * mengikuti bentuk foto, jadi strip Booth dan foto tegak tampil utuh. Kotak tujuan titipan dan
- * nama pengirimnya tetap, karena fotonya diambil untuk surat titipan itu.
+ * mengikuti bentuk foto (`addPhoto`), jadi strip Booth dan foto tegak tampil utuh. Kotak tujuan
+ * titipan dan nama pengirimnya tetap, karena fotonya diambil untuk surat titipan itu.
  */
 async function startWithPhoto(pending: PendingPhoto) {
   // Foto untuk surat titipan yang belum dikirim tetap ke kotak itu. Kalau titipannya sudah
@@ -147,7 +147,6 @@ async function startWithPhoto(pending: PendingPhoto) {
   else await draft.reset()
   draft.setTemplate('photo-1')
   draft.addPhoto(pending.photo)
-  draft.fitPhotos({ grow: 1.4 })
   await draft.save()
   notice.value = draft.box
     ? `Foto dari ${pending.from} sudah ada di isi surat. Tulis pesanmu, lalu titip ke kotak.`
@@ -157,7 +156,8 @@ async function startWithPhoto(pending: PendingPhoto) {
 
 /**
  * Tambahkan foto ke draf. Kalau slot template-nya tidak cukup, tata letaknya diganti ke template
- * dengan slot sebanyak fotonya, supaya foto baru tidak menumpuk di atas foto lama.
+ * dengan slot sebanyak fotonya, supaya foto baru tidak menumpuk di atas foto lama. Bingkai foto
+ * di slot mengikuti bentuk fotonya, dan stiker yang jadi menutupi isi dipindah (`setTemplate`).
  */
 async function addToDraft(pending: PendingPhoto) {
   const id = draft.addPhoto(pending.photo)
@@ -170,14 +170,7 @@ async function addToDraft(pending: PendingPhoto) {
   const current = byId(letter.templates, draft.design.template)
   const next =
     current && current.photos >= count ? null : templateForPhotos(letter.templates, count)
-  if (next) {
-    draft.setTemplate(next.id)
-    draft.fitPhotos({ grow: count === 1 ? 1.4 : 1 })
-    // Tata letak baru bisa membuat stiker lama menutupi tulisan atau foto.
-    draft.tidyStickers()
-  } else {
-    draft.fitPhotos({ ids: [id] })
-  }
+  if (next) draft.setTemplate(next.id)
   await draft.save()
   notice.value = next
     ? `Foto dari ${pending.from} ditambahkan. Tata letaknya diganti ke "${next.label}" supaya fotonya tidak bertumpuk.`
@@ -273,10 +266,11 @@ function onDrop(event: DragEvent) {
   if (file) takeFile(file)
 }
 
-// Paste foto dari clipboard; teks biasa tetap masuk ke kolom isi surat.
+// Paste foto dari clipboard; teks biasa tetap masuk ke kolom isi surat. Selama editor isi surat
+// terbuka, foto yang ditempel tidak mengganti gambar depan diam-diam.
 useEventListener(document, 'paste', (event: ClipboardEvent) => {
   const file = imageFile(event.clipboardData?.files)
-  if (!file) return
+  if (!file || editing.value) return
   event.preventDefault()
   takeFile(file)
 })
@@ -287,6 +281,7 @@ const template = computed({
   set: (id: string) => draft.setTemplate(id),
 })
 const filled = computed(() => draft.content.elements.filter(isFilledElement))
+const hasTextSlot = computed(() => draft.content.elements.some((e) => e.kind === 'text'))
 const contentSummary = computed(() => {
   const photos = filled.value.filter((e) => e.kind === 'photo').length
   const stickers = filled.value.filter((e) => e.kind === 'sticker').length
@@ -428,8 +423,15 @@ async function startOver() {
         :foil-border="draft.design.foilBorder"
       >
         <template #inside>
-          <LetterPage :content="draft.content" :photo-urls="draft.photoUrls" />
-          <p v-if="filled.length === 0" class="opacity-40">Tulis isi suratmu di langkah 5.</p>
+          <!-- Petunjuknya ditulis di slot teks, jadi tidak menimpa slot foto di atasnya. -->
+          <LetterPage
+            :content="draft.content"
+            :photo-urls="draft.photoUrls"
+            text-placeholder="Tulis isi suratmu di langkah 5."
+          />
+          <p v-if="!hasTextSlot && filled.length === 0" class="opacity-40">
+            Tulis isi suratmu di langkah 5.
+          </p>
         </template>
       </FoilCard>
       <p

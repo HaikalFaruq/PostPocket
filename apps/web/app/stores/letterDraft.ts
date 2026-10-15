@@ -8,17 +8,22 @@ import {
   isFilledElement,
   letter,
   normalizeContent,
+  photoBox,
+  photoGrow,
+  reflowTemplate,
+  slotOf,
   surprise,
   tidyStickers as tidiedStickers,
   type LetterContent,
   type LetterDesign,
   type LetterElement,
+  type PhotoElement,
   type TextElement,
 } from '@postpocket/presets'
 import { del, get, keys, set } from 'idb-keyval'
 import { defineStore } from 'pinia'
 import type { SentLetter } from '~/utils/letter-api'
-import { uniqueId } from '~/utils/letter-gesture'
+import { keptInPage, scaled, uniqueId } from '~/utils/letter-gesture'
 import { requestPersistentStorage } from '~/utils/pwa'
 import {
   INVITE_PATTERN,
@@ -347,7 +352,19 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     photos.value = { ...photos.value, [key]: next }
     dirtyPhotos.add(key)
     if (slot) {
-      updateElement(slot.id, { photo: key })
+      // Bingkai dibentuk ulang mengikuti fotonya di dalam kotak slotnya (`photoBox`), jadi foto
+      // tampil utuh tanpa terpotong, tidak menabrak isi lain, dan tidak terus mengecil saat
+      // fotonya diganti berkali-kali.
+      const template = currentTemplate()
+      const grow = template && slotOf(slot, template, ratio.value) ? photoGrow(template) : 1
+      const box = photoBox(slot as PhotoElement, template, ratio.value)
+      const shaped = fitPhoto(box, next.width / next.height, ratio.value, { grow })
+      updateElement(slot.id, {
+        photo: key,
+        width: shaped.width,
+        aspect: shaped.aspect,
+        ...keptInPage(shaped, ratio.value),
+      })
       return slot.id
     }
     const id = uniqueId('p', takenIds())
@@ -374,36 +391,64 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     return id
   }
 
+  const currentTemplate = () => byId(letter.templates, design.value.template)
+
   /**
-   * Bingkai foto isi mengikuti bentuk fotonya, jadi foto dari Pocket atau Booth tampil utuh.
-   * Tanpa `ids`, semua foto isi; `grow` lihat `fitPhoto()`.
+   * Foto di bingkai slot template dimuat ulang ke kotak slotnya mengikuti bentuk fotonya sendiri,
+   * jadi tampil utuh tanpa dipotong dan tidak keluar dari tempatnya. Foto yang sudah dipindah user
+   * tidak diubah.
    */
-  function fitPhotos({ ids, grow }: { ids?: string[]; grow?: number } = {}) {
-    setContent({
-      elements: content.value.elements.map((element) => {
+  function shapeSlotPhotos(next: LetterContent): LetterContent {
+    const template = currentTemplate()
+    if (!template) return next
+    const grow = photoGrow(template)
+    return {
+      version: 1,
+      elements: next.elements.map((element) => {
         if (element.kind !== 'photo' || !element.photo) return element
-        if (ids && !ids.includes(element.id)) return element
         const item = photos.value[element.photo]
-        return item ? fitPhoto(element, item.width / item.height, ratio.value, { grow }) : element
+        if (!item || !slotOf(element, template, ratio.value)) return element
+        const box = photoBox(element, template, ratio.value)
+        return fitPhoto(box, item.width / item.height, ratio.value, { grow })
       }),
-    })
-  }
-
-  /** Stiker yang menutupi teks atau foto dipindah ke tempat yang kosong. */
-  function tidyStickers(random: () => number = Math.random) {
-    setContent(tidiedStickers(content.value, ratio.value, random))
+    }
   }
 
   /**
-   * Pakai template lain. Teks dan foto user tetap ada, hanya tata letaknya yang berubah; stiker
-   * yang jadi menutupi tulisan atau foto dipindah ke tempat kosong.
+   * Susun isi surat dengan tata letak template yang dipakai (template baru, atau Surprise me).
+   * Teks dan foto user mengisi slotnya; bingkai foto mengikuti bentuk fotonya di dalam kotak
+   * slotnya, dan stiker yang jadi menutupi tulisan atau foto dipindah ke tempat kosong.
    */
-  function setTemplate(id: string) {
-    const template = byId(letter.templates, id)
+  function relayout() {
+    const template = currentTemplate()
     if (!template) return
-    design.value = { ...design.value, template: id }
-    setContent(tidiedStickers(applyTemplate(content.value, template, ratio.value), ratio.value))
+    const placed = shapeSlotPhotos(applyTemplate(content.value, template, ratio.value))
+    setContent(tidiedStickers(placed, ratio.value))
   }
+
+  /** Pakai template lain. */
+  function setTemplate(id: string) {
+    if (!byId(letter.templates, id)) return
+    design.value = { ...design.value, template: id }
+    relayout()
+  }
+
+  // Bentuk kartu (atau foto depan di bentuk Asli) berganti. Ukuran foto dan tulisan dihitung dari
+  // rasio halaman, jadi isi yang masih di slot template pindah ke slot tata letak rasio baru,
+  // dengan putaran, rata teks, dan ukuran huruf pilihan user (`reflowTemplate`). Yang sudah
+  // dipindah user tetap di tempatnya, hanya dijaga muat di halaman baru.
+  watch(ratio, (next, previous) => {
+    const template = currentTemplate()
+    if (!ready.value || !template || Math.abs(next - previous) < 1e-6) return
+    const elements = reflowTemplate(content.value, template, previous, next).elements.map(
+      (element): LetterElement => {
+        const sized =
+          element.kind === 'text' ? element : { ...element, ...scaled(element, 1, next) }
+        return { ...sized, ...keptInPage(sized, next) }
+      },
+    )
+    setContent(tidiedStickers(shapeSlotPhotos({ version: 1, elements }), next))
+  })
 
   /** Blok teks pertama, yang ditulis langsung dari kolom isi surat di langkah 5. */
   const firstText = () => content.value.elements.find((e): e is TextElement => e.kind === 'text')
@@ -417,12 +462,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   })
 
   function surpriseMe(random: () => number = Math.random) {
-    const next = surprise(design.value, random, { keepIllustration: isPhotoFront.value })
-    design.value = next
-    const template = byId(letter.templates, next.template)
-    if (template) {
-      setContent(tidiedStickers(applyTemplate(content.value, template, ratio.value), ratio.value))
-    }
+    design.value = surprise(design.value, random, { keepIllustration: isPhotoFront.value })
+    relayout()
   }
 
   /** Tandai draf ini sebagai balasan untuk surat `slug`, atau `null` untuk batal membalas. */
@@ -515,8 +556,6 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     removeElement,
     bringToFront,
     addText,
-    fitPhotos,
-    tidyStickers,
     addSticker,
     addPhoto,
     setTemplate,
