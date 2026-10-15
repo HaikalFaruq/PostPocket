@@ -35,7 +35,12 @@ useIntersectionObserver(line, ([entry]) => {
   overflow: hidden;
 }
 
-/* Garisnya: memudar dari atas, digambar sekali saat pertama terlihat. */
+/*
+ * Garisnya memudar dari atas dan digambar sekali saat pertama terlihat, dengan ease 700 ms
+ * Hairline: penampakannya perubahan sekali jalan (aturan 08). Kilaunya bergerak dengan kecepatan
+ * tetap, seperti sinyal di kabel: turun 1,7 detik lalu diam 1,1 detik, jadi sekali lewat setiap
+ * 2,8 detik dan tetap tenang.
+ */
 .crowd-line::before {
   content: '';
   position: absolute;
@@ -57,11 +62,11 @@ useIntersectionObserver(line, ([entry]) => {
 }
 
 .crowd-line.is-drawn::before {
-  animation: line-draw 900ms var(--ease-sheet) forwards;
+  animation: line-draw 700ms var(--ease-sheet) forwards;
 }
 
 .crowd-line.is-drawn::after {
-  animation: line-glint 2800ms var(--ease-sheet) 900ms infinite;
+  animation: line-glint 2800ms linear 700ms infinite;
 }
 
 .crowd-line.is-paused::after {
@@ -90,11 +95,15 @@ useIntersectionObserver(line, ([entry]) => {
     opacity: 0;
     transform: translateY(-100%);
   }
-  20% {
+  10% {
     opacity: 1;
   }
-  65% {
+  50% {
     opacity: 1;
+  }
+  60% {
+    opacity: 0;
+    transform: translateY(250%);
   }
   100% {
     opacity: 0;

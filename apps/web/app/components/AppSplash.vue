@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { BRAND_SYMBOL } from '~/utils/brand-logo'
 import { BRAND_SIGNATURE } from '~/utils/brand-signature'
-import { SPLASH_MS, splashRoute } from '~/utils/splash'
+import { SPLASH_MS } from '~/utils/splash'
 
 /**
  * Splash di awal setiap sesi (docs/desain.md bagian Splash). Logo P-amplop terbentuk: garisnya
@@ -10,14 +10,15 @@ import { SPLASH_MS, splashRoute } from '~/utils/splash'
  *
  * Seluruh animasinya CSS, jadi sudah berjalan sejak HTML pertama tergambar, sebelum JavaScript
  * selesai dimuat. Skrip di <head> (app/utils/splash.ts) menyembunyikannya lebih dulu kalau tidak
- * perlu. Ketukan atau tombol apa pun melewatinya.
+ * perlu, dan app.vue hanya memasangnya di halaman yang boleh. Ketukan atau tombol apa pun
+ * melewatinya.
  */
-const route = useRoute()
-const shown = ref(splashRoute(route.path))
+const shown = ref(true)
 const leaving = ref(false)
 const maskId = useId()
 const clipId = useId()
 const glintId = useId()
+const glyphId = useId()
 let timer: ReturnType<typeof setTimeout> | undefined
 
 function finish() {
@@ -26,6 +27,10 @@ function finish() {
   removeEventListener('keydown', skip)
 }
 
+/**
+ * Dilewati lewat `click`, bukan `pointerdown`: seluruh ketukan (turun, naik, klik) tetap jatuh ke
+ * splash, jadi tidak ikut menekan tautan atau tombol di halaman di bawahnya.
+ */
 function skip() {
   if (leaving.value) return
   leaving.value = true
@@ -34,7 +39,6 @@ function skip() {
 }
 
 onMounted(() => {
-  if (!shown.value) return
   if (document.documentElement.dataset.splash === 'skip') return finish()
   timer = setTimeout(finish, SPLASH_MS)
   addEventListener('keydown', skip)
@@ -64,7 +68,7 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
     :class="{ 'is-leaving': leaving }"
     aria-hidden="true"
     data-testid="splash"
-    @pointerdown="skip"
+    @click="skip"
   >
     <div class="splash-stage">
       <div class="mark">
@@ -102,9 +106,20 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
         </svg>
       </div>
 
-      <!-- Tanda tangan: tiap huruf digores tipis, dan goresan tebal di topeng menyingkap isinya. -->
+      <!--
+        Tanda tangan: tiap huruf digores tipis, dan goresan tebal di topeng menyingkap isinya.
+        Garis hurufnya ditulis sekali di <defs> lalu dipakai tiga kali lewat <use>, jadi HTML-nya
+        tidak membawa 12 KB garis yang sama tiga kali.
+      -->
       <svg class="signature" :viewBox="signatureBox">
         <defs>
+          <path
+            v-for="(d, i) in sig.glyphs"
+            :id="`${glyphId}-${i}`"
+            :key="i"
+            :d="d"
+            pathLength="1"
+          />
           <!-- Wilayah topeng ditulis sendiri: bawaannya (−10% sampai 120% dari titik 0) tidak
                mencakup huruf yang berada di atas garis dasar, di y negatif. -->
           <mask
@@ -115,26 +130,24 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
             :width="signature.width"
             :height="signature.height"
           >
-            <path
-              v-for="(d, i) in sig.glyphs"
+            <use
+              v-for="(_, i) in sig.glyphs"
               :key="i"
               class="sig-reveal"
               :style="{ '--i': i }"
-              :d="d"
-              pathLength="1"
+              :href="`#${glyphId}-${i}`"
             />
           </mask>
         </defs>
-        <path
-          v-for="(d, i) in sig.glyphs"
+        <use
+          v-for="(_, i) in sig.glyphs"
           :key="i"
           class="sig-line"
           :style="{ '--i': i }"
-          :d="d"
-          pathLength="1"
+          :href="`#${glyphId}-${i}`"
         />
         <g :mask="`url(#${maskId})`" class="sig-ink">
-          <path v-for="(d, i) in sig.glyphs" :key="i" :d="d" />
+          <use v-for="(_, i) in sig.glyphs" :key="i" :href="`#${glyphId}-${i}`" />
         </g>
       </svg>
     </div>
@@ -143,9 +156,19 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
 
 <style scoped>
 /*
- * Linimasa (ms): garis P 80–780, isi 480–1080, tutup 820–1440, kilau 1360–2060, tanda tangan
- * 900–2235 (tiap huruf 75 ms setelah sebelumnya), keluar 2340–2800 (sama dengan SPLASH_MS).
- * Kurvanya --ease-sheet, kurva lift Hairline, kecuali tutup yang sedikit memantul saat menutup.
+ * Linimasa (ms):
+ * - garis P 60–760;
+ * - isi tinta 520–1100;
+ * - tutup emas 880–1500;
+ * - kilau 1380–2080;
+ * - tanda tangan 760–1945 (tiap huruf 600 ms, 65 ms setelah huruf sebelumnya);
+ * - utuh dan diam sampai 2600, lalu keluar 2600–3060 (SPLASH_MS 3100).
+ * Garis digambar dengan ease-in-out, seperti tangan yang mulai dan berhenti menulis. Isi, kilau,
+ * dan keluar memakai --ease-sheet, kurva lift Hairline. Tutup sedikit memantul saat menutup.
+ *
+ * Tebal garis ditulis dalam satuan viewBox, bukan `non-scaling-stroke`: dengan `pathLength="1"`,
+ * goresan yang tidak ikut berskala menghitung panjang putusnya dari ukuran layar, jadi garisnya
+ * selesai jauh lebih cepat dari durasinya.
  */
 .splash {
   position: fixed;
@@ -154,7 +177,7 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
   display: grid;
   place-items: center;
   background: var(--color-canvas);
-  animation: splash-out 460ms var(--ease-sheet) 2340ms forwards;
+  animation: splash-out 460ms var(--ease-sheet) 2600ms forwards;
 }
 
 /* Kisi titik yang sama dengan panggung figur Hairline di Beranda, memudar ke tepi. */
@@ -174,8 +197,12 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
   animation: fade-in 900ms var(--ease-sheet) forwards;
 }
 
+/*
+ * Lewati: animasi keluar dengan nama sendiri. Dengan nama yang sama (`splash-out`), browser hanya
+ * mengganti waktunya dan menghitungnya dari awal halaman, jadi splash langsung hilang tanpa pudar.
+ */
 .splash.is-leaving {
-  animation: splash-out 240ms var(--ease-sheet) forwards;
+  animation: splash-skip 240ms var(--ease-sheet) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -189,7 +216,7 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
   display: grid;
   justify-items: center;
   gap: clamp(18px, 3.5vh, 28px);
-  animation: stage-out 460ms var(--ease-sheet) 2340ms forwards;
+  animation: stage-out 460ms var(--ease-sheet) 2600ms forwards;
 }
 
 .mark {
@@ -207,15 +234,15 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
   overflow: visible;
 }
 
+/* Putus 1, celah 2: di awal celahnya menutupi seluruh garis, tanpa sisa titik di ujungnya. */
 .mark-line {
   fill: none;
   stroke: var(--color-ink);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 2.3;
   stroke-linejoin: round;
-  stroke-dasharray: 1;
+  stroke-dasharray: 1 2;
   stroke-dashoffset: 1;
-  animation: draw 700ms var(--ease-sheet) 80ms forwards;
+  animation: draw 700ms ease-in-out 60ms forwards;
 }
 
 .mark-fill {
@@ -223,18 +250,18 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
   inset: 0;
   fill: var(--color-ink);
   clip-path: inset(100% 0 0 0);
-  animation: wipe 600ms var(--ease-sheet) 480ms forwards;
+  animation: wipe 580ms var(--ease-sheet) 520ms forwards;
 }
 
 .mark-flap {
   fill: var(--color-brand-gold);
   transform-box: fill-box;
   transform-origin: 50% 0;
-  animation: flap 620ms cubic-bezier(0.34, 1.4, 0.64, 1) 820ms both;
+  animation: flap 620ms cubic-bezier(0.34, 1.4, 0.64, 1) 880ms both;
 }
 
 .mark-glint {
-  animation: glint 700ms var(--ease-sheet) 1360ms both;
+  animation: glint 700ms var(--ease-sheet) 1380ms both;
 }
 
 .signature {
@@ -245,23 +272,23 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
 .sig-line {
   fill: none;
   stroke: var(--color-ink);
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 1.7;
   stroke-linejoin: round;
-  stroke-dasharray: 1;
+  stroke-dasharray: 1 2;
   stroke-dashoffset: 1;
-  animation: draw 640ms ease-in-out calc(900ms + var(--i) * 75ms) forwards;
+  animation: draw 600ms ease-in-out calc(760ms + var(--i) * 65ms) forwards;
 }
 
+/* Ujung bulat selebar 22 akan tampak sebagai titik tinta kalau putusnya tidak benar-benar nol. */
 .sig-reveal {
   fill: none;
   stroke: #fff;
   stroke-width: 22;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 1;
+  stroke-dasharray: 1 2;
   stroke-dashoffset: 1;
-  animation: draw 640ms ease-in-out calc(900ms + var(--i) * 75ms) forwards;
+  animation: draw 600ms ease-in-out calc(760ms + var(--i) * 65ms) forwards;
 }
 
 .sig-ink {
@@ -322,6 +349,13 @@ const signatureBox = `${signature.x} ${signature.y} ${signature.width} ${signatu
 }
 
 @keyframes splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes splash-skip {
   to {
     opacity: 0;
     visibility: hidden;

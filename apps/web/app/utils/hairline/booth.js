@@ -191,7 +191,7 @@ function mount({ stage, svg, read }, value) {
     frames.forEach((el, k) => {
       const top = sz - 4 - k * FRAME,
         bottom = Math.max(top - FRAME + 3, end),
-        shown = top - bottom > 2.5
+        shown = top - bottom > 0.3
       el.setAttribute(
         'd',
         shown

@@ -44,7 +44,7 @@ const LINES = [
   CT = 1.4,
   ET = 3,
   FLAP = 24
-const REST = 0.28,
+const REST = 0.26,
   PEN = 46,
   PR = 2.3
 // Tiap baris kecuali yang terakhir: 65% jatahnya untuk menulis, sisanya pulpen terangkat dan

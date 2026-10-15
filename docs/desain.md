@@ -100,7 +100,7 @@ Di awal setiap sesi, sebelum Beranda atau halaman aplikasi tampil, logo P-amplop
 4. kilau foil lewat sekali;
 5. "PostPocket" ditulis tangan huruf demi huruf di bawahnya. Template tanda tangan dari Kall diubah dari React ke Vue tanpa memuat font: garis tiap huruf disimpan di `app/utils/brand-signature.ts`.
 
-Totalnya 2,8 detik, lalu splash memudar ke halaman.
+Tanda tangannya selesai di 1,9 detik, logo dan tanda tangan yang utuh diam sebentar, lalu splash memudar ke halaman. Totalnya 3,1 detik.
 
 - **Sekali per sesi.** Skrip kecil di `<head>` (`app/utils/splash.ts`) memutuskan sebelum halaman tergambar, jadi tidak ada kedip.
 - **Tidak di halaman yang dibuka dari link:** surat, kotak, dan titip. Penerimanya datang untuk isinya.

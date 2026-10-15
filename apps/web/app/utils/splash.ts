@@ -12,8 +12,8 @@ export const SPLASH_KEY = 'postpocket:splash'
  */
 export const SPLASH_SKIP = ['/l/', '/k/', '/titip/', '/privasi', '/lisensi', '/lab']
 
-/** Lama splash dari awal sampai hilang, sama dengan animasi keluarnya di AppSplash. */
-export const SPLASH_MS = 2800
+/** Lama splash dari awal sampai dilepas dari halaman: animasi keluarnya di AppSplash selesai di 3060 ms. */
+export const SPLASH_MS = 3100
 
 /** Halaman ini boleh dibuka dengan splash. */
 export const splashRoute = (path: string) => !SPLASH_SKIP.some((prefix) => path.startsWith(prefix))

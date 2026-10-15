@@ -12,8 +12,9 @@ test('splash diputar sekali di awal sesi, lalu Beranda terlihat utuh', async ({ 
   await page.goto('/')
   const splash = page.getByTestId('splash')
   await expect(splash).toBeVisible()
-  // Logo P-amplop dan tanda tangan sepuluh huruf (garis, topeng, dan isi).
-  await expect(splash.locator('.signature path')).toHaveCount(30)
+  // Tanda tangan sepuluh huruf: garisnya ditulis sekali, lalu dipakai untuk goresan, topeng, dan isi.
+  await expect(splash.locator('.signature defs > path')).toHaveCount(10)
+  await expect(splash.locator('.signature use')).toHaveCount(30)
   await expect(splash).toHaveCount(0, { timeout: 8000 })
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 
@@ -32,6 +33,19 @@ test('ketukan melewati splash', async ({ page }) => {
   await expect(page.locator('[data-hairline] svg').first()).toBeAttached()
   await splash.click()
   await expect(splash).toHaveCount(0, { timeout: 1500 })
+})
+
+test('mengetuk splash di atas tautan tidak ikut membuka tautannya', async ({ page }) => {
+  await page.goto('/')
+  const splash = page.getByTestId('splash')
+  await expect(splash).toBeVisible()
+  await expect(page.locator('[data-hairline] svg').first()).toBeAttached()
+  // Ketuk tepat di atas tautan "Kotak surat" di header, yang tertutup splash.
+  const link = page.getByRole('banner').getByRole('link', { name: 'Kotak surat' })
+  const box = (await link.boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(splash).toHaveCount(0, { timeout: 1500 })
+  await expect(page).toHaveURL(/\/$/)
 })
 
 test('surat dari link dibuka tanpa splash', async ({ page }) => {
