@@ -46,6 +46,13 @@ test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, browser, req
   expect((await recipient.goto(url))?.status()).toBe(200)
   await expect(recipient.getByTestId('own-letter-note')).toHaveCount(0)
   expect(await openedAt()).toBeNull()
+  // POST /l/:slug/open yang pertama sengaja diputus seperti gangguan sesaat. Klien mencobanya
+  // sekali lagi, jadi suratnya tetap tercatat dibuka.
+  let openCalls = 0
+  await recipient.route(
+    (url) => /\/l\/[^/]+\/open$/.test(url.pathname),
+    (route) => (++openCalls === 1 ? route.abort('failed') : route.continue()),
+  )
   const card = recipient.getByRole('button', { name: /Surat untukmu/ })
   await card.click()
   await expect(card).toHaveAttribute('aria-pressed', 'true')
@@ -57,6 +64,7 @@ test('surat dikirim, dibuka penerima, lalu dibalas', async ({ page, browser, req
   await reader.getByRole('button', { name: 'Tutup' }).click()
   await expect(reader).toBeHidden()
   await expect.poll(openedAt).not.toBeNull()
+  expect(openCalls).toBe(2)
 
   await recipient.getByTestId('reply').click()
   await expect(recipient.getByTestId('reply-banner')).toBeVisible()

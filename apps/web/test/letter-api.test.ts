@@ -206,6 +206,19 @@ describe('createLetterApi', () => {
     expect(down).toHaveBeenCalledTimes(2)
   })
 
+  it('POST open juga dicoba sekali lagi setelah gangguan sesaat, karena idempoten', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')))
+      .mockImplementationOnce(async () => respond(200, { openedAt: 'a', photosExpireAt: 'b' }))
+    const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch, retryDelay: 0 })
+    await expect(api.open('x7Kp2qLm9A')).resolves.toEqual({ openedAt: 'a', photosExpireAt: 'b' })
+    expect(fetch.mock.calls.map(([url, init]) => `${init?.method} ${url}`)).toEqual([
+      'POST https://api.test/l/x7Kp2qLm9A/open',
+      'POST https://api.test/l/x7Kp2qLm9A/open',
+    ])
+  })
+
   it('kirim dan hapus tidak diulang otomatis', async () => {
     const fetch = vi.fn(async () => respond(503, 'Service Unavailable'))
     const api = createLetterApi({ base: 'https://api.test', apiKey: 'k', fetch, retryDelay: 0 })

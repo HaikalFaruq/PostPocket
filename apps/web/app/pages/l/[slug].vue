@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { byId, letter as letterPresets } from '@postpocket/presets'
 import { PHOTO_FRONT, cardRatio } from '~/utils/letter-draft'
-import { LetterApiError } from '~/utils/letter-api'
+import { LetterApiError, transient } from '~/utils/letter-api'
 import { shownFromApi } from '~/utils/letter-view'
 import { sentHere } from '~/utils/sent-letters'
 
@@ -106,8 +106,10 @@ watch(open, async (isOpen) => {
   try {
     const opened = await api.open(slug)
     letter.value = { ...letter.value, ...opened }
-  } catch {
-    // Gagal mencatat waktu dibuka tidak menghalangi membaca.
+  } catch (problem) {
+    // Gagal mencatat waktu dibuka tidak menghalangi membaca. Kalau gangguannya sesaat, kartu yang
+    // dibuka lagi mencatatnya lagi.
+    if (transient(problem)) marked = false
   }
 })
 

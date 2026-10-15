@@ -73,6 +73,16 @@ describe('klien kotak bareng', () => {
     expect(call(run, 2).url).toContain('/k/x7Kp2qLm9A')
   })
 
+  it('kotak yang dibuka penerima dicatat lagi setelah gangguan sesaat', async () => {
+    const { run, box } = api([json(503, {}), json(200, { openedAt: 'a', photosExpireAt: 'b' })])
+    await expect(box.open('x7Kp2qLm9A')).resolves.toEqual({ openedAt: 'a', photosExpireAt: 'b' })
+    expect(run).toHaveBeenCalledTimes(2)
+    for (const index of [0, 1]) {
+      expect(call(run, index).method).toBe('POST')
+      expect(call(run, index).url).toContain('/k/x7Kp2qLm9A/open')
+    }
+  })
+
   it('error dari kontrak jadi LetterApiError dengan kodenya', async () => {
     const { box } = api([
       json(409, { error: { code: 'box_not_open', message: 'belum' } }),

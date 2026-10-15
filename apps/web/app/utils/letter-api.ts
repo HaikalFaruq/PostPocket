@@ -307,7 +307,7 @@ export interface ApiOptions {
   base: string
   apiKey: string
   fetch?: typeof globalThis.fetch
-  /** Jeda sebelum GET dicoba sekali lagi, dalam milidetik. */
+  /** Jeda sebelum request yang aman diulang (`retryOnce`) dicoba sekali lagi, dalam milidetik. */
   retryDelay?: number
   /**
    * Region tempat fungsi dijalankan (kontrak 0.2.2, `forceFunctionRegion`). Tidak berlaku untuk
@@ -354,14 +354,22 @@ export function createApiCall(options: ApiOptions): ApiCall {
   }
 }
 
-/** GET yang aman diulang: dicoba sekali lagi setelah gangguan sesaat. */
-export async function getWithRetry<T>(call: ApiCall, path: string, delay = 400): Promise<T> {
+/**
+ * Request yang aman diulang, yaitu GET dan POST `/open` yang di kontrak idempoten: dicoba sekali
+ * lagi setelah gangguan sesaat.
+ */
+export async function retryOnce<T>(
+  call: ApiCall,
+  method: 'GET' | 'POST',
+  path: string,
+  delay = 400,
+): Promise<T> {
   try {
-    return await call<T>('GET', path)
+    return await call<T>(method, path)
   } catch (problem) {
     if (!transient(problem)) throw problem
     await new Promise((resolve) => setTimeout(resolve, delay))
-    return call<T>('GET', path)
+    return call<T>(method, path)
   }
 }
 
@@ -382,8 +390,12 @@ export function createLetterApi(options: ApiOptions): LetterApi {
     // Penerima jangan sampai melihat "Surat belum bisa dimuat" (atau WhatsApp gagal membaca
     // preview) karena satu gangguan sesaat, misalnya koneksi lama yang sudah diputus server saat
     // halaman di-SSR. Membaca surat aman diulang, jadi GET dicoba sekali lagi.
-    get: (slug) => getWithRetry<Letter>(call, `/l/${encodeURIComponent(slug)}`, options.retryDelay),
-    open: (slug) => call('POST', `/l/${encodeURIComponent(slug)}/open`),
+    get: (slug) =>
+      retryOnce<Letter>(call, 'GET', `/l/${encodeURIComponent(slug)}`, options.retryDelay),
+    // Waktu dibuka memulai hitungan 7 hari foto, jadi jangan sampai hilang karena satu gangguan
+    // sesaat. Panggilan berikutnya mengembalikan waktu yang sama.
+    open: (slug) =>
+      retryOnce(call, 'POST', `/l/${encodeURIComponent(slug)}/open`, options.retryDelay),
     remove: (id, editToken) => call('DELETE', `/letters/${encodeURIComponent(id)}`, { editToken }),
     async upload(target, file) {
       let response: Response
