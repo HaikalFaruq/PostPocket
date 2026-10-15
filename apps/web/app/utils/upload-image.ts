@@ -221,11 +221,23 @@ export async function renderOgImage(card: OgCard): Promise<UploadImage> {
       ctx.drawImage(layer.canvas, x, y, cardW, cardH)
     }
     if (card.foilBorder) {
-      const inset = cardW * 0.035
-      ctx.strokeStyle = metal(ctx, card.foil, width, height)
-      ctx.lineWidth = cardW * 0.012
-      roundedRect(ctx, x + inset, y + inset, cardW - inset * 2, cardH - inset * 2, radius)
-      ctx.stroke()
+      // Sama dengan .foil-border di FoilCard: garis tebal di luar dan garis tipis di dalam,
+      // 4% sisi pendek kartu dari tepi.
+      const cq = Math.min(cardW, cardH) / 100
+      const rule = Math.max(1.5 * unit, 0.8 * cq)
+      const gap = Math.max(1.5 * unit, 0.9 * cq)
+      const hair = Math.max(unit, 0.35 * cq)
+      ctx.beginPath()
+      for (const inset of [
+        4 * cq,
+        4 * cq + rule,
+        4 * cq + rule + gap,
+        4 * cq + rule + gap + hair,
+      ]) {
+        ctx.rect(x + inset, y + inset, cardW - inset * 2, cardH - inset * 2)
+      }
+      ctx.fillStyle = metal(ctx, card.foil, width, height)
+      ctx.fill('evenodd')
     }
     ctx.restore()
   }
