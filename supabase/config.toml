@@ -450,6 +450,13 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/k/index.ts"
 
+# Hapus akun (kontrak 0.4.0). verify_jwt mati seperti fungsi lain: access token user dicek sendiri
+# lewat auth.getUser(), supaya akun yang sudah dihapus ikut ditolak.
+[functions.account]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/account/index.ts"
+
 # Job pembersihan, dipanggil pg_cron lewat public.run_cleanup(). Diautentikasi sendiri dengan
 # token dari Vault atau secret key, bukan JWT.
 [functions.cleanup]

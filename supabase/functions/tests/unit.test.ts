@@ -257,6 +257,8 @@ Deno.test('routePattern membuang id dan slug dari path', () => {
   assertEquals(routePattern('/l/abcdefghij'), '/l/:slug')
   assertEquals(routePattern('/l/AbCdE12345/open'), '/l/:slug/open')
   assertEquals(routePattern('/cleanup'), '/cleanup')
+  assertEquals(routePattern('/account'), '/account')
+  assertEquals(routePattern('/account/lain'), '/:other')
   assertEquals(routePattern('/l'), '/:other')
   assertEquals(routePattern('/l/abcdefghij/bukan'), '/:other')
   assertEquals(routePattern('/letters/a/publish/lagi'), '/:other')
