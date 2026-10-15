@@ -429,9 +429,11 @@ function sprig(W) {
       for (const side of [1, -1]) {
         const spread = dir + side * (48 + random() * 16)
         const color = sage[(i * 2 + (side > 0 ? 0 : 1)) % sage.length]
-        if (i % foilEvery === 1 && side === (i % 2 ? 1 : -1))
+        art += roundLeaf(p.x, p.y, leafLen, spread, color, '#d5e1d3')
+        // Sebagian daun bertepi foil, tepat di garis tepi daunnya sendiri.
+        if (i % foilEvery === 1 && side === (i % 2 ? 1 : -1)) {
           foil += roundLeaf(p.x, p.y, leafLen, spread, '#000')
-        else art += roundLeaf(p.x, p.y, leafLen, spread, color, '#d5e1d3')
+        }
       }
     }
     art += roundLeaf(c.tip.x, c.tip.y, size * 0.52, c.tangent(1) - 8, sage[2], '#dfe8dd')
@@ -502,6 +504,32 @@ function sprig(W) {
   foil += `<path d="M${x + 4} ${y + 2}C${x + 15} ${y + 38} ${x + 32} ${y + 70} ${x + 60} ${y + 98}L${x + 42} ${y + 98}L${x + 40} ${y + 116}C${x + 19} ${y + 86} ${x + 4} ${y + 46} ${x - 4} ${y + 6}Z" fill="#000"/>`
   foil += `<ellipse cx="${x}" cy="${y + 2}" rx="12" ry="10" fill="#000"/>`
 
+  // Kartu mendatar: daun yang berguguran mengisi kiri dan kanan buket.
+  const drifting = []
+  if (wide > 1.1) {
+    for (const side of [-1, 1]) {
+      const edge = side < 0 ? 0 : W
+      for (const [dx, py, len, turn, gilded] of [
+        [0.1, 0.3, 54, 30, false],
+        [0.18, 0.5, 48, -40, true],
+        [0.11, 0.69, 58, 15, false],
+      ]) {
+        const px = edge - side * W * dx
+        drifting.push({ x: px, y: H * py })
+        const angle = side < 0 ? turn : 180 - turn
+        art += roundLeaf(
+          px,
+          H * py,
+          len,
+          angle,
+          sage[(drifting.length + 1) % sage.length],
+          '#d5e1d3',
+        )
+        if (gilded) foil += roundLeaf(px, H * py, len, angle, '#000')
+      }
+    }
+  }
+
   // Titik foil kecil di sekitar buket, di luar cincin.
   const dots = scatter(random, {
     count: Math.round(12 * Math.max(1, wide)),
@@ -510,7 +538,10 @@ function sprig(W) {
     y0: 70,
     y1: H - 80,
     gap: 90,
-    blocked: (px, py) => Math.hypot(px - cx, py - cy) < R + 50 || Math.hypot(px - x, py - y) < 170,
+    blocked: (px, py) =>
+      Math.hypot(px - cx, py - cy) < R + 50 ||
+      Math.hypot(px - x, py - y) < 170 ||
+      drifting.some((leafAt) => Math.hypot(px - leafAt.x, py - leafAt.y) < 70),
   })
   for (const p of dots) {
     foil += `<circle cx="${r1(p.x)}" cy="${r1(p.y)}" r="${r1(2.5 + random() * 3)}" fill="#000"/>`
@@ -716,13 +747,16 @@ function birthday(W) {
     foil += `<path d="M${r1(sx)} ${r1(sy)}C${r1(sx + 18)} ${r1(sy + 60)} ${r1(sx - 22)} ${r1(sy + 110)} ${r1(tie.x)} ${r1(tie.y)}" fill="none" stroke="#000" stroke-width="2"/>`
   }
   const left = Math.max(110, cx - cw / 2 - 120)
-  const tieL = { x: cx - cw / 2 - 30, y: plate - 40 }
+  // Tali balon diikat di ujung piring kue, dengan simpul foil.
+  const tieL = { x: cx - cw / 2 - 16, y: plate + 2 }
+  foil += `<circle cx="${r1(tieL.x)}" cy="${r1(tieL.y)}" r="6" fill="#000"/>`
   balloon(left - 30, 420, 50, palette[0], tieL)
   balloon(left + 52, 350, 46, palette[3], tieL)
   balloon(left + 8, 540, 42, palette[2], tieL)
   if (W > 900) {
     const right = W - Math.max(110, W - (cx + cw / 2 + 120))
-    const tieR = { x: cx + cw / 2 + 30, y: plate - 40 }
+    const tieR = { x: cx + cw / 2 + 16, y: plate + 2 }
+    foil += `<circle cx="${r1(tieR.x)}" cy="${r1(tieR.y)}" r="6" fill="#000"/>`
     balloon(right + 30, 410, 50, palette[1], tieR)
     balloon(right - 52, 345, 44, palette[4], tieR)
     balloon(right - 6, 530, 42, palette[0], tieR)

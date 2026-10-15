@@ -421,6 +421,7 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
   inset: 0;
   padding: 10cqw 9cqw;
   font-family: var(--font-letter);
+  word-spacing: var(--letter-word-spacing);
   font-size: 8cqw;
   line-height: 1.25;
 }

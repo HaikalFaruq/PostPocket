@@ -98,15 +98,33 @@ function keepFocusIfHover(event: Event) {
   if (byHover) event.preventDefault()
 }
 onBeforeUnmount(() => clearTimeout(closing))
+
+// Thumbnail yang dipilih selalu terlihat di barisnya, misalnya foto kamu di ujung kanan.
+const row = ref<{ $el: HTMLElement } | null>(null)
+function showChecked() {
+  const el = row.value?.$el
+  const tile = el?.querySelector<HTMLElement>('[data-state="checked"]')
+  if (!el || !tile) return
+  const left = tile.offsetLeft - el.offsetLeft
+  if (left < el.scrollLeft) el.scrollLeft = left - 4
+  else if (left + tile.offsetWidth > el.scrollLeft + el.clientWidth) {
+    el.scrollLeft = left + tile.offsetWidth - el.clientWidth + 4
+  }
+}
+watch([model, () => props.shape.id], () => nextTick(showChecked))
+onMounted(showChecked)
 </script>
 
 <template>
+  <!-- Satu baris yang bisa digeser: tingginya tetap saat thumbnail melebar di bentuk Mendatar,
+       jadi pilihan Bentuk di bawahnya tidak berpindah di bawah jari. -->
   <RadioGroupRoot
+    ref="row"
     v-model="model"
     aria-label="Gambar depan"
     orientation="horizontal"
     loop
-    class="flex flex-wrap gap-2"
+    class="front-row"
   >
     <RadioGroupItem
       v-for="item in illustrations"
@@ -152,7 +170,7 @@ onBeforeUnmount(() => clearTimeout(closing))
         <PopoverTrigger as-child>
           <button
             type="button"
-            class="grid size-9 place-items-center rounded-full text-ink-muted hover:bg-fill hover:text-ink"
+            class="relative grid size-9 place-items-center rounded-full text-ink-muted before:absolute before:-inset-1 before:content-[''] hover:bg-fill hover:text-ink"
             aria-label="Ukuran foto yang pas"
             data-testid="photo-size-info"
             @pointerenter="onInfoEnter"
@@ -222,8 +240,31 @@ onBeforeUnmount(() => clearTimeout(closing))
 </template>
 
 <style scoped>
+.front-row {
+  display: flex;
+  gap: 8px;
+  /* Ruang untuk cincin pilihan dan fokus keyboard, yang terpotong di tepi wadah yang digeser. */
+  margin: -4px;
+  padding: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+@media (pointer: coarse) {
+  .front-row {
+    scrollbar-width: none;
+  }
+
+  .front-row::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 .front-tile {
   flex: none;
+  scroll-snap-align: start;
   height: 60px;
   padding: 2px;
   border-radius: 7px;
