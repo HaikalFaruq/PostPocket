@@ -11,7 +11,7 @@ import {
   formatWhen as formatWhenIn,
 } from '~/utils/box-time'
 import { missingBox } from '~/utils/box-api'
-import { LetterApiError } from '~/utils/letter-api'
+import { LetterApiError, transient } from '~/utils/letter-api'
 import { letterFront, shownFromBox } from '~/utils/letter-view'
 import { boxHere } from '~/utils/my-boxes'
 
@@ -154,8 +154,10 @@ async function onOpened(id: string) {
   try {
     const opened = await api.open(slug)
     box.value = { ...box.value, ...opened }
-  } catch {
-    // Gagal mencatat waktu dibuka tidak menghalangi membaca.
+  } catch (problem) {
+    // Gagal mencatat waktu dibuka tidak menghalangi membaca. Kalau gangguannya sesaat, surat
+    // berikutnya yang dibuka mencatatnya lagi.
+    if (transient(problem)) marked = false
   }
 }
 

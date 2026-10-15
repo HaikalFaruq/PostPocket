@@ -185,6 +185,13 @@ test('pembuat bikin kotak, dua teman menitip, penerima membaca satu per satu lal
   // Penerima: kotak terbuka, surat dibaca satu per satu.
   await rani.reload()
   await expect(rani.getByTestId('box-hint')).toBeVisible()
+  // POST /k/:slug/open yang pertama sengaja diputus, seperti gangguan sesaat yang pernah terlihat
+  // di produksi. Klien mencobanya sekali lagi, jadi kotaknya tetap tercatat dibuka.
+  let openCalls = 0
+  await rani.route(
+    (url) => /\/k\/[^/]+\/open$/.test(url.pathname),
+    (route) => (++openCalls === 1 ? route.abort('failed') : route.continue()),
+  )
   await rani.getByTestId('folder-toggle').click()
   await rani.getByTestId('box-read').click()
   const viewer = rani.getByTestId('letter-viewer')
@@ -201,6 +208,7 @@ test('pembuat bikin kotak, dua teman menitip, penerima membaca satu per satu lal
   await expect
     .poll(async () => (await (await request.get(`/mock-api/k/${slug}`)).json()).openedAt)
     .not.toBeNull()
+  expect(openCalls).toBe(2)
   await viewer.getByTestId('viewer-next').click()
   await expect(viewer.getByTestId('viewer-title')).toHaveText('Dari Sari')
   await shownCard(viewer)

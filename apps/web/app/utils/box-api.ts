@@ -1,7 +1,7 @@
 import type { LetterContent, LetterDesign } from '@postpocket/presets'
 import {
   createApiCall,
-  getWithRetry,
+  retryOnce,
   type ApiOptions,
   type Asset,
   type LetterApiError,
@@ -136,13 +136,16 @@ export function createBoxApi(options: ApiOptions): BoxApi {
       call('DELETE', `${box(id)}/letters/${encodeURIComponent(letterId)}`, { editToken }),
     // Dibaca SSR untuk preview WhatsApp, jadi diulang sekali seperti GET surat.
     invite: (code) =>
-      getWithRetry<BoxInvite>(
+      retryOnce<BoxInvite>(
         call,
+        'GET',
         `/boxes/invite/${encodeURIComponent(code)}`,
         options.retryDelay,
       ),
     forRecipient: (slug) =>
-      getWithRetry<RecipientBox>(call, `/k/${encodeURIComponent(slug)}`, options.retryDelay),
-    open: (slug) => call('POST', `/k/${encodeURIComponent(slug)}/open`),
+      retryOnce<RecipientBox>(call, 'GET', `/k/${encodeURIComponent(slug)}`, options.retryDelay),
+    // Idempoten seperti POST /l/{slug}/open, jadi diulang sekali juga.
+    open: (slug) =>
+      retryOnce(call, 'POST', `/k/${encodeURIComponent(slug)}/open`, options.retryDelay),
   }
 }
