@@ -4,4 +4,5 @@
   <NuxtPage />
   <PwaUpdateToast />
   <DraftChoiceDialog />
+  <AppSplash />
 </template>
