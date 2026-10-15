@@ -24,7 +24,7 @@ Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 - nama modul di Beranda, seperti label tulisan tangan di bawah gambarnya;
 - tanda tangan "PostPocket" di splash.
 
-Halaman info dan angka (bulan di Pocket, tanggal) tetap Gantari supaya mudah dibaca. Font cadangannya diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), jadi teks tidak melompat saat Gantari selesai dimuat.
+Spasi Delicious Handrawn sangat sempit ("ulang tahun" terbaca "ulangtahun"), jadi tulisan tangan yang lebih dari satu kata memakai jarak kata 0,15 em (`--letter-word-spacing`). Halaman info dan angka (bulan di Pocket, tanggal) tetap Gantari supaya mudah dibaca. Font cadangannya diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), jadi teks tidak melompat saat Gantari selesai dimuat.
 
 **Modul.** Pocket dan TV memakai kertas dan tinta yang sama dengan Beranda. Ciri tiap modul ada di bendanya: kantong jajan dan jepitan kayu (utility `clothespin`) di Pocket, TV jadul berlayar VT323 di Memori TV dan Booth, dan folder kaca buram dengan panel belakang bercorak cairan di Kotak surat. Seni folder dilukis dari resep warna di preset (`kotak.json`). Resep bawaannya memakai merah dan biru par avion, karena folder itu juga membingkai surat.
 
