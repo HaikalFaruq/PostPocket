@@ -24,7 +24,7 @@ onMounted(async () => {
   if (typeof query.error_description === 'string') {
     loginFailed.value =
       query.error === 'access_denied'
-        ? 'Login dibatalkan. Selama beta, hanya akun Google tester yang bisa masuk.'
+        ? 'Login dibatalkan. Fotomu tetap tersimpan di perangkat ini.'
         : 'Login Google gagal. Coba lagi.'
   }
   await sync.start()
@@ -107,7 +107,7 @@ const tone = computed(() => {
         {{ loginFailed || sync.error }}
       </p>
       <p class="mt-2 text-[12px] text-pocket-muted">
-        Selama beta, cadangan maksimal 100 foto dan hanya untuk akun tester yang didaftarkan.
+        Selama beta, cadangan maksimal 100 foto per akun.
         <NuxtLink to="/privasi" class="underline underline-offset-2">Privasi</NuxtLink>
       </p>
     </template>
