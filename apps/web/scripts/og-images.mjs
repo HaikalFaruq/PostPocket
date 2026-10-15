@@ -3,8 +3,8 @@
 // - og-beranda.jpg: link Beranda;
 // - og-kotak.jpg dan og-titip.jpg: link buka dan link titip kotak bareng, dengan folder kaca.
 // Disusun dengan HTML dari ilustrasi dan warna foil emas milik sendiri, lalu dirender Chromium
-// milik Playwright, dengan bingkai par avion dan huruf Gantari (docs/desain.md). Fontnya diambil
-// dari Google Fonts saat skrip jalan.
+// milik Playwright, di kanvas berkisi titik seperti Beranda, dengan huruf Gantari dan kata "surat"
+// dalam Delicious Handrawn (docs/desain.md). Fontnya diambil dari Google Fonts saat skrip jalan.
 //
 //   node scripts/og-images.mjs                 # semua gambar
 //   node scripts/og-images.mjs og-kotak.jpg    # hanya gambar tertentu
@@ -20,10 +20,9 @@ const svg = (path) =>
 // Lockup logo (app/utils/brand-logo.ts): P-amplop dan wordmark yang sudah jadi garis.
 const logo = `data:image/svg+xml;base64,${Buffer.from(brandLockupSvg()).toString('base64')}`
 
-// Sama dengan --color-canvas, --color-ink, --color-post-red, kertas krem, dan foil emas di preset.
+// Sama dengan --color-canvas, --color-ink, kertas krem, dan foil emas di preset.
 const canvas = '#f1f4f8'
 const ink = '#18204a'
-const red = '#e23b3b'
 const paper = '#f2eadb'
 const gold = { shade: '#6f5112', base: '#c9a227', light: '#fff1b8' }
 
@@ -70,22 +69,32 @@ function page({ title, note, visual }) {
   const metal = `linear-gradient(115deg, ${gold.shade} 0%, ${gold.base} 22%, ${gold.light} 40%, ${gold.base} 58%, ${gold.shade} 78%, ${gold.base} 100%)`
   const mask = svg('illustrations/meadow-foil.svg')
   return `<!doctype html><html><head>
-<link href="https://fonts.googleapis.com/css2?family=Gantari:wght@500;700&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gantari:wght@500;700&family=Delicious+Handrawn&display=block" rel="stylesheet">
 <style>
   html, body { margin: 0; }
   body {
-    width: 1200px; height: 630px; overflow: hidden; box-sizing: border-box; padding: 26px;
-    background: repeating-linear-gradient(-45deg, ${red} 0 24px, #fff 24px 36px, ${ink} 36px 60px, #fff 60px 72px);
-    color: ${ink}; font-family: 'Gantari', sans-serif;
+    width: 1200px; height: 630px; overflow: hidden; box-sizing: border-box;
+    background: ${canvas}; color: ${ink}; font-family: 'Gantari', sans-serif;
   }
   .sheet {
-    height: 100%; display: grid; grid-template-columns: 1fr 440px; align-items: center;
-    background: ${canvas};
+    position: relative; height: 100%; display: grid; grid-template-columns: 1fr 470px;
+    align-items: center;
   }
-  .copy { padding-left: 74px; }
+  /* Kisi titik Hairline di belakang kartu, memudar ke tepi, sama dengan panggung di Beranda. */
+  .sheet::before {
+    content: ''; position: absolute; top: 40px; bottom: 40px; right: 10px; width: 560px;
+    background-image: radial-gradient(circle, rgb(24 32 74 / 0.16) 1.3px, transparent 1.8px),
+      radial-gradient(circle, rgb(24 32 74 / 0.16) 1.3px, transparent 1.8px);
+    background-position: 0 0, 12px 6px; background-size: 24px 12px;
+    -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent);
+    mask-image: radial-gradient(closest-side, #000 35%, transparent);
+  }
+  .sheet > * { position: relative; }
+  .copy { padding-left: 96px; }
+  .hand { font-family: 'Delicious Handrawn', cursive; font-size: 1.16em; font-weight: 400; letter-spacing: normal; line-height: 1; }
   .brand { display: flex; }
   .brand img { height: 52px; width: auto; }
-  h1 { margin: 40px 0 0; max-width: 580px; font-size: 70px; line-height: 0.98; font-weight: 700; letter-spacing: -0.035em; }
+  h1 { margin: 40px 0 0; max-width: 580px; font-size: 70px; line-height: 0.98; font-weight: 700; letter-spacing: -0.035em; text-wrap: balance; }
   p { margin: 22px 0 0; font-size: 30px; font-weight: 500; color: rgb(24 32 74 / 0.66); }
   .card {
     position: relative; width: 318px; height: 442px; border-radius: 5px; overflow: hidden;
@@ -120,7 +129,7 @@ function page({ title, note, visual }) {
 </style></head><body><div class="sheet">
   <div class="copy">
     <div class="brand"><img src="${logo}" alt="PostPocket"></div>
-    <h1>${title}</h1>
+    <h1>${title.replace('surat', '<span class="hand">surat</span>')}</h1>
     <p>${note}</p>
   </div>
   ${

@@ -28,6 +28,14 @@ test('logo P-amplop di header bernama PostPocket dan kembali ke Beranda', async 
   expect(beta!.y + beta!.height).toBeLessThan(logo!.y + logo!.height * 0.75)
 })
 
+test('garis di atas kerumunan digambar begitu terlihat', async ({ page }) => {
+  await page.goto('/')
+  const line = page.getByTestId('crowd-line')
+  await expect(line).not.toHaveClass(/is-drawn/)
+  await line.scrollIntoViewIfNeeded()
+  await expect(line).toHaveClass(/is-drawn/)
+})
+
 test('Tulis surat membuka editor surat', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('link', { name: 'Tulis surat' }).click()

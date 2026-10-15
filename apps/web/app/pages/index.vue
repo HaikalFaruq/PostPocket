@@ -97,36 +97,35 @@ const modules = [
 
       <main class="flex-1">
         <section class="flex flex-col items-center pt-2 text-center sm:pt-6">
-          <!-- Pembuka: surat contoh dalam amplop par avion, yang bisa langsung dibuka. -->
+          <!-- Pembuka: surat contoh yang bisa langsung dibuka, di panggung berkisi titik seperti
+               figur di bawahnya, tanpa bingkai. -->
           <figure class="w-full max-w-[400px]">
-            <div class="airmail">
-              <div class="relative h-[clamp(240px,38dvh,360px)] rounded-[3px] bg-canvas">
-                <ClientOnly>
-                  <FoilCard
-                    v-model:open="open"
-                    :art="example.art"
-                    :foil-mask="example.foil"
-                    :foil="foil"
-                    :paper="paper"
-                    :ratio="example.ratio"
-                    label="Contoh surat"
-                  >
-                    <template #inside>
-                      <p>Untukmu,</p>
-                      <p>hari ini seru banget. Makasih udah nemenin!</p>
-                      <p class="mt-[6cqw] text-right">PostPocket</p>
-                    </template>
-                  </FoilCard>
-                  <template #fallback>
-                    <div class="grid size-full place-items-center">
-                      <div
-                        class="aspect-[0.72] h-[72%] rounded-[3px]"
-                        :style="{ backgroundColor: paper.color }"
-                      />
-                    </div>
+            <div class="dot-stage h-[clamp(240px,38dvh,360px)]">
+              <ClientOnly>
+                <FoilCard
+                  v-model:open="open"
+                  :art="example.art"
+                  :foil-mask="example.foil"
+                  :foil="foil"
+                  :paper="paper"
+                  :ratio="example.ratio"
+                  label="Contoh surat"
+                >
+                  <template #inside>
+                    <p>Untukmu,</p>
+                    <p>hari ini seru banget. Makasih udah nemenin!</p>
+                    <p class="mt-[6cqw] text-right">PostPocket</p>
                   </template>
-                </ClientOnly>
-              </div>
+                </FoilCard>
+                <template #fallback>
+                  <div class="grid size-full place-items-center">
+                    <div
+                      class="aspect-[0.72] h-[72%] rounded-[3px]"
+                      :style="{ backgroundColor: paper.color }"
+                    />
+                  </div>
+                </template>
+              </ClientOnly>
             </div>
             <figcaption class="mt-3 text-caption text-ink-muted">
               Contoh surat. Ketuk untuk membuka, geser untuk memutar.
@@ -136,10 +135,7 @@ const modules = [
           <h1
             class="mt-10 max-w-[14ch] text-[40px] leading-[1.02] font-bold tracking-[-0.035em] text-balance sm:text-[58px]"
           >
-            Kenangan kecil, dikirim jadi
-            <span class="font-letter text-[1.16em] leading-none font-normal tracking-normal"
-              >surat</span
-            >.
+            Kenangan kecil, dikirim jadi <span class="hand-word">surat</span>.
           </h1>
           <p class="mt-4 max-w-[34rem] text-[16px] leading-relaxed text-pretty text-ink-muted">
             Tulis kartu foil 3D, simpan satu momen setiap hari, dan foto bareng di booth. Semua
@@ -160,7 +156,7 @@ const modules = [
               :data-testid="`modul-${item.id}`"
             >
               <HairlineFigure :figure="item.figure" class="w-full max-w-[380px]" />
-              <h2 class="text-[21px] font-bold tracking-[-0.02em]">{{ item.title }}</h2>
+              <h2 class="font-letter text-[30px] leading-none">{{ item.title }}</h2>
               <p class="mt-1.5 max-w-[32ch] text-pretty text-ink-muted">{{ item.text }}</p>
               <TagButton :to="item.to" :label="item.action" :tags="item.tags" />
             </li>
@@ -174,7 +170,7 @@ const modules = [
             </span>
           </span>
           <span class="min-w-0 flex-1">
-            <span class="block text-[17px] font-bold tracking-[-0.02em]">Kotak surat</span>
+            <span class="block font-letter text-[25px] leading-none">Kotak surat</span>
             <span class="mt-0.5 block text-ink-muted">
               {{
                 kotakBareng
@@ -193,16 +189,13 @@ const modules = [
             id="crowd-title"
             class="mx-auto max-w-[22ch] text-[24px] leading-tight font-bold tracking-[-0.025em] text-balance sm:text-[28px]"
           >
-            Untuk siapa pun yang mau kamu kirimi surat.
+            Untuk siapa pun yang mau kamu kirimi <span class="hand-word">surat</span>.
           </h2>
           <p class="mx-auto mt-2 max-w-md text-pretty text-ink-muted">
             Teman sekelas, keluarga, atau orang yang baru kamu kenal hari ini. Mereka cukup membuka
             satu link.
           </p>
-          <span
-            class="mx-auto mt-6 block h-12 w-px bg-linear-to-b from-transparent to-ink/30"
-            aria-hidden="true"
-          />
+          <CrowdLine class="mx-auto mt-6" />
         </section>
       </main>
     </div>
