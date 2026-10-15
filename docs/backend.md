@@ -191,7 +191,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Sprint 4 dan beta (minggu 8–10)**
 
 - [x] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS: [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi `phase2` dan test `phase2.test.sql`
-- [ ] Login Google: OAuth client dan provider di dashboard, dipasang bareng Kall ([Login Google](#login-google))
+- [x] Login Google: OAuth client dan provider di dashboard, dipasang bareng Kall 15 Oktober 2026, provider Email dimatikan 16 Oktober ([Login Google](#login-google)). Hapus akun (#62, #63) sudah dicek di produksi lewat akun tester dan UI
 - [x] Edge Function `account` untuk `DELETE /account` (kontrak 0.4.0): hapus berkas `moments/<user_id>/…` lewat Storage API, lalu `auth.admin.deleteUser`; sesi dicek dengan `auth.getUser(token)`. Test integrasi `tests/account.test.ts`: tanpa token, token salah, dan akun yang sudah dihapus `401`, akun lain tidak tersentuh, berkas dan baris hilang
 - [ ] Lingkungan beta
 - [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
@@ -303,7 +303,7 @@ Login fase 2 hanya lewat Google (keputusan #47). Kall membuat OAuth client di Go
 Bintang mengundang email Kall ke organisasi Supabase dulu (Organization → Team), lalu:
 
 - Sign In / Providers → Google: aktifkan, isi Client ID dan Client Secret (Kall).
-- Sign In / Providers → Email: matikan provider Email ("Enable Email provider"). Jangan pakai "Allow new users to sign up" di pengaturan umum, karena itu ikut menutup pendaftaran lewat Google. Sampai sekarang provider email di produksi masih nyala (dicek lewat `/auth/v1/settings`), dan PostPocket tidak memakainya.
+- Sign In / Providers → Email: matikan provider Email ("Enable Email provider"). Jangan pakai "Allow new users to sign up" di pengaturan umum, karena itu ikut menutup pendaftaran lewat Google. Di produksi provider Email sudah dimatikan sejak 16 Oktober 2026 (`/auth/v1/settings`: `email: false`, `google: true`), karena PostPocket hanya memakai tombol Google. Akibatnya tes ke produksi tidak bisa lagi memakai akun email dan password; tes yang butuh login di produksi lewat akun Google di UI.
 - URL Configuration: Site URL `https://postpocket.vercel.app`, Redirect URLs `https://postpocket.vercel.app/**`. Preview Vercel dan localhost tidak didaftarkan, sama seperti CORS: REST Supabase menerima origin mana pun, jadi redirect ke localhost membuat `pnpm dev` bisa login dan menulis tabel fase 2 di produksi. Login saat development lewat stack lokal, yang Site URL-nya sudah `http://localhost:3000` di `config.toml` dan callback-nya `http://127.0.0.1:54321/auth/v1/callback` (sudah didaftarkan di Google).
 
 **3. Cek setelah setup**
