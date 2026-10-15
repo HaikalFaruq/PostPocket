@@ -32,6 +32,15 @@ Halaman info dan angka (bulan di Pocket, tanggal) tetap Gantari supaya mudah dib
 
 **Satu hal yang berani.** Kartu foil itu sendiri, ditambah kata "surat" yang ditulis tangan. Sejak 15 Oktober 2026 kartu contoh di Beranda, surat penerima, dan gambar OG tidak lagi dibingkai garis par avion merah-biru (Kall: "jatohnya kaya barbershop"). Kartunya melayang di panggung `dot-stage`, kisi titik yang memudar seperti panggung figur Hairline. Bagian lain dibuat tenang.
 
+**Desain kartu siap pakai.** Sejak 16 Oktober 2026 ada lima desain sampul, masing-masing digambar ulang untuk setiap bentuk kartu (Asli, Tegak, Persegi, Mendatar), jadi tidak ada yang terpotong atau membesar. Ulang tahun dan Lebaran baru ditawarkan di editor setelah fungsi `letters` di-deploy ulang ([frontend.md](frontend.md#kartu-dan-isi-surat)):
+- **Padang bunga:** ladang bunga di bawah, karangan daun foil dan dua kupu-kupu foil di atasnya.
+- **Ranting:** buket eukaliptus, zaitun, dan beri di depan cincin foil ganda, diikat pita foil. Sebagian daunnya hanya garis foil.
+- **Malam berbintang:** bukit berlapis dengan cemara dan pondok berjendela foil; bulan sabit, rasi, dan bintang jatuh dari foil.
+- **Ulang tahun:** untaian bendera segitiga, balon dengan kilau foil, dan kue bertingkat dengan nyala lilin foil.
+- **Lebaran:** ketupat bergantung pada tali foil, bulan sabit dengan bintang segi delapan, dan masjid berkubah dengan jendela foil.
+
+Bingkai foil di tepi berupa dua garis, tebal di luar dan tipis di dalam, seperti bingkai kartu ucapan cetak. Isi surat tidak pernah saling menimpa: tulisan yang panjang diperkecil sampai muat di pitanya, dan bingkai foto mengikuti bentuk fotonya.
+
 **Beranda bergaris tipis.** Sejak 15 Oktober 2026 Beranda memakai gaya [Hairline](https://hairline.lucasmarkes.com), pilihan Kall: figur isometrik dari satu garis tinta di atas putih, satu garis terang sebagai satu-satunya sorotan, dan kisi titik yang memudar di belakangnya. Modul tetap dibuka dengan bendanya (aturan 1), hanya digambar sebagai garis: surat dan amplop, kantong jajan di tali jemuran, bilik foto. Tiga panelnya satu pita bersekat, bukan tiga kartu yang sama. Kerumunan Open Peeps di atas footer diwarnai tinta yang sama dan berjalan pelan, supaya tidak mengalahkan isi halaman.
 
 Garis dari judul kerumunan ke kerumunannya (`CrowdLine`) ikut bergerak seperti garis Hairline:
