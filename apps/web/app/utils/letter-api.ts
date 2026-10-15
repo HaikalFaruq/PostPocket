@@ -316,10 +316,11 @@ export interface ApiOptions {
   region?: string
 }
 
+/** `bearer`: access token sesi login, khusus `DELETE /account` (kontrak 0.4.0). */
 export type ApiCall = <T>(
   method: string,
   path: string,
-  init?: { body?: unknown; editToken?: string; alsoOk?: number },
+  init?: { body?: unknown; editToken?: string; bearer?: string; alsoOk?: number },
 ) => Promise<T>
 
 /**
@@ -334,11 +335,12 @@ export function createApiCall(options: ApiOptions): ApiCall {
   return async function call<T>(
     method: string,
     path: string,
-    init: { body?: unknown; editToken?: string; alsoOk?: number } = {},
+    init: { body?: unknown; editToken?: string; bearer?: string; alsoOk?: number } = {},
   ) {
     const headers: Record<string, string> = { apikey: options.apiKey }
     if (init.body !== undefined) headers['content-type'] = 'application/json'
     if (init.editToken) headers['x-edit-token'] = init.editToken
+    if (init.bearer) headers.authorization = `Bearer ${init.bearer}`
     let response: Response
     try {
       response = await run(`${base}${path}${query}`, {

@@ -239,7 +239,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Pesan saat kuota penuh (`23514`, 100 foto). Unggah yang ditolak policy menggagalkan sinkron itu dan dicoba lagi, kecuali unggah ulang berkas yang hilang, yang dilewati per foto
 - [x] `/privasi` menjelaskan akun Google dan cadangan foto, sebelum login dibuka
 - [x] Sinkron baru dinyalakan di produksi setelah job pembersihan berkas dan baris berstatus hapus dari Bintang ada (#52). Kartu Cadangan baru muncul kalau provider Google sudah aktif
-- [ ] Hapus akun dari aplikasi, setelah Edge Function hapus akun dari Bintang ada. Sampai itu, `/privasi` mengarahkan ke Lapor masalah
+- [x] Hapus akun dari kartu Cadangan (kontrak 0.4.0), tanpa login ulang ([Sinkron Pocket](#sinkron-pocket)). `/privasi` menjelaskan caranya, dan Lapor masalah tetap ada untuk yang tidak bisa masuk lagi
 
 ## Sinkron Pocket
 
@@ -251,19 +251,27 @@ Login Google mencadangkan dan menyinkronkan Pocket, TV, dan Booth antar perangka
 | `app/utils/sync-run.ts` (`runSync`) | Satu putaran: tarik, unduh foto baru dulu, gabungkan, kirim perubahan, lalu unggah ulang berkas yang hilang dari cadangan |
 | `app/utils/sync.ts` | Bentuk baris tabel dan aturan gabung (`mergeRemote`), fungsi murni |
 | `app/utils/sync-supabase.ts` | `SyncBackend` di atas PostgREST dan bucket `moments`. Tarikan per halaman 1.000 baris diurutkan `updated_at` lalu kunci unik (`id`, atau `day` untuk kantong), karena baris dari satu upsert punya `updated_at` yang sama persis |
-| `app/components/pocket/BackupCard.vue` | Kartu Cadangan di bawah kalender: tombol Google, status, kuota, keluar |
+| `app/components/pocket/BackupCard.vue` | Kartu Cadangan di bawah kalender: tombol Google, status, kuota, keluar, dan Hapus akun (`DeleteAccountDialog.vue`) |
+| `app/utils/account-api.ts` | `DELETE /account` (kontrak 0.4.0) dengan sesi login di `Authorization: Bearer`. Alamatnya selalu fungsi Supabase (`useAccountApiOptions`), juga saat `NUXT_PUBLIC_API_BASE` menunjuk mock |
 
 Aturannya:
 - **Catatan perubahan.** Setiap perubahan kenangan dicatat di `MemoryData.pending` dalam tulisan yang sama dengan datanya, dengan nomor urut. Baris yang tercatat tapi sudah tidak ada berarti dihapus. Nomor urut menjaga perubahan yang terjadi selama sinkron supaya tidak ikut dianggap terkirim. Semua perubahan data store dibaca dan ditulis tanpa jeda `await`, supaya sinkron di belakang tidak menimpa perubahan user.
 - **Tulisan terakhir menang** dihitung saat kirim. Baris yang masih menunggu dikirim menang dari server, tapi momen yang hanya ada di server tetap ditambahkan ke urutan kantong dan album. Baris lain mengikuti server, dan momen yang hanya ada di perangkat ditempel lagi lalu dikirim ulang.
 - **Sinkron pertama** akun di perangkat (dicatat per akun di `postpocket:sync`): server menang untuk baris yang ada di kedua tempat, data yang hanya ada di perangkat dikirim, dan tanda hapus lama tidak pernah menghapus apa pun.
-- **Ganti akun.** Perangkat yang sebelumnya tersinkron ke akun lain bertanya dulu. Kalau user setuju, semua momen dan album mendapat id baru (`withNewIds`), karena id di cadangan unik untuk semua akun. Fotonya tetap di kunci lamanya (`photoKey`).
+- **Ganti akun.** Perangkat yang sebelumnya tersinkron ke akun lain bertanya dulu. Kalau user setuju, semua momen dan album mendapat id baru (`withNewIds`), karena id di cadangan unik untuk semua akun. Fotonya tetap di kunci lamanya (`photoKey`). Email yang sama dengan id baru tidak ditanya (`asksBeforeMerging`): akun lamanya sudah dihapus lalu dibuat lagi lewat akun Google yang sama, jadi kenangannya memang milik orang yang sama.
+- **Hapus akun.** Tidak perlu login ulang, karena pemegang sesi juga bisa menghapus semua cadangan lewat sinkron. Dialognya menyebut yang ikut terhapus dan yang tetap ada, dengan fokus awal di Batal.
+  - `removeAccount()` memanggil `DELETE /account`, lalu keluar di perangkat ini.
+  - `postpocket:sync` sengaja tidak dihapus. Akun Google yang sama yang masuk lagi tidak ditanya (lihat Ganti akun), tapi akun lain tetap ditanya dulu sebelum kenangan di perangkat ini digabung ke cadangannya.
+  - 401 juga dianggap selesai, misalnya kalau jawaban 204 sebelumnya hilang di jalan. Error lain ditampilkan di dialog, dan user tetap masuk.
+  - Selama sinkron berjalan, tombolnya mati, dan selama akun dihapus, sinkron tidak dimulai.
+  - Kenangan di perangkat, surat, dan kotak bareng tidak ikut terhapus.
+  - Perangkat lain keluar sendiri saat token-nya diperbarui, paling lama 1 jam. Sampai itu, sinkron di sana ditolak server.
 - **Foto.** Foto dari cadangan diunduh sebelum momennya ditampilkan. Yang gagal diunduh ditarik lagi di sinkron berikutnya. Yang naik selalu versi kompres JPEG ≤ 500.000 byte.
 - **Kartu Cadangan** hanya muncul kalau URL Supabase diisi dan provider Google aktif (`/auth/v1/settings`), atau user sudah login. Tanpa itu, isinya tetap pengingat bahwa kenangan hanya ada di perangkat ini.
 
 **Uji.**
 - `test/sync.test.ts` menguji aturan gabung dan `runSync` dengan server palsu.
-- `e2e/sinkron.spec.ts` menguji dua perangkat, hapus, kuota, unggah ulang, ganti akun, dan tombol Google ke stack Supabase lokal. Butuh Docker:
+- `e2e/sinkron.spec.ts` menguji dua perangkat, hapus, kuota, unggah ulang, ganti akun, hapus akun, dan tombol Google ke stack Supabase lokal. Stack di CI tidak menjalankan Edge Functions, jadi tes hapus akun menjawab `DELETE /account` dari dalam tes: tesnya memeriksa header, menghapus berkas dan akunnya lewat admin API sesuai kontrak, lalu menjawab 204. Butuh Docker:
 
 ```sh
 npx supabase@2.120.0 start -x studio,imgproxy,mailpit,realtime,logflare,vector,supavisor,postgres-meta,edge-runtime

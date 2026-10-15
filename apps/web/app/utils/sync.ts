@@ -58,6 +58,21 @@ export interface RemoteChanges {
 export type Outgoing<Row> = Omit<Row, 'updated_at'>
 
 /**
+ * Kenangan di perangkat ini sebelumnya tersinkron ke akun lain, jadi user ditanya dulu sebelum
+ * menggabungkannya ke akun yang baru masuk. Email yang sama dengan id baru tidak ditanya: akun
+ * lamanya sudah dihapus (`DELETE /account`) lalu dibuat lagi lewat akun Google yang sama, jadi
+ * kenangannya memang milik orang yang sama dan barisnya di server sudah tidak ada.
+ */
+export function asksBeforeMerging(
+  synced: { userId: string; email: string } | null,
+  user: { id: string; email: string },
+  hasLocal: boolean,
+): boolean {
+  if (!synced?.userId || synced.userId === user.id || !hasLocal) return false
+  return !user.email || synced.email !== user.email
+}
+
+/**
  * Tarikan berikutnya mulai 5 menit sebelum `updated_at` terbaru yang sudah diterima.
  * `updated_at = now()` adalah waktu mulai transaksi, jadi transaksi yang commit belakangan bisa
  * membawa waktu yang lebih kecil (docs/backend.md, Sinkron).

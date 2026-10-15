@@ -69,9 +69,11 @@ useSeoMeta({
       <li>keluar dari akun tidak menghapus cadangan maupun kenangan di perangkat ini.</li>
     </ul>
     <p>
-      Menghapus akun dari aplikasi menyusul. Selama beta, minta penghapusan akun lewat
-      <FeedbackLink>Lapor masalah</FeedbackLink>; semua cadangannya ikut terhapus, fotonya paling
-      lama sekitar satu jam setelah akunnya dihapus.
+      Akun bisa kamu hapus sendiri dari Pocket, lewat Hapus akun di kartu Cadangan. Akun dan semua
+      cadangannya di server, termasuk fotonya, langsung terhapus. Kenangan di perangkatmu dan surat
+      yang sudah kamu kirim<template v-if="kotakBareng">, juga kotak bareng,</template> tidak ikut
+      terhapus, karena tidak terikat ke akun. Kalau tidak bisa masuk lagi, minta penghapusan akun
+      lewat <FeedbackLink>Lapor masalah</FeedbackLink>.
     </p>
 
     <h2>Siapa yang bisa membuka suratmu</h2>
