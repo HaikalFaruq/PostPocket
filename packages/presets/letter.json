@@ -5,21 +5,107 @@
       "label": "Padang bunga",
       "art": "/illustrations/meadow.svg",
       "foil": "/illustrations/meadow-foil.svg",
-      "ratio": 0.72
+      "ratio": 0.72,
+      "variants": {
+        "portrait": {
+          "art": "/illustrations/meadow-portrait.svg",
+          "foil": "/illustrations/meadow-portrait-foil.svg"
+        },
+        "square": {
+          "art": "/illustrations/meadow-square.svg",
+          "foil": "/illustrations/meadow-square-foil.svg"
+        },
+        "landscape": {
+          "art": "/illustrations/meadow-landscape.svg",
+          "foil": "/illustrations/meadow-landscape-foil.svg"
+        }
+      }
     },
     {
       "id": "sprig",
       "label": "Ranting",
       "art": "/illustrations/sprig.svg",
       "foil": "/illustrations/sprig-foil.svg",
-      "ratio": 0.72
+      "ratio": 0.72,
+      "variants": {
+        "portrait": {
+          "art": "/illustrations/sprig-portrait.svg",
+          "foil": "/illustrations/sprig-portrait-foil.svg"
+        },
+        "square": {
+          "art": "/illustrations/sprig-square.svg",
+          "foil": "/illustrations/sprig-square-foil.svg"
+        },
+        "landscape": {
+          "art": "/illustrations/sprig-landscape.svg",
+          "foil": "/illustrations/sprig-landscape-foil.svg"
+        }
+      }
     },
     {
       "id": "night",
       "label": "Malam berbintang",
       "art": "/illustrations/night.svg",
       "foil": "/illustrations/night-foil.svg",
-      "ratio": 0.72
+      "ratio": 0.72,
+      "variants": {
+        "portrait": {
+          "art": "/illustrations/night-portrait.svg",
+          "foil": "/illustrations/night-portrait-foil.svg"
+        },
+        "square": {
+          "art": "/illustrations/night-square.svg",
+          "foil": "/illustrations/night-square-foil.svg"
+        },
+        "landscape": {
+          "art": "/illustrations/night-landscape.svg",
+          "foil": "/illustrations/night-landscape-foil.svg"
+        }
+      }
+    },
+    {
+      "id": "birthday",
+      "label": "Ulang tahun",
+      "art": "/illustrations/birthday.svg",
+      "foil": "/illustrations/birthday-foil.svg",
+      "ratio": 0.72,
+      "hidden": true,
+      "variants": {
+        "portrait": {
+          "art": "/illustrations/birthday-portrait.svg",
+          "foil": "/illustrations/birthday-portrait-foil.svg"
+        },
+        "square": {
+          "art": "/illustrations/birthday-square.svg",
+          "foil": "/illustrations/birthday-square-foil.svg"
+        },
+        "landscape": {
+          "art": "/illustrations/birthday-landscape.svg",
+          "foil": "/illustrations/birthday-landscape-foil.svg"
+        }
+      }
+    },
+    {
+      "id": "lebaran",
+      "label": "Lebaran",
+      "art": "/illustrations/lebaran.svg",
+      "foil": "/illustrations/lebaran-foil.svg",
+      "ratio": 0.72,
+      "hidden": true,
+      "variants": {
+        "portrait": {
+          "art": "/illustrations/lebaran-portrait.svg",
+          "foil": "/illustrations/lebaran-portrait-foil.svg"
+        },
+        "square": {
+          "art": "/illustrations/lebaran-square.svg",
+          "foil": "/illustrations/lebaran-square-foil.svg"
+        },
+        "landscape": {
+          "art": "/illustrations/lebaran-landscape.svg",
+          "foil": "/illustrations/lebaran-landscape-foil.svg"
+        }
+      }
     }
   ],
   "shapes": [

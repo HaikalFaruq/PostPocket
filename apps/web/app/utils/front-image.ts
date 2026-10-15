@@ -9,6 +9,27 @@ const PHOTO_MAX_BYTES = 25 * 1024 * 1024
 /** Kesalahan yang pesannya aman ditampilkan ke user. */
 export class PhotoError extends Error {}
 
+/**
+ * Ukuran foto depan yang pas untuk kartu berasio `ratio` (lebar dibagi tinggi): rasionya sama,
+ * jadi tidak ada yang terpotong, dan sisi panjangnya sebesar yang disimpan (`PHOTO_MAX_SIDE`).
+ */
+export function idealPhotoSize(ratio: number): { width: number; height: number } {
+  return ratio >= 1
+    ? { width: PHOTO_MAX_SIDE, height: Math.round(PHOTO_MAX_SIDE / ratio) }
+    : { width: Math.round(PHOTO_MAX_SIDE * ratio), height: PHOTO_MAX_SIDE }
+}
+
+/** Rasio dalam bilangan bulat kecil yang dikenal orang, misalnya 1.3333 jadi "4:3". */
+export function ratioLabel(ratio: number): string {
+  let best = { a: 1, b: 1, error: Infinity }
+  for (let b = 1; b <= 16; b++) {
+    const a = Math.round(ratio * b)
+    const error = Math.abs(a / b - ratio)
+    if (a > 0 && error < best.error - 1e-9) best = { a, b, error }
+  }
+  return `${best.a}:${best.b}`
+}
+
 function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
   return new Promise((resolve, reject) =>
     canvas.toBlob(

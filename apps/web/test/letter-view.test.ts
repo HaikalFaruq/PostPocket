@@ -73,4 +73,10 @@ describe('letterFront', () => {
     expect(letterFront({ ...defaultLetterDesign, illustration: 'upload' }, 'blob:x')).toBe('blob:x')
     expect(letterFront({ ...defaultLetterDesign, illustration: 'upload' }, null)).toBeNull()
   })
+
+  it('ilustrasi memakai komposisi untuk bentuk kartunya', () => {
+    const design = { ...defaultLetterDesign, illustration: 'night', shape: 'landscape' }
+    expect(letterFront(design, null)).toBe('/illustrations/night-landscape.svg')
+    expect(letterFront({ ...design, shape: 'original' }, null)).toBe('/illustrations/night.svg')
+  })
 })

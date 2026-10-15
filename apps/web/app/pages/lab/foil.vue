@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { byId, letter, type Illustration } from '@postpocket/presets'
+import { byId, illustrationArt, letter, type Illustration } from '@postpocket/presets'
 import { BottomSheet, SidePanel } from '#components'
 import type { FrameStats } from '~/utils/card-motion'
 
 useSeoMeta({ title: 'Lab kartu foil · PostPocket', robots: 'noindex' })
 
 const isDesktop = useMediaQuery('(min-width: 1024px)')
+// Untuk uji di perangkat tanpa input otomatis (simulator, HP): ?art=<ilustrasi>,
+// ?shape=<bentuk>, dan ?border=1, selain ?flip=1, ?open=1, dan ?bench=1 di bawah.
+const route = useRoute()
+const query = (key: string) => (typeof route.query[key] === 'string' ? route.query[key] : '')
 
-const illustration = ref('meadow')
+const illustration = ref(byId(letter.illustrations, query('art')) ? query('art') : 'meadow')
+const shape = computed(() => byId(letter.shapes, query('shape')) ?? letter.shapes[0]!)
 const foilColor = ref('gold')
 const paper = ref('white')
-const foilBorder = ref(false)
+const foilBorder = ref(!!query('border'))
 const open = ref(false)
 const expanded = ref(true)
 
@@ -25,6 +30,7 @@ const copied = ref(false)
 const front = computed(
   () => byId(letter.illustrations, illustration.value) ?? (letter.illustrations[0] as Illustration),
 )
+const frontArt = computed(() => illustrationArt(front.value, shape.value.id))
 const foil = computed(() => byId(letter.foilColors, foilColor.value) ?? letter.foilColors[0]!)
 const paperPreset = computed(() => byId(letter.papers, paper.value) ?? letter.papers[0]!)
 
@@ -62,8 +68,6 @@ async function runBenchmark() {
   running.value = false
 }
 
-// Untuk uji di perangkat tanpa input otomatis (simulator, HP): ?flip=1, ?open=1, ?bench=1
-const route = useRoute()
 onMounted(() => {
   setTimeout(() => {
     if (route.query.flip) card.value?.turnBy(180)
@@ -103,11 +107,11 @@ async function copyResult() {
       <FoilCard
         ref="card"
         v-model:open="open"
-        :art="front.art"
-        :foil-mask="front.foil"
+        :art="frontArt.art"
+        :foil-mask="frontArt.foil"
         :foil="foil"
         :paper="paperPreset"
-        :ratio="front.ratio"
+        :ratio="shape.ratio ?? front.ratio"
         :foil-border="foilBorder"
       >
         <template #inside>

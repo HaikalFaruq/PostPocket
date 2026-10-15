@@ -83,6 +83,9 @@ describe('errorMessage', () => {
     expect(errorMessage(new LetterApiError('box_closed', 'x'))).toContain('sudah ditutup')
     expect(errorMessage(new LetterApiError('box_full', 'x'))).toContain('penuh')
     expect(errorMessage(new LetterApiError('box_not_found', 'x'))).toContain('tidak ada')
+    expect(errorMessage(new LetterApiError('invalid_design', 'x'))).toContain(
+      'Pilih gambar depan lain',
+    )
     expect(errorMessage(new LetterApiError('invalid_content', 'detail teknis'))).not.toContain(
       'detail teknis',
     )

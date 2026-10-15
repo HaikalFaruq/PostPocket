@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   byId,
   defaultLetterDesign,
+  illustrationArt,
   isAllowed,
+  offeredIllustrations,
   kotak,
   letter,
   pocket,
@@ -53,6 +55,7 @@ describe('data preset', () => {
   })
 
   it('jumlah pilihan sesuai PRD', () => {
+    expect(letter.illustrations).toHaveLength(5)
     expect(letter.foilColors).toHaveLength(6)
     expect(letter.papers).toHaveLength(6)
     expect(letter.shapes).toHaveLength(4)
@@ -99,6 +102,17 @@ describe('data preset', () => {
     }
   })
 
+  it('setiap ilustrasi punya komposisi untuk setiap bentuk kartu yang rasionya tetap', () => {
+    const fixed = letter.shapes.filter((shape) => shape.ratio)
+    for (const item of letter.illustrations) {
+      expect(Object.keys(item.variants).sort()).toEqual(fixed.map((shape) => shape.id).sort())
+      for (const [shape, art] of Object.entries(item.variants)) {
+        expect(art.art).toBe(`/illustrations/${item.id}-${shape}.svg`)
+        expect(art.foil).toBe(`/illustrations/${item.id}-${shape}-foil.svg`)
+      }
+    }
+  })
+
   it('aturan surprise hanya menyebut kertas dan foil yang ada', () => {
     for (const rule of letter.surpriseRules) {
       expect(byId(letter.papers, rule.paper)).toBeDefined()
@@ -107,7 +121,7 @@ describe('data preset', () => {
   })
 
   it('desain bawaan memakai id yang ada dan lolos aturan', () => {
-    expect(byId(letter.illustrations, defaultLetterDesign.illustration)).toBeDefined()
+    expect(byId(letter.illustrations, defaultLetterDesign.illustration)?.hidden).toBeFalsy()
     expect(byId(letter.papers, defaultLetterDesign.paper)).toBeDefined()
     expect(isAllowed(defaultLetterDesign)).toBe(true)
   })
@@ -148,8 +162,33 @@ describe('surprise', () => {
     }
   })
 
+  it('tidak memilih ilustrasi yang belum ditawarkan', () => {
+    const random = seeded(3)
+    const offered = new Set(offeredIllustrations().map((item) => item.id))
+    for (let i = 0; i < 300; i++) {
+      expect(offered.has(surprise(defaultLetterDesign, random).illustration)).toBe(true)
+    }
+  })
+
   it('tidak mengubah foil border', () => {
     const next = surprise({ ...defaultLetterDesign, foilBorder: true }, seeded(1))
     expect(next.foilBorder).toBe(true)
+  })
+})
+
+describe('illustrationArt', () => {
+  const sprig = byId(letter.illustrations, 'sprig')!
+
+  it('memakai komposisi bentuk kartunya', () => {
+    expect(illustrationArt(sprig, 'landscape')).toEqual({
+      art: '/illustrations/sprig-landscape.svg',
+      foil: '/illustrations/sprig-landscape-foil.svg',
+    })
+  })
+
+  it('bentuk Asli dan bentuk yang tidak dikenal memakai gambar aslinya', () => {
+    const original = { art: '/illustrations/sprig.svg', foil: '/illustrations/sprig-foil.svg' }
+    expect(illustrationArt(sprig, 'original')).toEqual(original)
+    expect(illustrationArt(sprig, 'hilang')).toEqual(original)
   })
 })

@@ -209,6 +209,10 @@ const front = computed({
 })
 
 const shapeOptions = letter.shapes.map((shape) => ({ value: shape.id, label: shape.label }))
+const shape = computed(() => byId(letter.shapes, draft.design.shape) ?? letter.shapes[0]!)
+const photoRatio = computed(() =>
+  draft.photo ? draft.photo.width / draft.photo.height : undefined,
+)
 const paperOptions = letter.papers.map((item) => ({
   value: item.id,
   label: item.label,
@@ -590,7 +594,9 @@ async function startOver() {
           v-model="front"
           :foil="foil"
           :paper="paper"
+          :shape="shape"
           :photo-url="draft.photoUrl"
+          :photo-ratio="photoRatio"
           :busy="busy"
           :error="error"
           @file="takeFile"

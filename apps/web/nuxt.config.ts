@@ -126,8 +126,16 @@ export default defineNuxtConfig({
       globPatterns: ['**/*.{js,css,svg,png,webp}', 'offline.html'],
       // Pengubah HEIC (sekitar 2 MB) hanya dipakai kalau ada foto HEIC, jadi tidak ikut precache;
       // setelah sekali dipakai, aturan /_nuxt/ di bawah tetap menyimpannya untuk offline. Gambar
-      // kerumunan Beranda (178 KB) hanya hiasan dan baru dimuat saat footer didekati.
-      globIgnores: ['samples/**', 'peeps/**', '**/heic.worker-*.js'],
+      // kerumunan Beranda (178 KB) hanya hiasan dan baru dimuat saat footer didekati. Ilustrasi
+      // kartu untuk bentuk Tegak, Persegi, dan Mendatar (sekitar 800 KB) disimpan saat dipakai
+      // (aturan /illustrations/ di bawah); yang ikut precache hanya bentuk Asli.
+      globIgnores: [
+        'samples/**',
+        'peeps/**',
+        '**/heic.worker-*.js',
+        'illustrations/*-{portrait,square,landscape}.svg',
+        'illustrations/*-{portrait,square,landscape}-foil.svg',
+      ],
       runtimeCaching: [
         {
           // Halaman: jaringan dulu, salinan terakhir kalau offline. Surat penerima (/l/…),
@@ -155,6 +163,18 @@ export default defineNuxtConfig({
           urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/_fonts/'),
           handler: 'CacheFirst',
           options: { cacheName: 'fonts', expiration: { maxEntries: 40, maxAgeSeconds: 31536000 } },
+        },
+        {
+          // Ilustrasi kartu yang tidak ikut precache: langsung dari cache, lalu diperbarui di
+          // belakang, karena nama berkasnya tetap saat desainnya diperbarui.
+          urlPattern: ({ url, sameOrigin }) =>
+            sameOrigin && url.pathname.startsWith('/illustrations/'),
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'illustrations',
+            expiration: { maxEntries: 48 },
+            cacheableResponse: { statuses: [200] },
+          },
         },
         {
           // Chunk dari versi lain yang tidak ada di precache, misalnya tab lama setelah deploy.
