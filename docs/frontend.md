@@ -230,7 +230,10 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Fase 2: login dan sinkron Pocket** (skema sudah di produksi sejak #50, [rancangan](backend.md#rancangan-skema-fase-2))
 
 - [x] Id momen dan album jadi UUID, data lama diganti saat dimuat (#48)
-- [ ] OAuth client Google (Google Cloud) dan provider Google di Supabase Auth
+- [x] OAuth client Google (Google Cloud) dan provider Google di Supabase Auth, dipasang 15 Oktober 2026. Login dan cadangan foto sudah dicek di iPhone.
+  - Client-nya masih mode Testing, jadi hanya akun di daftar test users yang bisa masuk (maksimal 100).
+  - Tester baru ditambahkan Kall di Google Cloud: Google Auth Platform → Audience → Test users.
+  - Akun lain mendapat pesan "Login dibatalkan" di kartu Cadangan.
 - [x] Login Google dan kartu Cadangan di Pocket ([Sinkron Pocket](#sinkron-pocket)). Surat tetap bisa dibuat dan dibuka tanpa login
 - [x] Sinkron dua arah sesuai catatan Sinkron di rancangan:
   - tarik dengan jendela 5 menit, penerapannya idempoten;
