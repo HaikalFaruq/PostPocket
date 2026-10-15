@@ -534,9 +534,11 @@ paths:
         lewat `X-Edit-Token` masing-masing atau habis masa berlakunya. Data di perangkat
         (IndexedDB) juga tidak disentuh.
 
-        Setelah `204`, sesi di browser sudah tidak berlaku. Frontend memanggil `signOut()` dan
-        menghapus status sinkron di perangkat itu; perangkat lain yang masih login akan mendapat
-        `401` di panggilan berikutnya.
+        Setelah `204`, sesi di browser sudah tidak berlaku. Frontend keluar di perangkat itu
+        (`signOut()`). Perangkat lain yang masih login keluar sendiri saat token-nya diperbarui
+        (paling lama 1 jam). Sampai itu, sinkron di sana ditolak: access token-nya masih sah,
+        tapi baris baru gagal di foreign key ke `auth.users` dan unggahan ditolak policy Storage,
+        jadi tidak ada berkas yatim baru.
       security:
         - publishableKey: []
           userSession: []
