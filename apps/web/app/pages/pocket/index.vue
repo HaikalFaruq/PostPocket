@@ -58,11 +58,13 @@ function openDay(day: string) {
   <div class="min-h-dvh bg-pocket-page text-pocket-ink">
     <main class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
       <header class="flex items-center justify-between gap-3 py-5">
-        <NuxtLink to="/" class="flex items-center gap-3">
-          <img src="/favicon.svg" alt="" class="size-8" />
-          <div>
-            <p class="text-[17px] leading-none font-bold tracking-[-0.02em]">PostPocket</p>
-            <p class="mt-1 text-caption text-pocket-muted">
+        <!-- Lockup dengan tagline: wordmark di separuh atas tinggi P, tagline mengisi separuh
+             bawahnya di samping batang (docs/desain.md bagian Logo). -->
+        <NuxtLink to="/" class="flex gap-2">
+          <BrandLogo variant="symbol" class="h-8" aria-hidden="true" />
+          <div class="flex flex-col justify-between">
+            <BrandLogo variant="wordmark" class="h-4 self-start" />
+            <p class="text-caption leading-none text-pocket-muted">
               kantong kecil untuk <span class="whitespace-nowrap">momen-momenmu</span>
             </p>
           </div>

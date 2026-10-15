@@ -91,6 +91,7 @@ packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, i
 | `FoilCard` | Letter, Beranda, halaman penerima | Kartu lipat foil CSS 3D, lihat [spike](spikes/foil-3d.md) |
 | `HairlineFigure` | Beranda | Figur garis Hairline yang berputar sendiri (`play`) dan menjawab pointer; di server kotak kosong 5:4 |
 | `TagButton` | Beranda | Link bertag dengan siku dan efek tekan sebelum pindah halaman |
+| `BrandLogo` | Semua header | Logo P-amplop ([Logo](desain.md#logo)): `variant` `lockup`, `symbol`, atau `wordmark`; tinggi lewat kelas, tinta ikut `currentColor`, tutup amplop `fill-brand-gold` |
 
 Semua komponen bisa dilihat dan dicoba di `/lab`.
 

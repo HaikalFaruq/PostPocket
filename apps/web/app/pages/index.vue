@@ -68,10 +68,11 @@ const modules = [
     <!-- Pembungkus selebar layar: kerumunan di atas footer ikut selebar layar, tanpa membuat
          halaman bisa digeser ke samping. Isi halaman tetap dalam kolom max-w-6xl. -->
     <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 sm:px-6">
-      <header class="flex items-center gap-2.5 py-5">
-        <NuxtLink to="/" class="flex items-center gap-2.5">
-          <img src="/favicon.svg" alt="" class="size-7" />
-          <span class="text-[19px] leading-none font-bold tracking-[-0.03em]">PostPocket</span>
+      <!-- Batang P menggantung di bawah wordmark seperti ekor huruf: tautannya setinggi huruf
+           kapital (separuh logo), jadi beta dan menu sejajar dengan garis dasar wordmark. -->
+      <header class="flex items-baseline gap-2.5 py-5">
+        <NuxtLink to="/" class="block h-3.5">
+          <BrandLogo class="block h-7" />
         </NuxtLink>
         <span class="text-caption text-ink-muted">beta</span>
         <nav aria-label="Menu" class="ml-auto flex items-center gap-5 text-body text-ink-muted">

@@ -29,6 +29,8 @@
   --color-hairline-mid: #c5c8d5;
   --color-hairline-lo: #e3e5ec;
   --color-post-red: #e23b3b;
+  /* Tutup amplop di logo P-amplop (app/utils/brand-logo.ts), emas foil yang sama dengan ikonnya. */
+  --color-brand-gold: #d9b45a;
 
   /*
    * Pocket dan TV memakai kertas dan tinta yang sama dengan beranda; ciri modulnya ada di bendanya

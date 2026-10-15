@@ -217,11 +217,8 @@ const untilOpen = computed(() =>
     <!-- overflow-x-clip: kipas folder yang terbuka boleh melewati tepi layar HP tanpa membuat
          halamannya bisa digeser ke samping. -->
     <header class="flex items-center gap-2 py-4">
-      <NuxtLink
-        to="/"
-        class="inline-flex items-center gap-2 text-[15px] font-bold tracking-[-0.02em]"
-      >
-        <img src="/favicon.svg" alt="" class="size-6" /> PostPocket
+      <NuxtLink to="/" class="inline-flex items-center">
+        <BrandLogo class="h-6" />
       </NuxtLink>
     </header>
 
