@@ -142,23 +142,21 @@ const formatDate = (value: string | null | undefined) =>
 
     <main v-if="letter" class="flex flex-1 flex-col items-center">
       <h1 class="sr-only">{{ ownLetter ? 'Pratinjau suratmu' : 'Surat untukmu' }}</h1>
-      <!-- Suratnya datang dalam amplop par avion, sama dengan gambar pratinjau di chat. -->
-      <div class="airmail w-full">
-        <div class="relative h-[min(60dvh,540px)] w-full rounded-[3px] bg-canvas">
-          <ClientOnly>
-            <ReceivedLetter
-              v-if="shown"
-              v-model:open="open"
-              v-model:reading="reading"
-              :letter="shown"
-            />
-            <template #fallback>
-              <div class="grid size-full place-items-center [container-type:size]">
-                <div class="rounded-[3px] shadow-raised" :style="placeholderStyle" />
-              </div>
-            </template>
-          </ClientOnly>
-        </div>
+      <!-- Suratnya melayang di panggung berkisi titik, sama dengan kartu contoh di Beranda. -->
+      <div class="dot-stage h-[min(60dvh,540px)] w-full">
+        <ClientOnly>
+          <ReceivedLetter
+            v-if="shown"
+            v-model:open="open"
+            v-model:reading="reading"
+            :letter="shown"
+          />
+          <template #fallback>
+            <div class="grid size-full place-items-center [container-type:size]">
+              <div class="rounded-[3px] shadow-raised" :style="placeholderStyle" />
+            </div>
+          </template>
+        </ClientOnly>
       </div>
       <!-- Sebelum dibuka, satu-satunya langkah adalah mengetuk kartu; balasan baru muncul sesudahnya. -->
       <p

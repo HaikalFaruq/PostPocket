@@ -185,9 +185,13 @@ function mount({ stage, svg, read }, value) {
       ),
     )
     const newest = Math.ceil(len - 0.05) - 1
+    // Bingkai ikut keluar bersama stripnya: tepi bawahnya tidak pernah melewati ujung strip, jadi
+    // bingkai baru tumbuh dari celah, bukan muncul utuh di luar strip.
+    const end = sz - out + 1.5
     frames.forEach((el, k) => {
       const top = sz - 4 - k * FRAME,
-        shown = k < len - 0.05
+        bottom = Math.max(top - FRAME + 3, end),
+        shown = top - bottom > 0.3
       el.setAttribute(
         'd',
         shown
@@ -196,8 +200,8 @@ function mount({ stage, svg, read }, value) {
                 [
                   [y0 + 2, top],
                   [y1 - 2, top],
-                  [y1 - 2, top - FRAME + 3],
-                  [y0 + 2, top - FRAME + 3],
+                  [y1 - 2, bottom],
+                  [y0 + 2, bottom],
                 ],
                 [1, 1, 1, 1],
               ).map(([y, z]) => P(BOX[2] + 1.2, y, z)),

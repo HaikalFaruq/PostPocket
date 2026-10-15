@@ -13,20 +13,35 @@ PostPocket tempat anak muda Indonesia menyimpan momen kecil per hari, lalu mengi
 | Kertas | `#F1F4F8` | Latar halaman: kertas HVS yang sedikit kebiruan, bukan krem |
 | Putih | `#FFFFFF` | Kartu, lembar, dan kolom isian |
 | Tinta | `#18204A` | Teks dan tombol utama: biru-hitam pulpen, bukan hitam |
-| Merah pos | `#E23B3B` | Hanya di garis par avion dan cap pos di halaman salah alamat (404) |
+| Merah pos | `#E23B3B` | Hanya di cap pos di halaman salah alamat (404) dan seni folder par avion di Kotak surat |
 | Emas foil | dari preset foil; `#D9B45A` di logo | Hanya di kartu dan tutup amplop di logo |
 
 Teks sekunder memakai tinta 66% (minimal 4,9:1) dan placeholder tinta 48%.
 
-**Huruf.** Gantari untuk semua teks antarmuka, dari judul sampai keterangan. Gantari dibuat Anugrah Pasau dari Lafontype, foundry di Makassar: huruf buatan Indonesia untuk aplikasi anak muda Indonesia. Bentuknya bersih dan geometris tapi tetap hangat, dan bukan salah satu font yang sering muncul di desain buatan AI (Inter, Space Grotesk, Bricolage Grotesque, Plus Jakarta Sans, dan sejenisnya). Judul memakai ketebalan 700 dengan jarak huruf sedikit rapat, teks biasa 400, dan label 500–600. Isi surat memakai Delicious Handrawn, tulisan tangan Agung Rohmat, desainer huruf dari Jawa Tengah: lebih tegak dan huruf kecilnya lebih tinggi daripada Caveat, jadi tetap terbaca di kartu yang kecil, tapi lebarnya sama, jadi tata letak surat yang sudah terkirim tidak bergeser. VT323 tetap untuk layar TV. Di luar isi surat, tulisan tangan hanya dipakai untuk satu kata di judul Beranda ("surat"), seperti kata miring di judul Hairline. Font cadangannya diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), jadi teks tidak melompat saat Gantari selesai dimuat.
+**Huruf.** Gantari untuk semua teks antarmuka, dari judul sampai keterangan. Gantari dibuat Anugrah Pasau dari Lafontype, foundry di Makassar: huruf buatan Indonesia untuk aplikasi anak muda Indonesia. Bentuknya bersih dan geometris tapi tetap hangat, dan bukan salah satu font yang sering muncul di desain buatan AI (Inter, Space Grotesk, Bricolage Grotesque, Plus Jakarta Sans, dan sejenisnya). Judul memakai ketebalan 700 dengan jarak huruf sedikit rapat, teks biasa 400, dan label 500–600. Isi surat memakai Delicious Handrawn, tulisan tangan Agung Rohmat, desainer huruf dari Jawa Tengah: lebih tegak dan huruf kecilnya lebih tinggi daripada Caveat, jadi tetap terbaca di kartu yang kecil, tapi lebarnya sama, jadi tata letak surat yang sudah terkirim tidak bergeser. VT323 tetap untuk layar TV. Di luar isi surat, tulisan tangan dipakai di tiga tempat, permintaan Kall pada 15 Oktober 2026 supaya hurufnya lebih mendominasi:
+
+- kata "surat" di judul (Beranda, Kotak surat, Titip surat, gambar OG), lewat utility `hand-word`;
+- nama modul di Beranda, seperti label tulisan tangan di bawah gambarnya;
+- tanda tangan "PostPocket" di splash.
+
+Halaman info dan angka (bulan di Pocket, tanggal) tetap Gantari supaya mudah dibaca. Font cadangannya diukur sama dengan Arial (iPhone, desktop) atau Roboto (Android), jadi teks tidak melompat saat Gantari selesai dimuat.
 
 **Modul.** Pocket dan TV memakai kertas dan tinta yang sama dengan Beranda. Ciri tiap modul ada di bendanya: kantong jajan dan jepitan kayu (utility `clothespin`) di Pocket, TV jadul berlayar VT323 di Memori TV dan Booth, dan folder kaca buram dengan panel belakang bercorak cairan di Kotak surat. Seni folder dilukis dari resep warna di preset (`kotak.json`). Resep bawaannya memakai merah dan biru par avion, karena folder itu juga membingkai surat.
 
 **Lapisan mengambang.** Modal, lembar, dan popup memakai utility `scrim`: halaman di belakangnya kabur (blur 14 px) dan sedikit gelap, jadi yang mengambang terasa terangkat tanpa memutus konteks. Di browser yang menggambar tanpa GPU dan di tes otomatis (`data-render="cpu"` di `<html>`), latarnya cukup diredupkan, dan animasi kantong serta tali Pocket langsung ke keadaan akhirnya.
 
-**Satu hal yang berani.** Garis par avion merah-biru hanya membingkai surat: kartu contoh di Beranda dan halaman surat penerima. Bagian lain dibuat tenang.
+**Satu hal yang berani.** Kartu foil itu sendiri, ditambah kata "surat" yang ditulis tangan. Sejak 15 Oktober 2026 kartu contoh di Beranda, surat penerima, dan gambar OG tidak lagi dibingkai garis par avion merah-biru (Kall: "jatohnya kaya barbershop"). Kartunya melayang di panggung `dot-stage`, kisi titik yang memudar seperti panggung figur Hairline. Bagian lain dibuat tenang.
 
 **Beranda bergaris tipis.** Sejak 15 Oktober 2026 Beranda memakai gaya [Hairline](https://hairline.lucasmarkes.com), pilihan Kall: figur isometrik dari satu garis tinta di atas putih, satu garis terang sebagai satu-satunya sorotan, dan kisi titik yang memudar di belakangnya. Modul tetap dibuka dengan bendanya (aturan 1), hanya digambar sebagai garis: surat dan amplop, kantong jajan di tali jemuran, bilik foto. Tiga panelnya satu pita bersekat, bukan tiga kartu yang sama. Kerumunan Open Peeps di atas footer diwarnai tinta yang sama dan berjalan pelan, supaya tidak mengalahkan isi halaman.
+
+Garis dari judul kerumunan ke kerumunannya (`CrowdLine`) ikut bergerak seperti garis Hairline:
+- digambar dari atas begitu terlihat;
+- lalu satu kilau tinta turun pelan, berulang;
+- kilaunya berhenti di luar layar, dan dengan gerakan dikurangi garisnya langsung utuh.
+
+Gerakan figur mengikuti aturan 08 Hairline: pilihan memakai ease 700 ms, posisi pointer memakai pegas. Tidak boleh ada yang meloncat dalam satu frame. Pengecualian yang disengaja ada di dua figur:
+- **Surat:** pulpennya terangkat ke awal baris berikutnya, tidak berpindah seketika. Pegas ceritanya teredam kritis (k 60, c 15,5), supaya putaran mundurnya tidak menyentak.
+- **Booth:** bingkai foto tumbuh bersama stripnya.
 
 ## Logo
 
@@ -74,6 +89,24 @@ Emas hanya ada di dalam P, tidak pernah langsung di atas kanvas atau putih.
   - `node scripts/brand.mjs` untuk master dan favicon;
   - `node scripts/pwa-icons.mjs` untuk ikon PWA;
   - `node scripts/og-images.mjs` untuk gambar OG.
+
+## Splash
+
+Di awal setiap sesi, sebelum Beranda atau halaman aplikasi tampil, logo P-amplop terbentuk di kanvas berkisi titik (`AppSplash`):
+
+1. garis P digambar;
+2. tinta mengisinya dari bawah;
+3. tutup amplop emas melipat turun;
+4. kilau foil lewat sekali;
+5. "PostPocket" ditulis tangan huruf demi huruf di bawahnya. Template tanda tangan dari Kall diubah dari React ke Vue tanpa memuat font: garis tiap huruf disimpan di `app/utils/brand-signature.ts`.
+
+Tanda tangannya selesai di 1,9 detik, logo dan tanda tangan yang utuh diam sebentar, lalu splash memudar ke halaman. Totalnya 3,1 detik.
+
+- **Sekali per sesi.** Skrip kecil di `<head>` (`app/utils/splash.ts`) memutuskan sebelum halaman tergambar, jadi tidak ada kedip.
+- **Tidak di halaman yang dibuka dari link:** surat, kotak, dan titip. Penerimanya datang untuk isinya.
+- **Tidak di halaman info dan lab,** dan tidak kalau pengguna meminta gerakan dikurangi.
+- **Bisa dilewati** dengan ketukan atau tombol apa pun.
+- **Tanpa JavaScript.** Seluruh animasinya CSS, jadi sudah berjalan sebelum JavaScript selesai dimuat.
 
 ## Aturan
 

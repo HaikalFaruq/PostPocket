@@ -130,33 +130,24 @@ function roundedRect(
 }
 
 /**
- * Garis par avion merah dan biru di tepi gambar, seperti amplop surat udara (docs/desain.md).
- * Warnanya sama dengan token --color-post-red dan --color-ink.
+ * Kisi titik isometrik yang memudar ke tepi, sama dengan panggung `dot-stage` di halaman
+ * (docs/desain.md): penuh sampai 35% jarak ke tepi, lalu memudar habis di tepinya. Warnanya
+ * --color-line.
  */
-function drawAirmail(ctx: CanvasRenderingContext2D, width: number, height: number, band: number) {
+function drawDots(ctx: CanvasRenderingContext2D, width: number, height: number, unit: number) {
+  const gapX = 28 * unit
+  const gapY = 14 * unit
+  const radius = 1.6 * unit
   ctx.save()
-  ctx.beginPath()
-  ctx.rect(0, 0, width, height)
-  ctx.rect(band, band, width - band * 2, height - band * 2)
-  ctx.clip('evenodd')
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, width, height)
-  const stripe = band * 0.9
-  const gap = stripe / 2
-  const period = (stripe + gap) * 2
-  for (let offset = -height; offset < width + height; offset += period) {
-    for (const [start, color] of [
-      [0, '#e23b3b'],
-      [stripe + gap, '#18204a'],
-    ] as const) {
-      const left = offset + start
+  ctx.fillStyle = 'rgb(24 32 74 / 0.16)'
+  for (let row = 0, y = 0; y <= height; row++, y += gapY) {
+    for (let x = row % 2 ? gapX / 2 : 0; x <= width; x += gapX) {
+      const distance = Math.hypot((x - width / 2) / (width / 2), (y - height / 2) / (height / 2))
+      const alpha = distance <= 0.35 ? 1 : 1 - (distance - 0.35) / 0.65
+      if (alpha <= 0) continue
+      ctx.globalAlpha = alpha
       ctx.beginPath()
-      ctx.moveTo(left, 0)
-      ctx.lineTo(left + stripe, 0)
-      ctx.lineTo(left + stripe - height, height)
-      ctx.lineTo(left - height, height)
-      ctx.closePath()
-      ctx.fillStyle = color
+      ctx.arc(x, y, radius, 0, Math.PI * 2)
       ctx.fill()
     }
   }
@@ -186,7 +177,7 @@ export interface OgCard {
 }
 
 /**
- * Gambar OG surat: sampul kartu tertutup di atas latar kanvas, JPEG 1200×630 di bawah 300.000
+ * Gambar OG surat: sampul kartu tertutup di atas kanvas berkisi titik, JPEG 1200×630 di bawah 300.000
  * byte. Dirender di browser waktu "Buat link" dari gambar cetak dan mask foil yang sama dengan
  * kartu di layar, jadi pratinjau WhatsApp sama dengan yang dibuka penerima.
  */
@@ -199,7 +190,7 @@ export async function renderOgImage(card: OgCard): Promise<UploadImage> {
     const unit = width / OG_WIDTH
     ctx.fillStyle = '#f1f4f8'
     ctx.fillRect(0, 0, width, height)
-    drawAirmail(ctx, width, height, 26 * unit)
+    drawDots(ctx, width, height, unit)
     const maxH = 540 * unit
     const maxW = 980 * unit
     const cardH = Math.min(maxH, maxW / card.ratio)

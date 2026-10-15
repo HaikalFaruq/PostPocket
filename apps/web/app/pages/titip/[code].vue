@@ -154,7 +154,7 @@ async function withdraw(item: SentRecord) {
       <h1
         class="mt-1 text-[30px] leading-tight font-bold tracking-[-0.03em] text-balance [overflow-wrap:anywhere]"
       >
-        Titip surat untuk {{ invite.to }}
+        Titip <span class="hand-word">surat</span> untuk {{ invite.to }}
       </h1>
 
       <div class="mt-6 w-full max-w-[340px]">

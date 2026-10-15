@@ -169,7 +169,7 @@ async function removeFolder(id: string, title: string) {
         tabindex="-1"
         class="mt-2 text-[34px] leading-none font-bold tracking-[-0.035em] outline-none"
       >
-        Kotak surat
+        Kotak <span class="hand-word">surat</span>
       </h1>
       <p class="mt-2 max-w-md text-pretty text-ink-muted">
         Surat yang kamu simpan di HP ini. Tetap bisa dibuka walau link-nya sudah mati, tanpa sinyal

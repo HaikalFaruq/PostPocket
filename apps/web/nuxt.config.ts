@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
+import { splashScript } from './app/utils/splash'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -48,6 +49,8 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon-180x180.png' },
       ],
+      // Memutuskan splash (app/utils/splash.ts) sebelum halaman tergambar.
+      script: [{ innerHTML: splashScript, tagPosition: 'head', tagPriority: 'critical' }],
     },
   },
 

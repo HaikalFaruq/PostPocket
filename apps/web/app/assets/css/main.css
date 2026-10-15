@@ -12,7 +12,7 @@
 
   /*
    * Identitas "surat par avion" (docs/desain.md): kertas HVS kebiruan, tinta biru-hitam pulpen,
-   * dan merah pos yang hanya dipakai di garis par avion.
+   * dan merah pos yang hanya dipakai di cap pos 404 dan seni folder par avion.
    */
   --color-canvas: #f1f4f8;
   --color-surface: #ffffff;
@@ -125,21 +125,44 @@
   --card-open-ms: 520ms;
   /* Cincin pelangi untuk pilihan "warna sendiri". */
   --spectrum: conic-gradient(#f87171, #fbbf24, #a3e635, #22d3ee, #818cf8, #e879f9, #f87171);
-  /* Garis par avion merah dan biru: satu-satunya hiasan berani, hanya untuk membingkai surat. */
-  --airmail: repeating-linear-gradient(
-    -45deg,
-    var(--color-post-red) 0 14px,
-    var(--color-white) 14px 21px,
-    var(--color-ink) 21px 35px,
-    var(--color-white) 35px 42px
-  );
 }
 
-/* Bingkai amplop par avion (docs/desain.md): hanya untuk membingkai surat. */
-@utility airmail {
-  padding: 10px;
-  border-radius: 6px;
-  background: var(--airmail);
+/*
+ * Panggung tanpa bingkai (docs/desain.md): kisi titik isometrik yang memudar ke tepi, sama dengan
+ * panggung figur Hairline di Beranda. Dipakai di belakang kartu contoh Beranda dan surat penerima,
+ * menggantikan bingkai garis par avion.
+ */
+@utility dot-stage {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      radial-gradient(circle, var(--color-line) 0.8px, transparent 1.1px),
+      radial-gradient(circle, var(--color-line) 0.8px, transparent 1.1px);
+    background-position:
+      0 0,
+      7px 3.5px;
+    background-size: 14px 7px;
+    mask-image: radial-gradient(closest-side, #000 35%, transparent);
+    pointer-events: none;
+  }
+}
+
+/*
+ * Satu kata tulisan tangan di judul, biasanya "surat" (docs/desain.md): Delicious Handrawn sedikit
+ * lebih besar dari judulnya, karena huruf kecilnya lebih pendek dari Gantari.
+ */
+@utility hand-word {
+  font-family: var(--font-letter);
+  font-size: 1.16em;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: normal;
 }
 
 /*
