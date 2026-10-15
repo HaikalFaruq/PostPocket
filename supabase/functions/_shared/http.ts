@@ -1,4 +1,5 @@
-// Respons, CORS, dan pemeriksaan apikey yang sama untuk fungsi `letters`, `l`, `boxes`, dan `k`.
+// Respons, CORS, dan pemeriksaan apikey yang sama untuk fungsi `letters`, `l`, `boxes`, `k`, dan
+// `account`.
 // Aturannya ada di docs/api/openapi.yaml bagian CORS dan Error.
 
 import { recordError } from './errors.ts'

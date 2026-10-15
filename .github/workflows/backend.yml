@@ -105,4 +105,4 @@ jobs:
         run: |
           eval "$(supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY)=')"
           export API_URL PUBLISHABLE_KEY SECRET_KEY
-          deno test -A tests/api.test.ts tests/cleanup.test.ts tests/boxes.test.ts
+          deno test -A tests/api.test.ts tests/cleanup.test.ts tests/boxes.test.ts tests/account.test.ts

@@ -192,7 +192,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS: [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi `phase2` dan test `phase2.test.sql`
 - [ ] Login Google: OAuth client dan provider di dashboard, dipasang bareng Kall ([Login Google](#login-google))
-- [ ] Edge Function `account` untuk `DELETE /account` (kontrak 0.4.0): hapus berkas `moments/<user_id>/…` lewat Storage API, lalu `auth.admin.deleteUser`; sesi dicek dengan `auth.getUser(token)`. Test integrasi: tanpa token dan token salah `401`, akun lain tidak tersentuh, berkas dan baris hilang
+- [x] Edge Function `account` untuk `DELETE /account` (kontrak 0.4.0): hapus berkas `moments/<user_id>/…` lewat Storage API, lalu `auth.admin.deleteUser`; sesi dicek dengan `auth.getUser(token)`. Test integrasi `tests/account.test.ts`: tanpa token, token salah, dan akun yang sudah dihapus `401`, akun lain tidak tersentuh, berkas dan baris hilang
 - [ ] Lingkungan beta
 - [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
 
@@ -365,12 +365,13 @@ API_URL=http://127.0.0.1:54321 PUBLISHABLE_KEY=<dari supabase status> deno test 
 # Job pembersihan, hanya stack lokal (memundurkan waktu di database)
 API_URL=… PUBLISHABLE_KEY=… SECRET_KEY=<dari supabase status> deno test -A tests/cleanup.test.ts
 API_URL=… PUBLISHABLE_KEY=… SECRET_KEY=<dari supabase status> deno test -A tests/boxes.test.ts
+API_URL=… PUBLISHABLE_KEY=… SECRET_KEY=<dari supabase status> deno test -A tests/account.test.ts
 
 # Setelah kontrak berubah
 scripts/bundle-contract.sh
 
 # Deploy (setelah migrasi baru di-push dengan supabase db push)
-supabase functions deploy letters l boxes k cleanup
+supabase functions deploy letters l boxes k cleanup account
 ```
 
 Di stack lokal, Kong menimpa header CORS dengan `*`, jadi test CORS di `api.test.ts` hanya jalan kalau `API_URL` menunjuk proyek Supabase asli.
