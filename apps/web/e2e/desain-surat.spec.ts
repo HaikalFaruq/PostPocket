@@ -73,16 +73,32 @@ const inside = (inner: Box, outer: Box) =>
   inner.top >= outer.top - 0.5 &&
   inner.bottom <= outer.bottom + 0.5
 
-/** Tulisan, foto, dan stiker di `page` tidak saling menimpa dan semuanya di dalam halaman. */
+/**
+ * Tulisan dan foto di `page` tidak saling menimpa dan semuanya di dalam halaman. Semua kotak
+ * diukur sekaligus, dan diulang sampai lolos: halaman editor ikut berubah ukuran saat panel alat
+ * muncul atau hilang, dan kartu sedang membuka.
+ */
 async function expectTidy(page: Locator) {
-  const [sheet] = await boxes(page)
-  const texts = await boxes(page.locator('[data-kind="text"] p'))
-  const photos = await boxes(page.locator('[data-kind="photo"] .letter-photo'))
-  for (const box of [...texts, ...photos]) expect(inside(box, sheet!)).toBe(true)
-  for (const text of texts) for (const photo of photos) expect(overlaps(text, photo)).toBe(false)
-  for (let i = 0; i < photos.length; i++) {
-    for (let j = i + 1; j < photos.length; j++) expect(overlaps(photos[i]!, photos[j]!)).toBe(false)
-  }
+  await expect(async () => {
+    const { sheet, texts, photos } = await page.evaluate((root) => {
+      const box = (el: Element) => {
+        const rect = el.getBoundingClientRect()
+        return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+      }
+      return {
+        sheet: box(root),
+        texts: [...root.querySelectorAll('[data-kind="text"] p')].map(box),
+        photos: [...root.querySelectorAll('[data-kind="photo"] .letter-photo')].map(box),
+      }
+    })
+    for (const box of [...texts, ...photos]) expect(inside(box, sheet)).toBe(true)
+    for (const text of texts) for (const photo of photos) expect(overlaps(text, photo)).toBe(false)
+    for (let i = 0; i < photos.length; i++) {
+      for (let j = i + 1; j < photos.length; j++) {
+        expect(overlaps(photos[i]!, photos[j]!)).toBe(false)
+      }
+    }
+  }).toPass({ timeout: 5_000 })
 }
 
 const longMessage =
@@ -266,7 +282,7 @@ test('isi surat: tulisan panjang mengecil di ruangnya, tidak menabrak foto atau 
 
   // Kartu yang terbuka memakai tata letak yang sama.
   await expect(cardPage(page).locator('[data-kind="text"] p')).toHaveAttribute('data-fit', /0\.\d+/)
-  await expect(async () => expectTidy(cardPage(page))).toPass({ timeout: 5_000 })
+  await expectTidy(cardPage(page))
 })
 
 test('ganti bentuk kartu menyusun ulang isi surat, tidak ada yang bertumpuk', async ({ page }) => {
@@ -303,7 +319,7 @@ test('ganti bentuk kartu menyusun ulang isi surat, tidak ada yang bertumpuk', as
   for (const shape of ['Mendatar', 'Persegi', 'Asli']) {
     await chooseShape(page, shape)
     await page.getByTestId('open-content-editor').click()
-    await expect(async () => expectTidy(editorPage(page))).toPass({ timeout: 5_000 })
+    await expectTidy(editorPage(page))
     await page
       .getByTestId('content-editor')
       .getByRole('button', { name: 'Selesai', exact: true })
@@ -340,6 +356,43 @@ test('ganti foto berkali-kali: bingkainya mengikuti foto tanpa terus mengecil', 
   }
   // Foto 4:3 terakhir sama besar dengan foto 4:3 pertama.
   expect(Math.abs((await area()) / first - 1)).toBeLessThan(0.03)
+})
+
+test('template dengan slot foto lebih sedikit dimatikan, dan teks baru tidak menimpa foto', async ({
+  page,
+}) => {
+  await chooseTemplate(page, '2 foto + teks')
+  await page.getByTestId('open-content-editor').click()
+  const upload = page.getByTestId('content-photo-upload')
+  for (const [index, size] of [
+    [400, 300],
+    [300, 400],
+  ].entries()) {
+    await upload.setInputFiles({
+      name: `foto-${index}.png`,
+      mimeType: 'image/png',
+      buffer: await photoPng(page, size[0]!, size[1]!),
+    })
+    await expect(editorPage(page).locator('[data-kind="photo"] img')).toHaveCount(index + 1)
+  }
+  const tools = page.getByTestId('content-editor')
+  await tools.getByRole('button', { name: 'Lepas pilihan' }).click()
+
+  // Dua foto: template satu foto dan teks saja tidak bisa dipilih.
+  const templates = tools.getByRole('radiogroup', { name: 'Template isi surat' })
+  await expect(templates.getByRole('radio', { name: 'Teks saja' })).toBeDisabled()
+  await expect(templates.getByRole('radio', { name: '1 foto + teks' })).toBeDisabled()
+  await expect(templates.getByRole('radio', { name: 'Kolase 4 foto' })).toBeEnabled()
+
+  // Dua blok teks baru: tidak ada yang ditaruh di atas foto.
+  for (let i = 0; i < 2; i++) {
+    await tools.getByRole('button', { name: 'Teks', exact: true }).click()
+    await page.keyboard.type(`Tambahan ${i + 1}`)
+    await tools.getByRole('button', { name: 'Lepas pilihan' }).click()
+  }
+  await expectTidy(editorPage(page))
+  await tools.getByRole('button', { name: 'Selesai', exact: true }).click()
+  await expect(page.getByTestId('template-limit')).toContainText('2 foto')
 })
 
 test('editor: elemen tidak bisa digeser keluar halaman', async ({ page }) => {

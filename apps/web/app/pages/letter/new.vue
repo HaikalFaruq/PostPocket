@@ -275,7 +275,6 @@ useEventListener(document, 'paste', (event: ClipboardEvent) => {
   takeFile(file)
 })
 
-const templateOptions = letter.templates.map((item) => ({ value: item.id, label: item.label }))
 const template = computed({
   get: () => draft.design.template,
   set: (id: string) => draft.setTemplate(id),
@@ -657,7 +656,15 @@ async function startOver() {
       </StepCard>
 
       <StepCard :step="5" title="Isi surat">
-        <PillGroup v-model="template" label="Template isi surat" :options="templateOptions" />
+        <PillGroup v-model="template" label="Template isi surat" :options="draft.templateChoices" />
+        <p
+          v-if="draft.templateChoices.some((choice) => choice.disabled)"
+          class="mt-2 text-caption text-ink-muted"
+          data-testid="template-limit"
+        >
+          Isi suratnya sudah berisi {{ draft.filledPhotos }} foto, jadi template dengan slot foto
+          lebih sedikit dimatikan supaya fotonya tidak bertumpuk.
+        </p>
         <p
           v-if="emptyWarning"
           role="alert"

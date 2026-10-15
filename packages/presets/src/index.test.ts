@@ -162,6 +162,14 @@ describe('surprise', () => {
     }
   })
 
+  it('dengan minPhotos, hanya memilih template yang slot fotonya cukup', () => {
+    const random = seeded(11)
+    for (let i = 0; i < 200; i++) {
+      const next = surprise(defaultLetterDesign, random, { minPhotos: 2 })
+      expect(byId(letter.templates, next.template)!.photos).toBeGreaterThanOrEqual(2)
+    }
+  })
+
   it('tidak memilih ilustrasi yang belum ditawarkan', () => {
     const random = seeded(3)
     const offered = new Set(offeredIllustrations().map((item) => item.id))

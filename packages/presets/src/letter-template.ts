@@ -126,11 +126,11 @@ export function photoBox<T extends PhotoElement>(
 }
 
 /**
- * Susun isi surat untuk halaman berasio baru, misalnya setelah bentuk kartu diganti. Teks dan foto
- * yang masih di slot template pindah ke slot yang sama di tata letak rasio baru; putaran, rata
- * teks, dan perbesaran huruf (A+, A−) milik user tetap. Bingkai foto di slot mendapat kotak slot
- * barunya (muatkan fotonya dengan `fitPhoto`). Elemen yang sudah dipindah user dan stiker tetap di
- * tempatnya.
+ * Susun isi surat untuk halaman berasio baru, misalnya setelah bentuk kartu diganti. Posisi lama
+ * tidak berlaku di halaman yang bentuknya lain (ukuran foto dihitung dari rasio halaman), jadi
+ * semua teks dan foto berisi mengisi slot template di tata letak rasio baru, seperti
+ * `applyTemplate`. Rata teks dan perbesaran hurufnya (A+, A−) terhadap slotnya tetap. Bingkai foto
+ * mendapat kotak slot barunya; muatkan fotonya dengan `fitPhoto`.
  */
 export function reflowTemplate(
   content: LetterContent,
@@ -139,24 +139,19 @@ export function reflowTemplate(
   toRatio: number,
 ): LetterContent {
   const before = templateElements(template, fromRatio)
-  const after = templateElements(template, toRatio)
-  const elements = content.elements.map((element): LetterElement => {
-    const index = homeSlot(element, before)
-    const from = before[index]
-    const to = after[index]
-    if (!from || !to) return element
-    const place = { x: to.x, y: to.y, rotation: element.rotation }
-    if (element.kind === 'text' && from.kind === 'text' && to.kind === 'text') {
-      const scale = element.size / from.size
-      const { min, max } = contentLimits.size
-      const size = round(Math.min(max, Math.max(min, to.size * scale)))
-      const width = round(Math.min(1, to.width * (element.width / from.width)))
-      return { ...element, ...place, width, size }
-    }
-    if (element.kind === 'photo' && to.kind === 'photo') {
-      return { ...element, ...place, width: to.width, aspect: to.aspect }
-    }
-    return element
+  const placed = applyTemplate(content, template, toRatio)
+  const sources = new Map(content.elements.map((element) => [element.id, element]))
+  const texts = placed.elements.filter((element) => element.kind === 'text')
+  const slotTexts = before.filter((element) => element.kind === 'text')
+  const elements = placed.elements.map((element): LetterElement => {
+    if (element.kind !== 'text') return element
+    const source = sources.get(element.id)
+    const slot = slotTexts[texts.indexOf(element)]
+    if (source?.kind !== 'text' || slot?.kind !== 'text') return element
+    // Teks berisi ke-n mengisi slot teks ke-n, jadi perbesarannya dihitung dari slot itu.
+    const { min, max } = contentLimits.size
+    const size = round(Math.min(max, Math.max(min, element.size * (source.size / slot.size))))
+    return { ...element, align: source.align, size }
   })
   return normalizeContent({ version: 1, elements })
 }
@@ -308,20 +303,38 @@ interface Spot {
 
 const EPSILON = 1e-4
 
-/** Urutan tempat: tulisan tidak pernah kalah, lalu foto, lalu stiker lain, lalu dekat tengah. */
-function rank(a: Spot, b: Spot): number {
-  for (const key of ['text', 'photo', 'sticker'] as const) {
-    if (Math.abs(a[key] - b[key]) > EPSILON) return a[key] - b[key]
+/** Jenis elemen yang dicarikan tempat; menentukan apa yang paling dihindari. */
+export type Placing = 'sticker' | 'photo' | 'text'
+
+/**
+ * Nilai tempat, dibandingkan berurutan, makin kecil makin baik. Stiker dan foto: tulisan tidak
+ * pernah ditutup, lalu foto dan stiker lain sesedikit mungkin (stiker di atas stiker lain dihitung
+ * dua kali, karena stiker di bawahnya hilang). Teks: foto tidak pernah ditabrak, lalu stiker, baru
+ * teks lain, karena teks yang berdekatan berbagi ruang (`textRooms`) tanpa bertumpuk. Terakhir,
+ * yang lebih dekat ke tengah halaman.
+ */
+function score(spot: Spot, placing: Placing): number[] {
+  return placing === 'text'
+    ? [spot.photo, spot.sticker, spot.text]
+    : [spot.text, spot.photo + 2 * spot.sticker]
+}
+
+function rank(placing: Placing) {
+  return (a: Spot, b: Spot): number => {
+    const [x, y] = [score(a, placing), score(b, placing)]
+    for (let i = 0; i < x.length; i++) {
+      if (Math.abs(x[i]! - y[i]!) > EPSILON) return x[i]! - y[i]!
+    }
+    return a.distance - b.distance
   }
-  return a.distance - b.distance
 }
 
 /**
  * Titik tengah untuk elemen baru selebar `width` (pecahan lebar halaman) dan setinggi `height`
- * (pecahan tinggi halaman). Tempat yang tidak menutupi tulisan selalu dipilih lebih dulu, baru
- * yang paling sedikit menutupi foto, lalu stiker lain; halaman kosong tetap mendapat tengah
- * halaman, dan tempat yang sama baiknya dipilih acak lewat `random`. `coversText` bernilai
- * benar kalau semua tempat menutupi tulisan, supaya pemanggil bisa mencoba ukuran lebih kecil.
+ * (pecahan tinggi halaman). Yang dihindari bergantung pada jenisnya (`placing`, lihat `score`);
+ * halaman kosong tetap mendapat tengah halaman, dan tempat yang sama baiknya dipilih acak lewat
+ * `random`. `coversText` dan `coversPhoto` bernilai benar kalau tempat terbaiknya pun menutupi
+ * tulisan atau foto, supaya pemanggil bisa mencoba ukuran lebih kecil.
  */
 export function freeSpot(
   content: LetterContent,
@@ -329,7 +342,8 @@ export function freeSpot(
   height: number,
   pageRatio: number,
   random: () => number = Math.random,
-): { x: number; y: number; coversText: boolean } {
+  placing: Placing = 'sticker',
+): { x: number; y: number; coversText: boolean; coversPhoto: boolean } {
   const rooms = textRooms(content, pageRatio)
   const boxes = content.elements.map((element) => ({
     box: elementBox(element, pageRatio, rooms[element.id]),
@@ -337,10 +351,10 @@ export function freeSpot(
   }))
   const within = (value: number, half: number) =>
     half >= 0.48 ? 0.5 : Math.min(1 - half - 0.02, Math.max(half + 0.02, value))
-  // Baris paling atas dan bawah dekat tepi halaman, jadi tulisan panjang di tengah halaman masih
-  // menyisakan tempat untuk stiker.
-  const spots = [0.18, 0.5, 0.82].flatMap((x) =>
-    [0.1, 0.3, 0.5, 0.7, 0.9].map((y): Spot => {
+  // Kisi 5 × 7 sampai dekat tepi halaman, jadi celah kecil di antara foto dan di pinggir tulisan
+  // panjang pun ikut dicoba.
+  const spots = [0.12, 0.31, 0.5, 0.69, 0.88].flatMap((x) =>
+    [0.08, 0.22, 0.36, 0.5, 0.64, 0.78, 0.92].map((y): Spot => {
       const spot: Spot = {
         x: within(x, width / 2),
         y: within(y, height / 2),
@@ -358,16 +372,20 @@ export function freeSpot(
       return spot
     }),
   )
-  spots.sort(rank)
+  spots.sort(rank(placing))
+  const top = score(spots[0]!, placing)
   const best = spots.filter(
     (spot) =>
-      Math.abs(spot.text - spots[0]!.text) <= EPSILON &&
-      Math.abs(spot.photo - spots[0]!.photo) <= EPSILON &&
-      Math.abs(spot.sticker - spots[0]!.sticker) <= EPSILON &&
+      score(spot, placing).every((value, i) => Math.abs(value - top[i]!) <= EPSILON) &&
       spot.distance <= spots[0]!.distance + 1e-6,
   )
   const pick = best[Math.min(best.length - 1, Math.floor(random() * best.length))]!
-  return { x: round(pick.x), y: round(pick.y), coversText: pick.text > EPSILON }
+  return {
+    x: round(pick.x),
+    y: round(pick.y),
+    coversText: pick.text > EPSILON,
+    coversPhoto: pick.photo > EPSILON,
+  }
 }
 
 function overlaps(a: ReturnType<typeof elementBox>, b: ReturnType<typeof elementBox>): boolean {

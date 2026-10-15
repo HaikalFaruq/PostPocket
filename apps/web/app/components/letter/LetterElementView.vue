@@ -21,8 +21,11 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** Skala huruf blok teks setelah disesuaikan dengan ruangnya: 1 berarti tidak diperkecil. */
-  fit: [scale: number]
+  /**
+   * Skala huruf blok teks setelah disesuaikan dengan ruangnya (1 berarti tidak diperkecil), dan
+   * apakah tulisannya tetap lebih tinggi dari ruangnya walau sudah sekecil mungkin.
+   */
+  fit: [scale: number, overflow: boolean]
 }>()
 
 const sticker = computed(() =>
@@ -51,8 +54,9 @@ function refit() {
       : 1
   // Ukuran akhir ditulis langsung, karena Vue tidak menulis ulang gaya yang nilainya tidak berubah.
   el.style.fontSize = sizeAt(next)
+  const overflow = props.maxHeight !== undefined && el.offsetHeight > props.maxHeight + 0.5
   scale.value = next
-  emit('fit', next)
+  emit('fit', next, overflow)
 }
 
 // Sumbernya dipisah, jadi pengukuran hanya diulang kalau salah satu nilainya berubah, bukan
@@ -110,6 +114,7 @@ onBeforeUnmount(() => document.fonts?.removeEventListener?.('loadingdone', refit
 .letter-text {
   margin: 0;
   font-family: var(--font-letter);
+  word-spacing: var(--letter-word-spacing);
   line-height: 1.2;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

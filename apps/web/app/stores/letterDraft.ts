@@ -90,6 +90,21 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     if (count) return `${count} foto, belum ada tulisan`
     return isPhotoFront.value ? 'Kartu bergambar foto, belum ada isinya' : 'Kartu tanpa tulisan'
   })
+  /** Jumlah foto yang sudah diisi di isi surat. */
+  const filledPhotos = computed(
+    () => content.value.elements.filter((e) => e.kind === 'photo' && e.photo).length,
+  )
+  /**
+   * Pilihan template untuk PillGroup. Template dengan slot foto lebih sedikit dari foto yang sudah
+   * diisi dimatikan, karena foto yang tidak kebagian slot akan menumpuk di atas isi lain.
+   */
+  const templateChoices = computed(() =>
+    letter.templates.map((item) => ({
+      value: item.id,
+      label: item.label,
+      disabled: item.photos < filledPhotos.value,
+    })),
+  )
   /** Isi surat sudah berisi 4 foto tanpa slot kosong, jadi foto baru tidak bisa ditambahkan. */
   const photosFull = computed(() => {
     const photoSlots = content.value.elements.filter((e) => e.kind === 'photo')
@@ -303,17 +318,19 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     if (count('text') >= contentLimits.text) return null
     const id = uniqueId('t', takenIds())
     const size = 0.06 * Math.min(1, 1 / ratio.value)
-    const { x, y } = freeSpot(
-      content.value,
-      0.7,
-      2 * size * 1.25 * ratio.value,
-      ratio.value,
-      random,
-    )
+    // Teks baru tidak pernah ditaruh di atas foto: kalau perlu, kotaknya dipersempit. Berbagi ruang
+    // dengan teks lain tidak apa-apa, karena keduanya diperkecil supaya tidak bertumpuk.
+    let place = { x: 0.5, y: 0.5, width: 0.7 }
+    for (const width of [0.7, 0.55, 0.42, 0.32]) {
+      const height = 2 * size * 1.25 * ratio.value
+      const spot = freeSpot(content.value, width, height, ratio.value, random, 'text')
+      place = { x: spot.x, y: spot.y, width }
+      if (!spot.coversPhoto) break
+    }
     setContent({
       elements: [
         ...content.value.elements,
-        { kind: 'text', id, x, y, width: 0.7, rotation: 0, text: '', size, align: 'center' },
+        { kind: 'text', id, ...place, rotation: 0, text: '', size, align: 'center' },
       ],
     })
     return id
@@ -462,7 +479,10 @@ export const useLetterDraft = defineStore('letterDraft', () => {
   })
 
   function surpriseMe(random: () => number = Math.random) {
-    design.value = surprise(design.value, random, { keepIllustration: isPhotoFront.value })
+    design.value = surprise(design.value, random, {
+      keepIllustration: isPhotoFront.value,
+      minPhotos: filledPhotos.value,
+    })
     relayout()
   }
 
@@ -534,6 +554,8 @@ export const useLetterDraft = defineStore('letterDraft', () => {
     blank,
     summary,
     photosFull,
+    filledPhotos,
+    templateChoices,
     sent,
     markSent,
     clearSent,

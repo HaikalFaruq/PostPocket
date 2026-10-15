@@ -26,8 +26,11 @@ export function describeElement(element: LetterElement, stickerLabel?: string): 
   }
 }
 
-/** Skala huruf terkecil untuk tulisan yang diperkecil supaya muat, supaya tetap terbaca. */
-export const MIN_TEXT_SCALE = 0.4
+/**
+ * Skala huruf terkecil untuk tulisan yang diperkecil supaya muat. Masih terbaca di tampilan baca
+ * ("Baca lebih besar"), dan cukup untuk puisi atau daftar sampai sekitar 30 baris.
+ */
+export const MIN_TEXT_SCALE = 0.2
 
 /**
  * Skala huruf terbesar, dari `MIN_TEXT_SCALE` sampai 1, yang membuat tulisan setinggi `maxHeight`

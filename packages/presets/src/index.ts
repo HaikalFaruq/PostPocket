@@ -227,17 +227,20 @@ function pick<T extends Option>(list: readonly T[], random: () => number): strin
  * Acak ilustrasi, bagian foil, warna foil, kertas, dan template sekaligus (tombol Surprise me).
  * Hasilnya selalu lolos `surpriseRules` dan berbeda dari desain sekarang.
  * Foto milik user tidak pernah ikut diacak: pakai `keepIllustration` kalau gambar depan
- * adalah foto user.
+ * adalah foto user, dan `minPhotos` (jumlah foto di isi surat) supaya template yang terpilih
+ * punya slot untuk semua fotonya.
  */
 export function surprise(
   current: LetterDesign,
   random: () => number = Math.random,
-  options: { keepIllustration?: boolean } = {},
+  options: { keepIllustration?: boolean; minPhotos?: number } = {},
 ): LetterDesign {
   // Foto user tidak punya lapisan foil bawaan, jadi "Sesuai desain" tidak berlaku.
   const modes = options.keepIllustration
     ? letter.foilModes.filter((mode) => mode.id !== 'design')
     : letter.foilModes
+  // Template dengan slot foto lebih sedikit dari foto di isi surat membuat fotonya bertumpuk.
+  const templates = letter.templates.filter((item) => item.photos >= (options.minPhotos ?? 0))
   for (let attempt = 0; attempt < 50; attempt++) {
     const next: LetterDesign = {
       ...current,
@@ -247,7 +250,7 @@ export function surprise(
       foilMode: pick(modes, random),
       foilColor: pick(letter.foilColors, random),
       paper: pick(letter.papers, random),
-      template: pick(letter.templates, random),
+      template: templates.length ? pick(templates, random) : current.template,
     }
     const changed = next.foilColor !== current.foilColor || next.paper !== current.paper
     if (changed && isAllowed(next)) return next

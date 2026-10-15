@@ -235,6 +235,7 @@ describe('freeSpot', () => {
       x: 0.5,
       y: 0.5,
       coversText: false,
+      coversPhoto: false,
     })
   })
 
@@ -275,6 +276,40 @@ describe('freeSpot', () => {
       }
       expect(overlap(sticker, textBounds(message, 0.75))).toBe(false)
       expect(spot.coversText).toBe(false)
+    }
+  })
+
+  it('enam stiker di halaman berfoto tidak saling menumpuk', () => {
+    for (const ratio of [0.75, 1]) {
+      let elements: unknown[] = templateElements(template('photo-1'), ratio).map((e) =>
+        e.kind === 'photo' ? { ...e, photo: 'f1' } : { ...e, text: 'Halo, apa kabar? '.repeat(6) },
+      )
+      for (let i = 0; i < 6; i++) {
+        const content = normalizeContent({ elements })
+        const spot = freeSpot(content, 0.22, 0.22 * ratio, ratio, () => 0.5)
+        const sticker = { kind: 'sticker', id: `s${i}`, ...spot, width: 0.22, rotation: 0 }
+        elements = [...elements, { ...sticker, sticker: 'heart' }]
+      }
+      const stickers = normalizeContent({ elements })
+        .elements.filter((e) => e.kind === 'sticker')
+        .map((e) => elementBounds(e, ratio))
+      for (let a = 0; a < stickers.length; a++) {
+        for (let b = a + 1; b < stickers.length; b++) {
+          expect(overlap(stickers[a]!, stickers[b]!), `${ratio}: stiker ${a} dan ${b}`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('teks baru tidak ditaruh di atas foto, walau harus berbagi ruang dengan teks lain', () => {
+    for (const ratio of [0.75, 1]) {
+      const content = normalizeContent({
+        elements: templateElements(template('photo-1'), ratio).map((e) =>
+          e.kind === 'photo' ? { ...e, photo: 'f1' } : { ...e, text: 'Halo dari Bandung' },
+        ),
+      })
+      const spot = freeSpot(content, 0.7, 2 * 0.06 * 1.25 * ratio, ratio, () => 0.5, 'text')
+      expect(spot.coversPhoto, String(ratio)).toBe(false)
     }
   })
 
@@ -484,9 +519,10 @@ describe('photoBox', () => {
 describe('reflowTemplate', () => {
   const photo1 = template('photo-1')
   const [photo, text] = templateElements(photo1, 0.75) as [PhotoElement, LetterElement]
+  const [wide, wideText] = templateElements(photo1, 1.3333) as [PhotoElement, LetterElement]
 
-  it('isi di slot pindah ke slot tata letak baru, dengan putaran, rata, dan ukuran huruf user', () => {
-    if (text.kind !== 'text') throw new Error('bukan teks')
+  it('teks dan foto pindah ke slot tata letak baru, dengan rata dan ukuran huruf pilihan user', () => {
+    if (text.kind !== 'text' || wideText.kind !== 'text') throw new Error('bukan teks')
     const content = normalizeContent({
       elements: [
         { ...photo, photo: 'f1', width: 0.5, aspect: 0.75, rotation: 6 },
@@ -495,24 +531,31 @@ describe('reflowTemplate', () => {
       ],
     })
     const next = reflowTemplate(content, photo1, 0.75, 1.3333)
-    const [wide, wideText] = templateElements(photo1, 1.3333) as [PhotoElement, LetterElement]
-    if (wideText.kind !== 'text') throw new Error('bukan teks')
-    const [movedPhoto, movedText, sticker] = next.elements
-    expect(movedPhoto).toMatchObject({ x: wide.x, y: wide.y, width: wide.width, rotation: 6 })
-    expect(movedPhoto!.kind === 'photo' && movedPhoto!.aspect).toBeCloseTo(wide.aspect, 3)
-    expect(movedText).toMatchObject({ x: wideText.x, y: wideText.y, align: 'right', text: 'Halo' })
-    expect(movedText!.kind === 'text' && movedText!.size).toBeCloseTo(wideText.size * 1.15, 3)
-    expect(sticker).toEqual(content.elements[2])
+    const moved = (id: string) => next.elements.find((element) => element.id === id)
+    expect(moved(photo.id)).toMatchObject({
+      photo: 'f1',
+      x: wide.x,
+      y: wide.y,
+      width: wide.width,
+      rotation: wide.rotation,
+    })
+    expect(moved(text.id)).toMatchObject({ x: wideText.x, y: wideText.y, align: 'right' })
+    const size = moved(text.id)!.kind === 'text' ? (moved(text.id) as typeof text).size : 0
+    expect(size).toBeCloseTo(wideText.size * 1.15, 3)
+    expect(moved('s')).toEqual(content.elements[2])
   })
 
-  it('elemen yang sudah dipindah user tidak ikut disusun', () => {
+  it('foto yang sempat digeser tetap disusun ke slot baru, supaya tidak menimpa tulisan', () => {
     const content = normalizeContent({
       elements: [
-        { ...photo, photo: 'f1', x: 0.2, y: 0.8 },
+        { ...photo, photo: 'f1', x: 0.47, y: 0.33 },
         { ...text, text: 'Halo' },
       ],
     })
-    const next = reflowTemplate(content, photo1, 0.75, 1)
-    expect(next.elements[0]).toMatchObject({ x: 0.2, y: 0.8 })
+    const next = reflowTemplate(content, photo1, 0.75, 1.3333)
+    expect(next.elements.find((element) => element.id === photo.id)).toMatchObject({
+      x: wide.x,
+      y: wide.y,
+    })
   })
 })

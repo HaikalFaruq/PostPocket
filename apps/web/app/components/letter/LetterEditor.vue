@@ -47,12 +47,24 @@ function maxHeight(id: string): number | undefined {
   const room = rooms.value[id]
   return room === undefined ? undefined : (room * pageWidth.value) / draft.ratio
 }
-/** Skala huruf tiap blok teks setelah disesuaikan dengan ruangnya. */
-const fits = ref<Record<string, number>>({})
-function onFit(id: string, scale: number) {
-  if (fits.value[id] !== scale) fits.value = { ...fits.value, [id]: scale }
+/** Skala huruf tiap blok teks setelah disesuaikan dengan ruangnya, dan yang tetap tidak muat. */
+const fits = ref<Record<string, { scale: number; overflow: boolean }>>({})
+function onFit(id: string, scale: number, overflow: boolean) {
+  const current = fits.value[id]
+  if (current?.scale !== scale || current.overflow !== overflow) {
+    fits.value = { ...fits.value, [id]: { scale, overflow } }
+  }
 }
-const shrunk = computed(() => !!selected.value && (fits.value[selected.value.id] ?? 1) < 0.98)
+const selectedFit = computed(() => (selected.value ? fits.value[selected.value.id] : undefined))
+const shrunk = computed(() => (selectedFit.value?.scale ?? 1) < 0.98)
+/** Keterangan untuk tulisan yang dipilih kalau hurufnya diperkecil, atau tetap tidak muat. */
+const fitNote = computed(() =>
+  selectedFit.value?.overflow
+    ? 'Tulisan ini belum muat walau hurufnya sudah sekecil mungkin. Pendekkan tulisannya, pindahkan ke tempat yang lebih lapang, atau perkecil fotonya.'
+    : shrunk.value
+      ? 'Hurufnya diperkecil supaya tulisan ini muat di ruangnya, tanpa menabrak foto atau keluar halaman.'
+      : '',
+)
 
 const selectedId = ref<string | null>(null)
 const selected = computed(() => draft.content.elements.find((e) => e.id === selectedId.value))
@@ -65,16 +77,12 @@ const counts = computed(() => {
   for (const element of draft.content.elements) total[element.kind]++
   return total
 })
-const filledPhotos = computed(
-  () => draft.content.elements.filter((e) => e.kind === 'photo' && e.photo).length,
-)
 const canAddPhoto = computed(
   () =>
     counts.value.photo < contentLimits.photo ||
     draft.content.elements.some((e) => e.kind === 'photo' && !e.photo),
 )
 
-const templateOptions = letter.templates.map((item) => ({ value: item.id, label: item.label }))
 const template = computed({
   get: () => draft.design.template,
   set: (id: string) => draft.setTemplate(id),
@@ -339,9 +347,13 @@ function remove(id: string) {
 }
 
 function resizeText(factor: number) {
-  if (selected.value?.kind === 'text') {
-    draft.updateElement(selected.value.id, textSized(selected.value, factor))
-  }
+  const element = selected.value
+  if (element?.kind !== 'text') return
+  const patch = textSized(element, factor)
+  draft.updateElement(
+    element.id,
+    inPage(element, patch, textHeightOf(element), patch.size / element.size),
+  )
 }
 
 let photoSlot: string | undefined
@@ -448,7 +460,7 @@ onMounted(() => dialog.value?.focus())
             text-placeholder="Tulis sesuatu…"
             photo-placeholder="Tambah foto"
             :max-height="maxHeight(element.id)"
-            @fit="onFit(element.id, $event)"
+            @fit="(scale, overflow) => onFit(element.id, scale, overflow)"
           />
           <template v-if="element.id === selectedId">
             <span
@@ -471,6 +483,8 @@ onMounted(() => dialog.value?.focus())
     <footer
       class="border-t border-line-soft bg-surface px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))]"
     >
+      <!-- Selalu ada di halaman, jadi pembaca layar mengumumkan saat huruf tulisan diperkecil. -->
+      <p class="sr-only" role="status">{{ fitNote }}</p>
       <div class="mx-auto max-w-xl space-y-3">
         <p
           v-if="error"
@@ -490,9 +504,8 @@ onMounted(() => dialog.value?.focus())
             </IconButton>
           </div>
           <template v-if="selected.kind === 'text'">
-            <p v-if="shrunk" class="text-caption text-ink-muted" data-testid="text-shrunk">
-              Tulisannya panjang, jadi hurufnya diperkecil supaya tidak menabrak foto atau keluar
-              halaman.
+            <p v-if="fitNote" class="text-caption text-ink-muted" data-testid="text-shrunk">
+              {{ fitNote }}
             </p>
             <textarea
               ref="textField"
@@ -512,10 +525,12 @@ onMounted(() => dialog.value?.focus())
               >
                 A−
               </button>
+              <!-- Tulisan yang sudah diperkecil supaya muat tidak bisa diperbesar lagi. -->
               <button
                 type="button"
                 class="tool"
                 aria-label="Huruf lebih besar"
+                :disabled="shrunk"
                 @click="resizeText(1.15)"
               >
                 A+
@@ -541,7 +556,11 @@ onMounted(() => dialog.value?.focus())
         </div>
 
         <template v-else>
-          <PillGroup v-model="template" label="Template isi surat" :options="templateOptions" />
+          <PillGroup
+            v-model="template"
+            label="Template isi surat"
+            :options="draft.templateChoices"
+          />
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
@@ -559,7 +578,9 @@ onMounted(() => dialog.value?.focus())
             >
               <Icon name="camera" :size="15" />
               {{ busy ? 'Menyiapkan foto…' : 'Foto' }}
-              <span class="text-ink-subtle">{{ filledPhotos }}/{{ contentLimits.photo }}</span>
+              <span class="text-ink-subtle"
+                >{{ draft.filledPhotos }}/{{ contentLimits.photo }}</span
+              >
             </button>
             <button
               type="button"
