@@ -76,7 +76,8 @@ Job `pg_cron` `pembersihan-surat` jalan tiap jam di menit ke-7 dan menjalankan `
 - foto surat yang `photos_expire_at`-nya sudah lewat (7 hari setelah dibuka), beserta cover dan gambar OG kalau gambar depannya foto user, lalu mengisi `photos_deleted_at`;
 - surat yang sudah lewat 30 hari sejak publish, beserta foto dan gambar OG-nya;
 - kotak bareng yang lewat `expires_at` (30 hari setelah `opens_at`), beserta semua titipan (termasuk draf) dan berkasnya;
-- berkas di bucket `moments` yang tidak punya baris `moments` aktif (`orphan_moment_files()`): momennya sudah dihapus, atau user-nya sudah dihapus dan barisnya ikut terhapus cascade. Berkas selalu diunggah setelah barisnya ada (policy unggah), jadi berkas tanpa baris aktif pasti sampah.
+- berkas di bucket `moments` yang tidak punya baris `moments` aktif (`orphan_moment_files()`): momennya sudah dihapus, atau user-nya sudah dihapus dan barisnya ikut terhapus cascade. Berkas selalu diunggah setelah barisnya ada (policy unggah), jadi berkas tanpa baris aktif pasti sampah;
+- berkas di bucket `letter-assets` yang tidak punya baris `letter_assets` (`orphan_letter_files()`, migrasi `hardening`). URL upload berlaku 2 jam dan tidak bisa dicabut, jadi berkas yang diunggah setelah suratnya dihapus tidak punya baris lagi.
 
 Satu putaran memproses paling banyak 1.000 surat per jenis; sisanya diambil putaran berikutnya. `GET /l/:slug` tidak menunggu job: surat jadi 404 begitu `expires_at` lewat, dan foto tidak dikembalikan lagi begitu `photos_expire_at` lewat. Jadi jeda sampai job jalan hanya memengaruhi kuota, tidak pernah terlihat penerima.
 
@@ -125,14 +126,14 @@ Baris lebih tua dari 13 bulan dihapus `run_cleanup()`. Datanya dibaca lewat SQL 
 
 Untuk sekarang tidak ada layanan luar (Sentry dan sejenisnya), supaya tidak ada data yang keluar ke pihak ketiga dan `/privasi` tetap benar.
 
-- Setiap respons 5xx dari `letters`, `l`, dan `cleanup` dicatat ke tabel `function_errors`, dengan kolom:
+- Setiap respons 5xx dari keenam fungsi (`letters`, `l`, `boxes`, `k`, `account`, dan `cleanup`) dicatat ke tabel `function_errors`, dengan kolom:
   - `function`, `route` (pola, misalnya `/l/:slug`, bukan path aslinya);
   - `status`, `error_name` (misalnya `TypeError`, `PostgrestError`), `error_code` (kode PostgREST atau Postgres seperti `PGRST116` atau `57014`, atau status Storage);
   - `occurred_at`.
 
   Pesan error tidak disimpan. Error `fetch` di Deno menyertakan URL lengkap, termasuk filter PostgREST seperti `slug=eq.…`, dan error Postgres kadang menyertakan nilai input. Nama dan kode disaring dengan pola huruf, angka, dan garis bawah di fungsi dan sekali lagi di constraint tabel. Header, body, IP, slug, dan token tidak dicatat. Barisnya disimpan 30 hari, lalu dihapus `run_cleanup()`.
 - Pencatatannya best effort lewat `EdgeRuntime.waitUntil()`. Respons 500 keluar tanpa menunggu insert, dan kalau insert-nya gagal (biasanya justru saat DB bermasalah), cukup ditulis ke log.
-- Log Edge Function di dashboard Supabase tetap jadi tempat detail. Log itu dicatat penyedia, sesuai kalimat log teknis di `/privasi`.
+- Log Edge Function di dashboard Supabase menyimpan nama, kode, dan baris stack error (`logError()` di `_shared/errors.ts`), tanpa pesannya, dengan alasan yang sama. Baris stack menunjuk tempat error terjadi. Log itu dicatat penyedia, sesuai kalimat log teknis di `/privasi`.
 - Hasil panggilan job pembersihan dicek dari `net._http_response`.
 - View `function_errors_daily` merangkum error per fungsi, route, dan kode per hari (WIB). Selama beta, view ini dicek tiap hari bareng pemantauan kuota storage dan egress.
 - 5xx dari gateway atau platform tidak lewat kode fungsi, jadi tidak masuk `function_errors`. Contohnya boot error, `WORKER_LIMIT`, dan timeout. Pengecekan harian tetap melihat Logs dan Invocations tiap fungsi di dashboard.
@@ -203,13 +204,19 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] `POST /letters` menerima `box` (ganti penjaga sementara `box_not_found` di `_shared/validate.ts`), publish memeriksa kotaknya, dan `GET /l/:slug`, `POST /l/:slug/open`, serta `replyTo` memperlakukan surat titipan sebagai tidak ada
 - [x] Edge Function `boxes` (enam endpoint `/boxes/…`) dan `k` (`GET /k/:slug`, `POST /k/:slug/open`), preflight CORS di `_shared/http.ts` menerima `PATCH`, dan `_shared/errors.ts` mencatat error kedua fungsi itu
 - [x] Job pembersihan: kotak lewat `expires_at` beserta titipannya, foto titipan 7 hari setelah kotak dibuka
-- [ ] Deploy, lalu kabari Kall untuk menyalakan `NUXT_PUBLIC_KOTAK_BARENG` di Vercel
+- [x] Deploy, lalu kabari Kall untuk menyalakan `NUXT_PUBLIC_KOTAK_BARENG` di Vercel (menyala di produksi sejak 15 Oktober 2026)
+
+**Rilis 1.0**
+
+- [x] Audit keamanan backend sebelum rilis ([hasil](#audit-sebelum-rilis-10)): migrasi `hardening`, perbaikan fungsi, dan kontrak 0.4.1
+- [ ] Deploy hasil audit: `supabase db push` dulu, baru `supabase functions deploy letters l boxes k cleanup account` (langkah `letterFiles` di `cleanup` butuh `orphan_letter_files()` dari migrasinya)
+- [ ] [Setelan dashboard](#setelan-dashboard) yang belum: audit log Auth, Realtime, dan peringatan pemakaian
 
 ## Data model rilis 1
 
 | Tabel | Kolom penting |
 | --- | --- |
-| `letters` | `id`, `slug`, `owner_id`, `design` jsonb, `content` jsonb, `status`, `edit_token_hash`, `reply_to_id`, `created_at`, `draft_expires_at`, `published_at`, `expires_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at` |
+| `letters` | `id`, `slug`, `design` jsonb, `content` jsonb, `status`, `edit_token_hash`, `reply_to_id`, `created_at`, `draft_expires_at`, `published_at`, `expires_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at` |
 | `letter_assets` | `id`, `letter_id`, `storage_path`, `kind` (`photo`/`cover`/`og`), `key` (kunci foto di `content`, khusus `photo`), `mime`, `size`, `width`, `height`, `uploaded_at` |
 | `rate_limit_hits` | `bucket`, `key` (HMAC dari IP, bukan IP mentah), `created_at`. Diisi `take_rate_limit()` |
 | `letter_events` | `kind` (`created`/`opened`/`replied`, plus `box_created`/`box_letter`/`box_opened` untuk kotak bareng), `occurred_at` (dibulatkan ke jam), `after_hours`. Diisi trigger `letters_record_event` dan `boxes_record_event` |
@@ -217,7 +224,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 | `boxes` | Kotak bareng (kontrak 0.3.0), lihat [Rancangan kotak bareng](#rancangan-kotak-bareng). `letters` mendapat `box_id` dan `from_name` untuk surat titipan |
 
 - `slug` unik, minimal 10 karakter acak, dibuat saat publish.
-- `owner_id` boleh kosong selama belum ada login.
+- Surat tidak terikat ke akun, juga setelah login Google ada: pengirim memegang edit token. Kolom `owner_id` yang dulu disiapkan untuk itu dibuang di migrasi `hardening` karena tidak pernah diisi.
 - `design` menyimpan **id preset** (gambar depan, bentuk, mode foil, bingkai foil, warna foil, kertas, template), bukan nilai warnanya, supaya preset bisa dipoles tanpa merusak surat lama. Id-nya berasal dari `packages/presets/*.json` milik Kall.
 - `content` menyimpan elemen kanvas (teks, foto, stiker) beserta posisi, lebar, dan rotasi. Bentuknya ada di [`docs/api/openapi.yaml`](api/openapi.yaml) (`LetterContent`) dan sama dengan `packages/presets/src/letter-content.ts`.
 - `letter_assets` dibuat saat `POST /letters` dari metadata yang dikirim frontend. Stiker tidak diunggah karena berasal dari preset.
@@ -226,7 +233,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - Batas berkas ditegakkan juga di database: foto dan cover JPEG/WebP ≤ 500.000 byte dan ≤ 2048 px, OG JPEG/PNG 1200×630 ≤ 300.000 byte, maksimal 4 foto per surat, satu cover dan satu OG.
 - Kedua tabel memakai RLS tanpa policy dan hak `anon`/`authenticated` dicabut. Semua akses lewat Edge Functions dengan secret key. Tabel fase 2 (`profiles`, `moments`, `pockets`, `albums`) beda: dibuka untuk `authenticated` dengan RLS per user, lihat [Rancangan skema fase 2](#rancangan-skema-fase-2).
 - Skema lengkapnya ada di `supabase/migrations/`, ujinya di `supabase/tests/database/`.
-- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, `create_box()`, `update_box()`, `open_box()` (kotak bareng), serta `cleanup_token_valid()`, `run_cleanup()`, dan `orphan_moment_files()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
+- Fungsi database untuk Edge Functions: `create_letter()` (draf dan baris berkas dalam satu transaksi), `publish_letter()`, `open_letter()` (idempoten), `take_rate_limit()`, `create_box()`, `update_box()`, `open_box()` (kotak bareng), serta `cleanup_token_valid()`, `run_cleanup()`, `orphan_moment_files()`, dan `orphan_letter_files()` untuk job pembersihan. Trigger `record_letter_event()` mengisi `letter_events`. Semuanya hanya bisa dijalankan secret key.
 - `edit_token_hash`: server hanya menyimpan hash. Token mentahnya dikembalikan sekali ke browser pengirim, supaya pengirim bisa menghapus suratnya tanpa akun.
 - `reply_to_id` menunjuk surat yang dibalas (jalur viral "Bikin balasan").
 - `status` bernilai `draft` atau `sent`. `opened_at` diisi sekali saat surat pertama kali dibuka.
@@ -261,6 +268,7 @@ Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql
 **Kuota**
 
 - Selama beta, maksimal **100 momen aktif per user** (sekitar 50 MB). Trigger di `moments` menolak insert, atau update yang mengosongkan `deleted_at`, kalau user sudah punya 100 momen dengan `deleted_at is null`.
+- Sejak migrasi `hardening`, ada juga batas baris per user, termasuk baris berstatus hapus: **1.500 kantong, 200 album, dan 1.000 baris momen**. Tanpa batas ini satu akun bisa mengisi database 500 MB lewat upsert biasa, misalnya ribuan album berisi 500 UUID acak atau momen yang dikirim sudah berstatus hapus. Hanya baris baru yang dihitung, jadi upsert baris yang sudah ada tetap lolos di batas. Ditolak dengan kode `23514` dan pesan `kuota … penuh`, yang di frontend jadi status "Cadangan … penuh" di kartu Cadangan.
 - Kuota ini hanya berarti kalau setiap berkas punya baris. Karena itu policy unggah di bucket `moments` mensyaratkan baris `moments` milik user dengan `id` sama dengan nama berkas dan `deleted_at is null` (dicatat Kall). Satu baris, satu berkas: tanpa policy update, berkasnya juga tidak bisa ditimpa.
 - Momen yang dihapus berkasnya dihapus browser saat itu juga (policy hapus), dan job pembersihan tiap jam menghapus berkas yang masih tertinggal tanpa baris aktif (lihat [Pembersihan file](#pembersihan-file)). Jadi hapus lalu tambah lagi hanya bisa menumpuk berkas paling lama sejam.
 - Momen yang dipulihkan (`deleted_at` dikosongkan) setelah job menghapus berkasnya tetap aktif tanpa berkas. Browser yang memulihkan momen harus mengunggah ulang fotonya; policy unggah menerimanya karena barisnya aktif lagi.
@@ -332,7 +340,7 @@ Detail request, respons, dan kode error ada di [`docs/api/openapi.yaml`](api/ope
 
 ## Edge Functions
 
-Lima fungsi di `supabase/functions/`, semuanya dengan `verify_jwt = false`:
+Enam fungsi di `supabase/functions/`, semuanya dengan `verify_jwt = false`:
 
 | Fungsi | Endpoint |
 | --- | --- |
@@ -340,16 +348,19 @@ Lima fungsi di `supabase/functions/`, semuanya dengan `verify_jwt = false`:
 | `l` | `GET /l/{slug}`, `POST /l/{slug}/open` |
 | `boxes` | `POST /boxes`, `GET`/`PATCH`/`DELETE /boxes/{id}`, `DELETE /boxes/{id}/letters/{letterId}`, `GET /boxes/invite/{invite}` |
 | `k` | `GET /k/{slug}`, `POST /k/{slug}/open` |
+| `account` | `DELETE /account` (hapus akun dan cadangan Pocket, kontrak 0.4.0) |
 | `cleanup` | Job pembersihan, bukan bagian kontrak (lihat bagian Pembersihan file) |
 
 Kode bersama ada di `_shared/`:
 
-- `http.ts`: CORS sesuai kontrak, cek header `apikey` (harus publishable key proyek), dan bentuk error.
-- `validate.ts`: body `POST /letters` dicek dengan skema dari kontrak (`_shared/openapi.json`, hasil `scripts/bundle-contract.sh`), lalu aturan isi dicek dengan preset dan `contentLimits` dari `packages/presets`, sama seperti mock frontend.
-- `image.ts`: membaca tipe dan dimensi dari isi berkas, lalu membuang EXIF, XMP, IPTC, dan komentar tanpa kompres ulang.
-- `files.ts`: hapus berkas lewat Storage API dulu, baru barisnya. Dipakai `DELETE /letters/{id}` dan job pembersihan.
-- `errors.ts`: mencatat error 5xx ke `function_errors` (pola route, nama, dan kode saja), best effort lewat `EdgeRuntime.waitUntil()`.
-- `db.ts`: klien secret key. Secret key diambil dari env yang disediakan Supabase (`SUPABASE_SECRET_KEYS`), jadi tidak perlu `secrets set`.
+- `http.ts`: CORS sesuai kontrak, cek header `apikey` (harus publishable key proyek), bentuk error, dan body JSON dengan batas ukuran (100 KB untuk surat, 4 KB untuk kotak).
+- `validate.ts`: body `POST /letters` dan `/boxes` dicek dengan skema dari kontrak (`_shared/openapi.json`, hasil `scripts/bundle-contract.sh`), lalu aturan isi dicek dengan preset dan `contentLimits` dari `packages/presets`, sama seperti mock frontend.
+- `image.ts`: membaca tipe dan dimensi dari isi berkas, lalu hanya menyimpan bagian yang membentuk gambar, tanpa kompres ulang. EXIF, XMP, IPTC, MPF, C2PA, komentar, dan data sesudah EOI (gambar kedua, video Motion Photo) dibuang; profil warna ICC tetap.
+- `files.ts`: hapus berkas lewat Storage API dulu, baru barisnya. Dipakai `DELETE /letters/{id}`, kotak bareng, dan job pembersihan.
+- `errors.ts`: mencatat error 5xx ke `function_errors` (pola route, nama, dan kode saja), best effort lewat `EdgeRuntime.waitUntil()`, dan `logError()` menulis error ke log tanpa pesannya.
+- `db.ts`: klien secret key, bentuk baris tabel, dan aturan bersama seperti `photosGone()`. Secret key diambil dari env yang disediakan Supabase (`SUPABASE_SECRET_KEYS`), jadi tidak perlu `secrets set`.
+- `rate-limit.ts`: rate limit per IP lewat `take_rate_limit()`, dipakai `letters` dan `boxes`.
+- `box.ts` dan `token.ts`: bentuk respons kotak bareng, serta edit token, slug, dan kunci rate limit.
 
 Yang terjadi saat publish: setiap berkas diunduh dari Storage, ukurannya harus sama persis dengan metadata, tipe dan dimensinya dibaca dari isi berkas (bukan dari header). Kalau ada metadata yang tersisa atau content-type dari browser salah, berkasnya ditulis ulang tanpa metadata. Baru setelah itu `slug` dibuat dan status jadi `sent`.
 
@@ -420,6 +431,38 @@ Risiko yang diterima untuk rilis 1:
 - Rate limit per IP lemah di CGNAT (lihat Keputusan yang sudah diambil).
 - Berkas di bucket publik bisa dibuka siapa pun yang tahu URL lengkapnya. Itu memang dibutuhkan crawler WhatsApp, dan path-nya memuat dua UUID acak.
 
+### Audit sebelum rilis 1.0
+
+Audit ulang semua fungsi, migrasi, workflow, dan `config.toml`, 16 Oktober 2026. Tidak ada celah akses (IDOR, token bocor, RLS bolong) dan tidak ada rahasia di repo maupun di riwayat git. Yang diperbaiki di migrasi `hardening`, fungsi, dan kontrak 0.4.1 (berlaku di produksi setelah deploy):
+
+| Temuan | Perbaikan |
+| --- | --- |
+| Satu akun Google bisa mengisi database 500 MB: kantong, album, dan baris momen yang dikirim sudah berstatus hapus tidak dibatasi | Batas baris per user (lihat [Kuota](#rancangan-skema-fase-2)), dan frontend menampilkan "Cadangan … penuh" |
+| Pola `BoxText` mundur-maju kuadratik: body 100 KB berisi satu baris panjang memakan sekitar 5 detik CPU per request, sebelum rate limit sempat menolak | Pola linear dengan lookahead, plus batas body 4 KB untuk `/boxes`. Unit test memastikan teks 99,9 KB divalidasi dalam hitungan milidetik |
+| URL upload yang masih berlaku bisa dipakai setelah suratnya dihapus, meninggalkan berkas publik tanpa baris yang tidak pernah dibersihkan | `orphan_letter_files()` dan langkah `letterFiles` di job `cleanup` |
+| Error dari fungsi `account` selalu ditolak check constraint `function_errors` | Constraint menerima `account` dan `/account` |
+| Log fungsi menulis error utuh, termasuk "Failing row contains (…)" dan URL berisi slug | `logError()` hanya menulis nama, kode, dan baris stack |
+| Pembersih metadata lapis kedua melewatkan MPF, C2PA (APP11 JPEG, chunk `caBX` PNG), dan data sesudah EOI | `image.ts` hanya menyimpan bagian yang membentuk gambar |
+| `letters.owner_id` tidak pernah diisi | Dibuang |
+| CI hanya mengecek tipe tiga fungsi dan tidak memindai rahasia | `deno check */index.ts`, dan workflow `Web` menjalankan `scripts/check-secrets.sh` ke semua berkas |
+
+Yang belum dikerjakan:
+
+- Batas tingkat proyek (semua IP digabung) untuk surat, kotak, dan cadangan. Rate limit sekarang per IP dan per user, jadi banyak IP atau banyak akun masih bisa menghabiskan storage dan egress. Putuskan bareng soal Supabase Pro atau Cloudflare R2 sebelum promosi besar.
+- Supabase Auth menulis audit log (email dan IP) ke `auth.audit_log_entries` tanpa batas waktu, juga setelah akunnya dihapus. Dimatikan lewat [Setelan dashboard](#setelan-dashboard).
+- Belum ada alarm kalau job pembersihan berhenti. Sementara itu, cek `net._http_response` dan `function_errors_daily`.
+- GitHub Actions dipasang lewat tag, bukan hash commit. Dampaknya kecil: semua workflow hanya punya hak baca dan tidak memakai secret.
+- Tabel `profiles` tidak dipakai aplikasi, tapi barisnya dibuat trigger di `auth.users`. Membuang trigger di tabel milik Supabase Auth butuh hak pemilik tabel, jadi dibiarkan.
+
+### Setelan dashboard
+
+`supabase/config.toml` hanya untuk stack lokal dan CI, dan sengaja berbeda dari produksi (login email dengan password 6 karakter untuk test). Jangan jalankan `supabase config push` ke produksi. Setelan produksi diatur di dashboard:
+
+- [x] Authentication: hanya provider Google, provider Email mati ([Login Google](#login-google)).
+- [ ] Authentication → Audit Logs: matikan "Write audit logs to the database", lalu kosongkan isi lamanya lewat SQL Editor (`delete from auth.audit_log_entries`). Log audit tetap tersimpan di log penyedia dengan masa simpan sesuai paket, sesuai kalimat log teknis di `/privasi`.
+- [ ] Realtime tidak dipakai: matikan akses channel publik di pengaturan Realtime.
+- [ ] Usage: pasang peringatan pemakaian database, storage, dan egress.
+
 ## Yang dibutuhkan frontend
 
 - `docs/api/openapi.yaml` lebih dulu, supaya Kall bisa membangun UI dengan mock.
@@ -443,7 +486,7 @@ Usulan Kall (14 Oktober 2026), disetujui Bintang di #56 dan diterapkan di migras
 
 | Tabel | Kolom | Catatan |
 | --- | --- | --- |
-| `boxes` | `id` (uuid), `slug` (10 base62, unik), `invite` (12 base62, unik), `edit_token_hash`, `title`, `recipient` (`to` di kontrak), `design`, `scheduled`, `created_at`, `opens_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at`, `expires_at` (generated: `opens_at` + 30 hari) | `title` dan `recipient` 1–40 code point setelah dipangkas, tanpa NUL. `design` berbentuk id seperti `design` surat; isinya dicek fungsi terhadap `packages/presets/kotak.json`. `opens_at` ≤ `created_at` + 30 hari |
+| `boxes` | `id` (uuid), `slug` (10 base62, unik), `invite` (12 base62, unik), `edit_token_hash`, `title`, `recipient` (`to` di kontrak), `design`, `scheduled`, `created_at`, `opens_at`, `opened_at`, `photos_expire_at`, `photos_deleted_at`, `expires_at` (`opens_at` + 30 hari, dijaga check constraint dan ikut bergeser bersama `opens_at`) | `title` dan `recipient` 1–40 code point setelah dipangkas, tanpa NUL. `design` berbentuk id seperti `design` surat; isinya dicek fungsi terhadap `packages/presets/kotak.json`. `opens_at` ≤ `created_at` + 30 hari |
 | `letters` | tambah `box_id` (uuid, `references boxes on delete restrict`) dan `from_name` (1–40) | Constraint: `box_id` dan `from_name` sama-sama kosong atau sama-sama terisi. Indeks `letters (box_id)`. Surat titipan tidak punya baris `og` di `letter_assets` |
 
 - RLS sama seperti `letters`: tanpa policy, hak `anon` dan `authenticated` dicabut, semua akses lewat Edge Functions dengan secret key. `security.test.sql` ikut menjaga `boxes`.

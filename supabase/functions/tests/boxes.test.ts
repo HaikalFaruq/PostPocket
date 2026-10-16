@@ -336,6 +336,8 @@ Deno.test({
       ],
       [{ ...base, title: '   ' }, 400, 'invalid_request'],
       [{ ...base, title: 'x'.repeat(41) }, 400, 'invalid_request'],
+      // Body kotak di atas 4 KB ditolak sebelum diparse.
+      [{ ...base, title: 'x'.repeat(5000) }, 400, 'invalid_request'],
     ]
     for (const [body, status, code] of cases) {
       const result = await call('POST', '/boxes', { body })

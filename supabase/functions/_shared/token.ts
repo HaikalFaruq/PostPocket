@@ -9,7 +9,7 @@ function base64url(bytes: Uint8Array): string {
   )
 }
 
-export function hex(bytes: Uint8Array): string {
+function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
@@ -37,7 +37,7 @@ export function sameHash(hash: Uint8Array, stored: string): boolean {
 }
 
 /** Kode base62 acak tanpa bias modulo (byte ≥ 248 dibuang). */
-export function newCode(length: number): string {
+function newCode(length: number): string {
   let code = ''
   while (code.length < length) {
     for (const byte of crypto.getRandomValues(new Uint8Array(16))) {

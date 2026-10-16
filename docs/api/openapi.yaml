@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PostPocket API
-  version: 0.4.0
+  version: 0.4.1
   description: |
     Kontrak API antara frontend (`apps/web`) dan backend (Supabase Edge Functions). Server
     melayani surat yang dikirim dan kotak bareng; Pocket, TV, dan Booth tetap di browser
@@ -196,8 +196,8 @@ paths:
         EXIF yang tersisa sebagai lapis kedua. Kalau lolos, server membuat `slug` dan status
         surat menjadi `sent`.
 
-        Surat titipan diperiksa sekali lagi terhadap kotaknya: masih berlaku
-        (`422 box_not_found`), masih terbuka untuk titipan (`422 box_closed`), dan masih muat
+        Surat titipan diperiksa sekali lagi terhadap kotaknya: masih terbuka untuk titipan
+        (`422 box_closed`, juga kalau kotaknya sudah lewat masa berlaku) dan masih muat
         (`422 box_full`). Kalau kotaknya dihapus pembuatnya, draf titipannya ikut terhapus, jadi
         publish menjawab `404`. Responsnya membawa `box`, `url`-nya
         link titip kotak itu (bukan `/l/{slug}`), dan `expiresAt`-nya masa berlaku kotak.
@@ -1072,7 +1072,10 @@ components:
       type: string
       minLength: 1
       maxLength: 40
-      pattern: '^[^\u0000\n\r]*[^\u0000\s][^\u0000\n\r]*$'
+      # Syarat "bukan hanya spasi" ditulis sebagai lookahead supaya waktunya linear. Bentuk lama
+      # `^[^…]*[^\u0000\s][^…]*$` mundur-maju kuadratik: validasi body 100 KB berisi satu baris
+      # panjang memakan beberapa detik CPU sebelum batas 40 karakter dan rate limit sempat menolak.
+      pattern: '^(?=[^\u0000]*[^\u0000\s])[^\u0000\n\r]*$'
       description: |
         Teks pendek satu baris dari pengguna: judul kotak, nama penerima, atau nama pengirim.
         Maksimal 40 code point, tanpa karakter NUL atau ganti baris, dan tidak boleh hanya spasi.

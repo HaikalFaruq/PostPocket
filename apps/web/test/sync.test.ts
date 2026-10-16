@@ -197,6 +197,8 @@ class FakeServer {
   albums = new Map<string, AlbumRow>()
   files = new Set<string>()
   quota = 100
+  /** Batas kantong per user (trigger `pockets_quota`). */
+  pocketQuota = Infinity
   clock = Date.parse('2026-10-14T10:00:00.000Z')
   onUpsert?: () => void
 
@@ -223,6 +225,9 @@ class FakeServer {
         this.moments.set(row.id, { ...row, updated_at: this.stamp() })
       },
       upsertPockets: async (rows) => {
+        const added = rows.filter((row) => !this.pockets.has(row.day)).length
+        // Satu upsert = satu statement: ditolak semua kalau ada baris baru yang tidak muat.
+        if (this.pockets.size + added > this.pocketQuota) throw new QuotaFull('pockets')
         for (const row of rows) this.pockets.set(row.day, { ...row, updated_at: this.stamp() })
       },
       upsertAlbums: async (rows) => {
@@ -335,9 +340,27 @@ describe('runSync', () => {
     const phone = new FakeDevice()
     for (const n of [1, 2, 3]) phone.addMoment(n)
     const outcome = await phone.sync(server)
-    expect(outcome.quotaFull).toBe(true)
+    expect(outcome.quotaFull).toBe('moments')
     expect(server.moments.size).toBe(2)
     expect(Object.keys(phone.memory.pending!.moments)).toHaveLength(1)
+  })
+
+  it('kuota kantong penuh: kantong baru menunggu, foto tetap tercadang', async () => {
+    const server = new FakeServer()
+    server.pocketQuota = 0
+    const phone = new FakeDevice()
+    phone.addMoment(1)
+    phone.saveDay(pocketDay([id(1)]))
+    const outcome = await phone.sync(server)
+    expect(outcome.quotaFull).toBe('pockets')
+    expect(server.moments.has(id(1))).toBe(true)
+    expect(server.pockets.size).toBe(0)
+    expect(Object.keys(phone.memory.pending!.days)).toEqual([DAY])
+
+    // Setelah ada ruang, kantongnya terkirim di sinkron berikutnya.
+    server.pocketQuota = Infinity
+    expect((await phone.sync(server)).quotaFull).toBeNull()
+    expect(server.pockets.get(DAY)?.moment_ids).toEqual([id(1)])
   })
 
   it('berkas yang hilang dari cadangan diunggah ulang dari perangkat yang masih punya fotonya', async () => {

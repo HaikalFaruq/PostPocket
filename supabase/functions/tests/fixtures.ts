@@ -15,6 +15,7 @@ const le16 = (n: number) => [n & 0xff, (n >> 8) & 0xff]
 const le24 = (n: number) => [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff]
 const le32 = (n: number) => [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff]
 const be32 = (n: number) => [(n >>> 24) & 0xff, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+const text = (value: string) => [...new TextEncoder().encode(value)]
 
 /** Segmen JPEG: marker + panjang + isi. */
 const segment = (marker: number, body: number[] | Uint8Array) => [
@@ -24,21 +25,38 @@ const segment = (marker: number, body: number[] | Uint8Array) => [
   ...body,
 ]
 
-/** JPEG dengan APP1 berisi "lokasi" palsu kalau `exif` diisi. `pad` menambah data scan. */
+/**
+ * JPEG dengan APP1 berisi "lokasi" palsu kalau `exif` diisi. `pad` menambah data scan. `extra`
+ * menambah profil warna ICC, MPF, C2PA (APP11), scan kedua seperti JPEG progresif (dengan isian
+ * 0xFF00 dan RST di data scan), dan gambar kedua sesudah EOI seperti foto dari HP.
+ */
 export function jpeg(
   width: number,
   height: number,
-  options: { exif?: boolean; pad?: number } = {},
+  options: { exif?: boolean; pad?: number; extra?: boolean } = {},
 ) {
+  const extra = options.extra
   return bytes(
     [0xff, 0xd8],
     segment(0xe0, [...new TextEncoder().encode('JFIF\0'), 1, 1, 0, 0, 1, 0, 1, 0, 0]),
     options.exif ? segment(0xe1, [...new TextEncoder().encode('Exif\0\0GPS-6.2,106.8')]) : [],
+    extra ? segment(0xe2, [...text('ICC_PROFILE\0'), 1, 1, ...new Array(16).fill(7)]) : [],
+    extra ? segment(0xe2, [...text('MPF\0'), ...new Array(8).fill(9)]) : [],
+    extra ? segment(0xeb, [...text('JP'), 0, 1, ...text('jumb c2pa')]) : [],
     segment(0xdb, new Array(65).fill(1)),
     segment(0xc0, [8, ...be16(height), ...be16(width), 1, 1, 0x11, 0]),
     segment(0xda, [1, 1, 0, 0, 0x3f, 0]),
     new Array(options.pad ?? 32).fill(0x55),
+    extra
+      ? [
+        ...[0xff, 0x00, 0x55, 0xff, 0xd0, 0x55],
+        ...segment(0xc4, new Array(17).fill(0)),
+        ...segment(0xda, [1, 1, 0, 0, 0x3f, 0]),
+        ...[0x66, 0x66],
+      ]
+      : [],
     [0xff, 0xd9],
+    extra ? [0xff, 0xd8, ...segment(0xe1, text('Exif\0\0GPS-kedua')), 0xff, 0xd9] : [],
   )
 }
 
@@ -51,8 +69,15 @@ function chunk(id: string, data: number[] | Uint8Array): Uint8Array {
   return bytes(id, le32(data.length), data, data.length % 2 ? [0] : [])
 }
 
-/** WebP lossy (VP8) sederhana, atau VP8X dengan chunk EXIF kalau `exif` diisi. */
-export function webp(width: number, height: number, options: { exif?: boolean } = {}) {
+/**
+ * WebP lossy (VP8) sederhana, atau VP8X dengan chunk EXIF kalau `exif` diisi. `extra` memberi
+ * profil warna ICC, XMP, dan chunk C2PA.
+ */
+export function webp(
+  width: number,
+  height: number,
+  options: { exif?: boolean; extra?: boolean } = {},
+) {
   const vp8 = chunk('VP8 ', [
     0,
     0,
@@ -64,18 +89,39 @@ export function webp(width: number, height: number, options: { exif?: boolean } 
     ...le16(height),
     ...new Array(20).fill(0x11),
   ])
+  if (options.extra) {
+    // Flag VP8X: ICC (0x20) dan XMP (0x04).
+    const vp8x = chunk('VP8X', [0x24, 0, 0, 0, ...le24(width - 1), ...le24(height - 1)])
+    return riff([
+      vp8x,
+      chunk('ICCP', [1, 2, 3, 4]),
+      vp8,
+      chunk('XMP ', text('<x:xmpmeta GPS-xmp/>')),
+      chunk('C2PA', text('c2pa-manifest')),
+    ])
+  }
   if (!options.exif) return riff([vp8])
   const vp8x = chunk('VP8X', [0x08, 0, 0, 0, ...le24(width - 1), ...le24(height - 1)])
   return riff([vp8x, vp8, chunk('EXIF', [...new TextEncoder().encode('MM\0*GPS')])])
 }
 
-/** PNG dengan chunk tEXt kalau `text` diisi. CRC tidak dihitung karena server tidak membacanya. */
-export function png(width: number, height: number, options: { text?: boolean } = {}) {
+/**
+ * PNG dengan chunk tEXt kalau `text` diisi. `extra` memberi profil warna ICC, chunk C2PA (caBX),
+ * dan chunk privat. CRC tidak dihitung karena server tidak membacanya.
+ */
+export function png(
+  width: number,
+  height: number,
+  options: { text?: boolean; extra?: boolean } = {},
+) {
   const pngChunk = (id: string, data: number[]) => bytes(be32(data.length), id, data, [0, 0, 0, 0])
   return bytes(
     [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
     pngChunk('IHDR', [...be32(width), ...be32(height), 8, 2, 0, 0, 0]),
     options.text ? pngChunk('tEXt', [...new TextEncoder().encode('Comment\0rahasia')]) : [],
+    options.extra ? pngChunk('iCCP', [...text('icc\0'), 0, 1, 2]) : [],
+    options.extra ? pngChunk('caBX', text('c2pa-manifest')) : [],
+    options.extra ? pngChunk('prVt', text('rahasia-lain')) : [],
     pngChunk('IDAT', [1, 2, 3, 4]),
     pngChunk('IEND', []),
   )

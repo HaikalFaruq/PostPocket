@@ -10,7 +10,7 @@ const internalUrl = () => Deno.env.get('SUPABASE_URL')!
  * URL proyek yang bisa dibuka browser. Di proyek Supabase sama dengan `SUPABASE_URL`; di lokal
  * diisi `PUBLIC_API_URL` dari `[edge_runtime.secrets]` di supabase/config.toml.
  */
-export const publicUrl = () => Deno.env.get('PUBLIC_API_URL') ?? internalUrl()
+const publicUrl = () => Deno.env.get('PUBLIC_API_URL') ?? internalUrl()
 
 /** Secret key dari env yang disediakan Supabase, tidak pernah diset manual. */
 export function secretKey(): string {
@@ -49,6 +49,34 @@ export function assetUrl(path: string): string {
   const encoded = path.split('/').map(encodeURIComponent).join('/')
   return `${publicUrl()}/storage/v1/object/public/${BUCKET}/${encoded}`
 }
+
+/** Berkas surat untuk penerima (`Asset` di kontrak), atau `null` kalau tidak ada. */
+export const assetJson = (file?: Pick<AssetRow, 'storage_path' | 'width' | 'height'>) =>
+  file ? { url: assetUrl(file.storage_path), width: file.width, height: file.height } : null
+
+/** Id surat, kotak, dan titipan. Id yang bentuknya salah langsung 404 tanpa query. */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Slug surat (`/l/…`) dan kotak (`/k/…`): 10 karakter base62 dari `newSlug()`. */
+export const SLUG = /^[A-Za-z0-9]{10}$/
+
+/** Waktu dari database dalam format ISO kontrak, `null` tetap `null`. */
+export const iso = (value: string | null) => (value === null ? null : new Date(value).toISOString())
+
+type PhotoClock = Pick<LetterRow, 'photos_expire_at' | 'photos_deleted_at'>
+
+/**
+ * Foto surat atau titipan kotak tidak dikembalikan lagi: sudah dihapus job pembersihan, atau
+ * masanya sudah lewat walau job (tiap jam) belum jalan. Klien tidak pernah menerima URL yang
+ * sebentar lagi 404.
+ */
+export const photosGone = (row: PhotoClock) =>
+  row.photos_deleted_at !== null ||
+  (row.photos_expire_at !== null && Date.parse(row.photos_expire_at) <= Date.now())
+
+/** `photosDeletedAt` di kontrak: waktu job menghapusnya, atau `photosExpireAt` begitu lewat. */
+export const photosDeletedAt = (row: PhotoClock) =>
+  iso(row.photos_deleted_at ?? (photosGone(row) ? row.photos_expire_at : null))
 
 /** Origin link surat: origin frontend yang memanggil, atau situs produksi. */
 export function siteUrl(request: Request): string {

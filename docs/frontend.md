@@ -267,6 +267,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
   - momen yang hilang dari `moment_ids` kantong ditempel lagi;
   - unggah versi kompres ke `<owner_id>/<id>.jpg`, dan berkas yang hilang diunggah ulang.
 - [x] Pesan saat kuota penuh (`23514`, 100 foto). Unggah yang ditolak policy menggagalkan sinkron itu dan dicoba lagi, kecuali unggah ulang berkas yang hilang, yang dilewati per foto
+- [x] Batas kantong dan album per user (migrasi `hardening`, [backend](backend.md#audit-sebelum-rilis-10)): kantong atau album yang ditolak kuota tetap menunggu di perangkat, perubahan lain tetap terkirim, dan kartu Cadangan menulis "Cadangan kantong penuh" atau "Cadangan album penuh"
 - [x] `/privasi` menjelaskan akun Google dan cadangan foto, sebelum login dibuka
 - [x] Sinkron baru dinyalakan di produksi setelah job pembersihan berkas dan baris berstatus hapus dari Bintang ada (#52). Kartu Cadangan baru muncul kalau provider Google sudah aktif
 - [x] Hapus akun dari kartu Cadangan (kontrak 0.4.0), tanpa login ulang ([Sinkron Pocket](#sinkron-pocket)). `/privasi` menjelaskan caranya, dan Lapor masalah tetap ada untuk yang tidak bisa masuk lagi

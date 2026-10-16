@@ -74,7 +74,7 @@ function fromOtherKind(error: ErrorObject): boolean {
  * Error ajv sebagai `details`, dengan path seperti `content.elements[2].size`. Sama dengan
  * `contractDetails()` di mock frontend, supaya pesan error mock dan backend asli serupa.
  */
-export function contractDetails(errors: ErrorObject[] | null | undefined): ErrorDetail[] {
+function contractDetails(errors: ErrorObject[] | null | undefined): ErrorDetail[] {
   const details = new Map<string, ErrorDetail>()
   for (const error of errors ?? []) {
     if (fromOtherKind(error)) continue
@@ -137,7 +137,7 @@ function contentProblem(content: CreateLetterRequest['content']): string | null 
 }
 
 /** Kunci foto di `content`, sesuai urutan. */
-export function photoKeys(content: CreateLetterRequest['content']): string[] {
+function photoKeys(content: CreateLetterRequest['content']): string[] {
   return content.elements.flatMap((element) => element.kind === 'photo' ? [element.photo] : [])
 }
 
