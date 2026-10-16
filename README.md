@@ -104,7 +104,7 @@ cp apps/web/.env.example apps/web/.env      # lalu aktifkan NUXT_MOCK_API dan NU
 pnpm dev                                    # http://localhost:3000
 ```
 
-Dengan mock API, alur kirim dan buka surat jalan tanpa Supabase. Untuk mencoba dari HP di jaringan yang sama, jalankan `pnpm dev --host`. Halaman alat uji `/lab` (komponen bersama, kartu foil, cek Safari, alur kirim) hanya ada di development dan build E2E.
+Dengan mock API, alur kirim dan buka surat jalan tanpa Supabase. Untuk mencoba dari HP di jaringan yang sama, jalankan `pnpm dev --host`. Halaman alat uji `/lab` (komponen bersama, kartu foil, cek Safari, alur kirim) dan mock API hanya ada di development dan build E2E, tidak ikut build produksi.
 
 | Perintah | Fungsi |
 | --- | --- |
@@ -123,7 +123,7 @@ Pertama kali menjalankan E2E di mesin baru: `pnpm --filter @postpocket/web exec 
 PostPocket/
 ├── apps/web/              # Nuxt 4: halaman, kartu foil, editor surat, Pocket, TV, Booth, PWA
 │   ├── app/               # pages, components, composables, stores, utils
-│   ├── server/            # mock API untuk development dan E2E (404 di produksi)
+│   ├── server/            # mock API untuk development dan E2E (tidak ikut build produksi)
 │   ├── public/            # ilustrasi, stiker, ikon, gambar OG
 │   ├── scripts/           # generator ilustrasi, ikon, gambar OG, dan cek preview link
 │   ├── test/              # unit test Vitest
@@ -154,7 +154,8 @@ Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. Ta
 
 - **Tanpa rahasia di repo.** Hook `pre-commit` menolak berkas `.env` dan pola secret, CI mengecek ulang semua berkas di setiap PR, dan secret scanning serta push protection GitHub menyala. Frontend hanya memakai URL Supabase dan publishable key.
 - **Akses data dibatasi di database.** Semua tabel memakai RLS, dan pengubahan surat atau kotak butuh token yang hanya dipegang pembuatnya. CORS Edge Functions hanya menerima domain produksi.
-- **Header keamanan.** Halaman tidak bisa dibingkai situs lain, jenis berkas tidak ditebak browser, dan hanya kamera (untuk Booth) yang boleh dipakai.
+- **Header keamanan.** Halaman dan aset tidak bisa dibingkai situs lain, jenis berkas tidak ditebak browser, dan hanya kamera (untuk Booth) yang boleh dipakai.
+- **Batas pemakaian.** Pembuatan surat dan kotak dibatasi per jaringan, dan cadangan Pocket dibatasi per akun, supaya satu orang tidak bisa menghabiskan kuota server.
 - **Data seperlunya.** Tidak ada cookie pelacak atau analitik pihak ketiga, dan fungsi server tidak mencatat alamat IP. Hitungan surat disimpan tanpa menunjuk surat yang mana. Rinciannya ada di [halaman Privasi](https://postpocket.vercel.app/privasi).
 - **Melaporkan celah keamanan.** Pakai [private vulnerability reporting](https://github.com/HaikalFaruq/PostPocket/security/advisories/new), bukan issue publik.
 

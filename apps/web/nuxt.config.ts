@@ -6,6 +6,18 @@ import { splashScript } from './app/utils/splash'
 // Versi rilis dari package.json, ditulis bersama commit yang di-deploy, misalnya "1.0.0 (1abb127)".
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
+// Header keamanan untuk semua halaman dan aset (docs/frontend.md, Keamanan): tidak boleh dibingkai
+// situs lain, jenis berkas tidak ditebak, alamat lengkap tidak dikirim ke situs lain, dan hanya
+// kamera (Booth) yang boleh dipakai.
+const securityHeaders = {
+  'Content-Security-Policy':
+    "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
+}
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-10',
@@ -16,8 +28,9 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@vueuse/nuxt',
     '@vite-pwa/nuxt',
-    // Halaman /lab adalah alat uji (komponen bersama, kartu foil, cek Safari, alur kirim). Ada di
-    // `pnpm dev` dan build E2E dengan mock API, tapi tidak ikut build produksi, jadi di sana 404.
+    // Alat uji: halaman /lab (komponen bersama, kartu foil, cek Safari, alur kirim) dan mock API
+    // di server/ (beserta kontraknya). Ada di `pnpm dev` dan build E2E dengan mock API, tapi tidak
+    // ikut build produksi, jadi di sana 404.
     (_options, nuxt) => {
       if (nuxt.options.dev || process.env.NUXT_MOCK_API === '1') {
         // Tidak perlu SSR dan tidak boleh diindeks.
@@ -32,6 +45,9 @@ export default defineNuxtConfig({
           if (pages[i]!.path.startsWith('/lab')) pages.splice(i, 1)
         }
       })
+      const nitro = nuxt.options.nitro
+      nitro.ignore = [...(nitro.ignore ?? []), 'routes/mock-api/**']
+      nitro.serverAssets = nitro.serverAssets?.filter((asset) => asset?.baseName !== 'contract')
     },
   ],
   css: ['~/assets/css/main.css'],
@@ -217,6 +233,16 @@ export default defineNuxtConfig({
     serverAssets: [
       { baseName: 'contract', dir: fileURLToPath(new URL('../../docs/api', import.meta.url)) },
     ],
+    // Di Vercel, header routeRules ditulis ke config tanpa `continue`, jadi berkas statis yang
+    // punya aturan lebih spesifik (aset /_nuxt/, manifest dan service worker PWA) tidak ikut
+    // mendapat header '/**'. Rute pertama ini memasangnya ke semua jalur lalu meneruskan routing.
+    vercel: {
+      config: {
+        // Tipe rute di Nitro hanya mengenal header cache-control, padahal Vercel menerima header
+        // apa pun.
+        routes: [{ src: '/(.*)', headers: securityHeaders, continue: true } as never],
+      },
+    },
   },
 
   runtimeConfig: {
@@ -241,19 +267,8 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    // Header keamanan untuk semua halaman dan aset (docs/frontend.md, Keamanan): tidak boleh
-    // dibingkai situs lain, jenis berkas tidak ditebak, alamat lengkap tidak dikirim ke situs lain,
-    // dan hanya kamera (Booth) yang boleh dipakai.
-    '/**': {
-      headers: {
-        'Content-Security-Policy':
-          "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
-        'X-Frame-Options': 'DENY',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
-      },
-    },
+    // Header keamanan untuk halaman yang dirender server dan berkas statis di server Node (E2E).
+    '/**': { headers: securityHeaders },
     // Editor surat bekerja dengan draf di IndexedDB, jadi cukup dirender di browser.
     '/letter/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // TV, Booth, dan Pocket membaca data dari IndexedDB dan kamera, jadi cukup di browser.

@@ -143,7 +143,7 @@ CI menjalankan lint skema, test pgTAP, lint kontrak, serta lint dan test Edge Fu
 ## 7. Struktur repo
 
 ```text
-apps/web/               Nuxt, dipegang Kall (halaman /lab hanya ada di development dan E2E)
+apps/web/               Nuxt, dipegang Kall (halaman /lab dan mock API hanya ada di development dan E2E)
 supabase/migrations/    skema SQL dan RLS, dipegang Bintang
 supabase/tests/         test pgTAP untuk skema
 supabase/functions/     Edge Functions (Deno) beserta test-nya, dipegang Bintang
