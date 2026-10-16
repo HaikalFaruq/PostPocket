@@ -253,9 +253,10 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Id momen dan album jadi UUID, data lama diganti saat dimuat (#48)
 - [x] OAuth client Google (Google Cloud) dan provider Google di Supabase Auth, dipasang 15 Oktober 2026. Login dan cadangan foto sudah dicek di iPhone.
-  - Client-nya masih mode Testing, jadi hanya akun di daftar test users yang bisa masuk (maksimal 100).
-  - Tester baru ditambahkan Kall di Google Cloud: Google Auth Platform → Audience → Test users.
-  - Akun lain mendapat pesan "Login dibatalkan" di kartu Cadangan.
+  - Sejak 16 Oktober 2026 client-nya dipublikasikan (In production), jadi akun Google mana pun bisa masuk, tanpa daftar test users dan batas 100. Scope-nya non-sensitive (`openid`, `email`, `profile`), jadi tidak perlu verifikasi Google. Logo sengaja tidak dipasang, karena logo butuh verifikasi brand.
+  - Branding: homepage `https://postpocket.vercel.app` dan kebijakan privasi `/privasi`. Authorized domain: `postpocket.vercel.app` dan domain proyek Supabase (`<ref>.supabase.co`). `vercel.app` dan `supabase.co` ada di Public Suffix List, jadi Google meminta domain proyeknya, bukan domain induknya.
+  - Halaman login Google menulis "Lanjutkan ke `<ref>.supabase.co`", karena callback-nya di domain Supabase. Supaya yang tampil domain sendiri, perlu custom domain Supabase (add-on berbayar).
+  - Dicek 16 Oktober 2026: "Masuk dengan Google" di produksi membuka halaman login Google tanpa error, link Kebijakan Privasinya ke `/privasi`, dan Kall berhasil masuk di HP dengan akun Google yang tidak pernah ada di daftar test users.
 - [x] Login Google dan kartu Cadangan di Pocket ([Sinkron Pocket](#sinkron-pocket)). Surat tetap bisa dibuat dan dibuka tanpa login
 - [x] Sinkron dua arah sesuai catatan Sinkron di rancangan:
   - tarik dengan jendela 5 menit, penerapannya idempoten;

@@ -354,6 +354,6 @@ test('kembali dari Google dengan error: pesannya tampil dan alamatnya dibersihka
 }) => {
   await googleOn(page)
   await page.goto('/pocket?error=access_denied&error_description=Akses+ditolak')
-  await expect(page.getByTestId('backup-card')).toContainText('hanya akun Google tester')
+  await expect(page.getByTestId('backup-card')).toContainText('Login dibatalkan')
   await expect(page).toHaveURL(/\/pocket$/)
 })

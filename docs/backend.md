@@ -293,7 +293,7 @@ Login fase 2 hanya lewat Google (keputusan #47). Kall membuat OAuth client di Go
 **1. Google Cloud (Google Auth Platform), oleh Kall**
 
 - Branding: nama aplikasi PostPocket, email dukungan, domain `postpocket.vercel.app`, link ke `/privasi`.
-- Audience: External. Selama beta cukup mode Testing dengan tester didaftarkan (maksimal 100). Scope hanya `openid`, `email`, `profile`, jadi tidak perlu verifikasi Google kalau nanti dipublikasikan.
+- Audience: External, dipublikasikan (In production) sejak 16 Oktober 2026, jadi akun Google mana pun bisa masuk tanpa daftar tester. Scope hanya `openid`, `email`, `profile`, jadi tidak perlu verifikasi Google; logo tidak dipasang karena logo butuh verifikasi brand.
 - Client: Web application.
   - Authorized JavaScript origins: `https://postpocket.vercel.app`.
   - Authorized redirect URI: `https://rmyfkdtqcltawmssollb.supabase.co/auth/v1/callback`. Untuk stack lokal tambahkan `http://127.0.0.1:54321/auth/v1/callback`.
