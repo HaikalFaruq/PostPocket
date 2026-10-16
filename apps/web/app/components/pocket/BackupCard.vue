@@ -4,7 +4,7 @@ import { useIntervalFn, useNow } from '@vueuse/core'
 /**
  * Cadangan Pocket di bawah kalender. Tanpa Supabase atau sebelum login Google dinyalakan, isinya
  * tetap pengingat bahwa kenangan hanya ada di perangkat ini. Setelah login: akun, status sinkron,
- * jumlah foto tercadang (kuota beta 100 foto), dan Hapus akun.
+ * jumlah foto tercadang (kuota 100 foto), dan Hapus akun.
  */
 const sync = useSync()
 const route = useRoute()
@@ -107,7 +107,7 @@ const tone = computed(() => {
         {{ loginFailed || sync.error }}
       </p>
       <p class="mt-2 text-[12px] text-pocket-muted">
-        Selama beta, cadangan maksimal 100 foto per akun.
+        Cadangan maksimal 100 foto per akun.
         <NuxtLink to="/privasi" class="underline underline-offset-2">Privasi</NuxtLink>
       </p>
     </template>

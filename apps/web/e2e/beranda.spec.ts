@@ -21,11 +21,19 @@ test('logo P-amplop di header bernama PostPocket dan kembali ke Beranda', async 
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg')
   await home.click()
   await expect(page).toHaveURL(/\/$/)
-  // Di Beranda, "beta" sejajar dengan garis dasar wordmark, bukan dengan tengah logo yang batangnya
+  // Di Beranda, menu sejajar dengan garis dasar wordmark, bukan dengan tengah logo yang batangnya
   // menggantung di bawah.
   const logo = await page.getByRole('banner').getByRole('img', { name: 'PostPocket' }).boundingBox()
-  const beta = await page.getByRole('banner').getByText('beta', { exact: true }).boundingBox()
-  expect(beta!.y + beta!.height).toBeLessThan(logo!.y + logo!.height * 0.75)
+  // Yang diukur garis teksnya, bukan kotak tautannya yang setinggi 44 px.
+  const menuText = await page
+    .getByRole('banner')
+    .getByRole('link', { name: 'Kotak surat', exact: true })
+    .evaluate((link) => {
+      const range = document.createRange()
+      range.selectNodeContents(link)
+      return range.getBoundingClientRect().bottom
+    })
+  expect(menuText).toBeLessThan(logo!.y + logo!.height * 0.75)
 })
 
 test('garis di atas kerumunan digambar begitu terlihat', async ({ page }) => {

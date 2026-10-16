@@ -11,7 +11,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <InfoPage title="Privasi" lead="Ringkasan cara PostPocket menyimpan datamu selama masa beta.">
+  <InfoPage title="Privasi" lead="Ringkasan cara PostPocket menyimpan datamu.">
     <h2>Yang tersimpan di perangkatmu</h2>
     <ul>
       <li>
@@ -61,7 +61,7 @@ useSeoMeta({
         untuk login, Supabase menyimpan email, nama, dan foto profil akun Googlemu. PostPocket hanya
         menampilkan emailnya di kartu Cadangan;
       </li>
-      <li>selama beta, cadangan paling banyak 100 foto per akun;</li>
+      <li>cadangan paling banyak 100 foto per akun;</li>
       <li>
         foto yang kamu hapus di Pocket ikut dihapus dari cadangan. Sisa berkasnya dibersihkan paling
         lama sekitar satu jam kemudian;
@@ -147,8 +147,8 @@ useSeoMeta({
       Kirim lewat <FeedbackLink>Lapor masalah</FeedbackLink>. Laporan otomatis menyertakan halaman,
       versi aplikasi, dan jenis perangkatmu, tanpa link suratmu.
       <template v-if="publicReports">
-        Selama beta, laporan masuk ke GitHub Issues: perlu akun GitHub dan bisa dibaca publik, jadi
-        jangan tulis data pribadi di sana.
+        Laporan masuk ke GitHub Issues: perlu akun GitHub dan bisa dibaca publik, jadi jangan tulis
+        data pribadi di sana.
       </template>
     </p>
   </InfoPage>

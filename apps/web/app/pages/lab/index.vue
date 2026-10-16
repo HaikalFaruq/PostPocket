@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Foto contoh hanya untuk halaman lab, jadi ikut chunk halaman ini, tidak disajikan dari public/.
+import samplePhoto from '~/assets/lab/contoh-foto.svg?url'
 import { letter, pocket } from '@postpocket/presets'
 
 useSeoMeta({ title: 'Lab komponen · PostPocket', robots: 'noindex' })
@@ -163,7 +165,7 @@ const frameVariant = computed(() => frame.value as 'polaroid' | 'stamp' | 'ticke
             class="w-40"
             :variant="frameVariant"
             :color="frameColorHex"
-            src="/samples/contoh-foto.svg"
+            :src="samplePhoto"
             alt="Contoh foto pantai saat senja"
             caption="10 Okt 2026"
           />
