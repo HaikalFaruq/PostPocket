@@ -411,6 +411,15 @@ Hasil 13 Oktober 2026, setelah region fungsi Sydney (#31, #33) ter-deploy:
 | 2. `check:preview` | Semua aturan lolos untuk surat dari Bintang: halaman 200, gambar OG JPEG 1200×630 sebesar 162.145 byte, `noindex` |
 | 3. WhatsApp | Kall dan Bintang saling kirim surat. Preview tampil dan suratnya terbuka tanpa login |
 
+## Gambar README
+
+- **Gambar promo** (`docs/gambar/promo-*.webp`, 1320 × 2868 seperti screenshot App Store) memakai layar produksi asli di dalam bingkai iPhone 17 yang digambar sendiri, di atas amplop bertutup emas, dengan satu kata tulisan tangan di judulnya. Buat ulang dengan `node scripts/promo-readme.mjs` setiap kali Beranda, editor surat, atau Pocket berubah. Butuh Google Chrome, karena kartu foil butuh GPU. Data contohnya hanya masuk IndexedDB browser sementara, jadi tidak ada surat yang dikirim. Teks judul, stiker, dan posisinya ada di daftar `promos` di skrip itu.
+- **Diagram arsitektur** dibuat dengan [Archify](https://github.com/tt-a1i/archify) dari [`arsitektur.archify.json`](arsitektur.archify.json). Versi interaktifnya (`docs/arsitektur.html`) dipublikasikan GitHub Pages dari folder `docs/` (ada `docs/.nojekyll`) di <https://haikalfaruq.github.io/PostPocket/arsitektur.html>, dan tiap bagian menaut ke baris kode di commit `meta.repository.revision`. Setelah arsitektur berubah:
+  1. Perbarui JSON-nya, termasuk revisi dan nomor baris rujukan.
+  2. Clone Archify di luar repo, lalu jalankan `node <archify>/archify/bin/archify.mjs finalize architecture docs/arsitektur.archify.json .archify/arsitektur.html --repo-root . --quality showcase` (folder `.archify/` di-ignore).
+  3. Salin `.archify/arsitektur.html` ke `docs/arsitektur.html`.
+  4. Ekspor PNG terang dan gelap lewat tombol Ekspor, lalu simpan sebagai WebP 2400 px: `cwebp -q 95 -resize 2400 0 <png> -o docs/gambar/arsitektur-terang.webp`, begitu juga `arsitektur-gelap.webp`.
+
 ## Deploy
 
 Proyek Vercel `postpocket` (Hobby, akun Kall) tersambung ke repo ini lewat GitHub. Setiap push ke `main` deploy ke produksi di [postpocket.vercel.app](https://postpocket.vercel.app), setiap PR dapat preview.
