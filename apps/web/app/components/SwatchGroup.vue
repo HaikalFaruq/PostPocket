@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RadioGroupRoot } from 'reka-ui'
 
-export interface SwatchOption {
+interface SwatchOption {
   value: string
   label: string
   color: string

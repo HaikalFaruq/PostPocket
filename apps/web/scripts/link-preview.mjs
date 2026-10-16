@@ -7,7 +7,7 @@
 export const WHATSAPP_AGENT = 'WhatsApp/2.24.20.78 A'
 
 /** Batas ukuran gambar OG, sama dengan kontrak API. */
-export const OG_MAX_BYTES = 300_000
+const OG_MAX_BYTES = 300_000
 
 /** Server lokal boleh memakai http; situs asli wajib https. */
 export function isLocalUrl(url) {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RadioGroupRoot } from 'reka-ui'
 
-export interface PillOption {
+interface PillOption {
   value: string
   label: string
   disabled?: boolean
