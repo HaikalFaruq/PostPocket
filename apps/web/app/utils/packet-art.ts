@@ -6,12 +6,12 @@ import { PACKET_H, PACKET_W, SEAL, TEAR_Y } from './packet-tear'
  * sudut dan sisi ke tengah. Semua digambar sendiri, tanpa aset dari web referensi.
  */
 
-export type Pt = [number, number]
+type Pt = [number, number]
 
 const fmt = (n: number) => Number(n.toFixed(2))
 
 /** Kurva halus lewat titik-titik (Catmull-Rom jadi Bézier kubik), mulai dari titik pertama. */
-export function smoothPath(points: Pt[]): string {
+function smoothPath(points: Pt[]): string {
   const out: string[] = []
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[i - 1] ?? points[i]!
@@ -80,7 +80,7 @@ export const PACKET_SHAPE = (() => {
 })()
 
 /** Satu lipatan foil: dari tepi (lebar `width`) meruncing ke ujungnya, sedikit melengkung. */
-export interface Fold {
+interface Fold {
   from: Pt
   to: Pt
   width: number

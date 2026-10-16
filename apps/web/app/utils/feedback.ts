@@ -1,4 +1,4 @@
-// Laporan dari tester beta: tombol "Lapor masalah" membuka kanal laporan (GitHub Issues, atau
+// Laporan dari pengguna: tombol "Lapor masalah" membuka kanal laporan (GitHub Issues, atau
 // kanal lain lewat NUXT_PUBLIC_FEEDBACK_URL) dengan isi awal berisi data untuk melacak masalah.
 
 /** Kanal bawaan. Repo-nya publik, jadi isi awalnya memperingatkan soal data pribadi. */

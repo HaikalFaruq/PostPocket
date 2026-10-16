@@ -2,6 +2,8 @@
 
 Oct 10, 2026 · @Kall
 
+> **Status:** rilis 1 live di [postpocket.vercel.app](https://postpocket.vercel.app) sejak 16 Oktober 2026, termasuk fase 2 (login Google dan cadangan Pocket) dan kotak bareng. Bagian di bawah adalah rencana awal; keputusan sesudahnya dicatat di [panduan frontend](../frontend.md) dan [panduan backend](../backend.md).
+
 ## Ringkasan
 
 PostPocket adalah satu web untuk menangkap momen (Booth), menyimpannya per hari (Pocket), lalu mengirimkannya ke orang lain sebagai surat foil 3D (Letter). Rilis pertama meniru layout dan interaksi tiga referensi sedekat mungkin, lalu dipoles setelah produk jalan.

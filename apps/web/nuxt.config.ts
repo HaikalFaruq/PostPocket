@@ -1,12 +1,39 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import { splashScript } from './app/utils/splash'
+
+// Versi rilis dari package.json, ditulis bersama commit yang di-deploy, misalnya "1.0.0 (1abb127)".
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-10',
   devtools: { enabled: true },
-  modules: ['@nuxt/eslint', '@nuxt/fonts', '@pinia/nuxt', '@vueuse/nuxt', '@vite-pwa/nuxt'],
+  modules: [
+    '@nuxt/eslint',
+    '@nuxt/fonts',
+    '@pinia/nuxt',
+    '@vueuse/nuxt',
+    '@vite-pwa/nuxt',
+    // Halaman /lab adalah alat uji (komponen bersama, kartu foil, cek Safari, alur kirim). Ada di
+    // `pnpm dev` dan build E2E dengan mock API, tapi tidak ikut build produksi, jadi di sana 404.
+    (_options, nuxt) => {
+      if (nuxt.options.dev || process.env.NUXT_MOCK_API === '1') {
+        // Tidak perlu SSR dan tidak boleh diindeks.
+        nuxt.options.routeRules = {
+          ...nuxt.options.routeRules,
+          '/lab/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+        }
+        return
+      }
+      nuxt.hook('pages:extend', (pages) => {
+        for (let i = pages.length - 1; i >= 0; i--) {
+          if (pages[i]!.path.startsWith('/lab')) pages.splice(i, 1)
+        }
+      })
+    },
+  ],
   css: ['~/assets/css/main.css'],
 
   // Komponen bersama dipanggil dengan nama dari PRD: <StepCard>, <PillGroup>, dst.
@@ -130,7 +157,6 @@ export default defineNuxtConfig({
       // kartu untuk bentuk Tegak, Persegi, dan Mendatar (sekitar 800 KB) disimpan saat dipakai
       // (aturan /illustrations/ di bawah); yang ikut precache hanya bentuk Asli.
       globIgnores: [
-        'samples/**',
         'peeps/**',
         '**/heic.worker-*.js',
         'illustrations/*-{portrait,square,landscape}.svg',
@@ -202,21 +228,32 @@ export default defineNuxtConfig({
       supabasePublishableKey: '',
       // Kosong berarti fungsi Supabase (<supabaseUrl>/functions/v1); `/mock-api` untuk mock.
       apiBase: '',
-      // Kanal "Lapor masalah" untuk tester; `{pesan}` diganti isi laporan. Kosong berarti GitHub
+      // Kanal "Lapor masalah"; `{pesan}` diganti isi laporan. Kosong berarti GitHub
       // Issues repo ini (lihat utils/feedback.ts dan .env.example).
       feedbackUrl: '',
-      // Versi yang ditulis di laporan: commit yang di-deploy Vercel, atau "lokal".
-      appVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'lokal',
-      // Kotak bareng (kontrak 0.3.0) baru dinyalakan setelah Edge Function `boxes` dan `k`
-      // ter-deploy. Mati: halamannya 404 dan pintu masuknya disembunyikan. E2E dan mock
+      // Versi yang ditulis di footer dan laporan masalah: rilis dan commit yang di-deploy.
+      appVersion: `${version} (${process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'lokal'})`,
+      // Kotak bareng (kontrak 0.3.0). Menyala di produksi lewat env Vercel sejak Edge Function
+      // `boxes` dan `k` ter-deploy. Mati: halamannya 404 dan pintu masuknya disembunyikan. E2E dan mock
       // menyalakannya dengan NUXT_PUBLIC_KOTAK_BARENG=1.
       kotakBareng: false,
     },
   },
 
   routeRules: {
-    // Halaman lab hanya alat uji: tidak perlu SSR dan tidak boleh diindeks.
-    '/lab/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
+    // Header keamanan untuk semua halaman dan aset (docs/frontend.md, Keamanan): tidak boleh
+    // dibingkai situs lain, jenis berkas tidak ditebak, alamat lengkap tidak dikirim ke situs lain,
+    // dan hanya kamera (Booth) yang boleh dipakai.
+    '/**': {
+      headers: {
+        'Content-Security-Policy':
+          "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
+        'X-Frame-Options': 'DENY',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
+      },
+    },
     // Editor surat bekerja dengan draf di IndexedDB, jadi cukup dirender di browser.
     '/letter/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // TV, Booth, dan Pocket membaca data dari IndexedDB dan kamera, jadi cukup di browser.

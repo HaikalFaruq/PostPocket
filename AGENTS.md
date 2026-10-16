@@ -113,7 +113,7 @@ Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
 | `SYNC_E2E=1 pnpm --filter @postpocket/web exec playwright test --project=android --project=iphone` | E2E sinkron Pocket ke stack Supabase lokal, butuh `API_URL`, `PUBLISHABLE_KEY`, dan `SECRET_KEY` dari `supabase status -o env` ([caranya](docs/frontend.md#sinkron-pocket)) |
 | `scripts/check-no-ai.sh --revs origin/main..HEAD` | Cek atribusi AI di commit yang belum masuk `main` |
 | `scripts/test-check-no-ai.sh` | Uji pola cek atribusi AI, wajib lolos setelah polanya diubah |
-| `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`) |
+| `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`; CI mengecek semua berkas lewat `--files`) |
 | `scripts/test-check-secrets.sh` | Uji pola cek rahasia, wajib lolos setelah polanya diubah |
 
 Sebelum push, pastikan `pnpm check` dan `pnpm test:e2e` lolos. Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. CI menjalankan semuanya di setiap PR (workflow `Web` dan `No AI attribution`).
@@ -142,24 +142,25 @@ CI menjalankan lint skema, test pgTAP, lint kontrak, serta lint dan test Edge Fu
 
 ## 7. Struktur repo
 
-Yang bertanda *(belum)* dibuat oleh pemiliknya di Sprint 0.
-
 ```text
-apps/web/               Nuxt, dipegang Kall
+apps/web/               Nuxt, dipegang Kall (halaman /lab hanya ada di development dan E2E)
 supabase/migrations/    skema SQL dan RLS, dipegang Bintang
 supabase/tests/         test pgTAP untuk skema
 supabase/functions/     Edge Functions (Deno) beserta test-nya, dipegang Bintang
-packages/presets/       preset JSON kertas, foil, kantong, bingkai, filter + helper
-docs/prd/               PRD (Markdown dan PDF) beserta gambarnya
+packages/presets/       preset JSON surat, kantong, TV, dan kotak + helper tata letak isi surat
+docs/prd/               PRD beserta gambarnya
 docs/frontend.md        panduan frontend
 docs/backend.md         panduan backend
-docs/spikes/            hasil spike Sprint 0 (kartu foil, Safari)
-docs/api/openapi.yaml   kontrak API (belum)
+docs/desain.md          identitas visual dan aturan desain
+docs/spikes/            hasil spike Sprint 0 (kartu foil, Safari, editor isi surat)
+docs/api/openapi.yaml   kontrak API
+docs/brand/             logo P-amplop dalam berbagai versi
+docs/screenshots/       screenshot untuk README
 docs/reference/         ukuran dan catatan tiga web referensi (screenshot di luar repo)
 docs/assets.md          sumber dan lisensi aset
-scripts/                cek atribusi AI (dipakai hook dan CI) beserta ujinya
-.githooks/              hook commit-msg dan pre-push
-.github/                workflow CI dan template PR
+scripts/                cek atribusi AI dan rahasia (dipakai hook dan CI) beserta ujinya, bundel kontrak
+.githooks/              hook pre-commit, commit-msg, dan pre-push
+.github/                workflow CI (Web, Backend, No AI attribution, Ping produksi) dan template PR
 ```
 
 ## 8. Aturan produk
@@ -179,4 +180,4 @@ Repo ini public: commit, PR, issue, dan komentar bisa dibaca siapa saja.
 - Commit memakai email noreply GitHub supaya email pribadi tidak tampil. Alamatnya sama dengan tabel co-author di bagian 2: `git config user.email <id>+<username>@users.noreply.github.com`.
 - Screenshot web referensi tidak disimpan di repo; `docs/reference/` hanya berisi ukuran dan catatan.
 
-Penjaganya berlapis. Hook `.githooks/pre-commit` (`scripts/check-secrets.sh`) menolak file `.env` dan pola secret sebelum commit. Setelah itu, secret scanning dan push protection GitHub menolak push yang memuat secret yang dikenali.
+Penjaganya berlapis. Hook `.githooks/pre-commit` (`scripts/check-secrets.sh`) menolak file `.env` dan pola secret sebelum commit, dan workflow `Web` menjalankan cek yang sama ke semua berkas yang di-track di setiap PR, termasuk commit yang dibuat tanpa hook. Setelah itu, secret scanning dan push protection GitHub menolak push yang memuat secret yang dikenali.

@@ -2,6 +2,9 @@
 
 Untuk Kall dan agent-nya. Baca [AGENTS.md](../AGENTS.md) dulu; detail produk lengkap ada di [PRD](prd/PRD-PostPocket.md), hasil bedah referensi di [docs/reference](reference/README.md).
 
+> [!NOTE]
+> **PostPocket 1.0 rilis 16 Oktober 2026.** Label beta sudah dihapus dari aplikasi. Versi rilis ada di `apps/web/package.json` dan tampil di footer Beranda serta laporan Lapor masalah bersama commit yang di-deploy, misalnya "1.0.0 (1abb127)". Naikkan versinya di PR rilis berikutnya.
+
 ## Mulai lokal
 
 Butuh Node 24 (lihat `.nvmrc`) dan pnpm 9.
@@ -52,12 +55,13 @@ apps/web/
   app/utils/                logika murni (card-motion, foil-map, letter-draft, memories, calendar, exif,
                             color, foil, icons, packet-art, packet-tear, photo-line) dan util browser
                             (front-image, photo-filter), diuji di test/
-  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /kotak (Kotak surat), /kotak/baru dan /kotak/:id (bikin dan kelola kotak bareng), /titip/:kode (titip surat), /k/:slug (kotak bareng untuk penerima), /lab, /lab/foil, /lab/safari, /lab/kirim
-  public/illustrations/     ilustrasi depan kartu, hasil scripts/illustrations.mjs
+  app/pages/                / (Beranda), /letter/new (editor surat), /l/:slug (penerima), /tv (TV dan Booth), /pocket (kalender), /pocket/:date (isi kantong), /kotak (Kotak surat), /kotak/baru dan /kotak/:id (bikin dan kelola kotak bareng), /titip/:kode (titip surat), /k/:slug (kotak bareng untuk penerima), serta alat uji /lab, /lab/foil, /lab/safari, /lab/kirim yang hanya ada di `pnpm dev` dan build E2E (mock API), tidak di produksi
+  public/illustrations/     ilustrasi depan kartu per bentuk kartu, hasil scripts/illustrations.mjs
   e2e/                      skenario Playwright
   server/routes/mock-api/   mock API surat dan kotak bareng untuk development dan E2E (NUXT_MOCK_API=1)
   test/                     unit test Vitest
-packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, isAllowed, surprise)
+packages/presets/           pilihan desain dalam JSON + tipe dan helper (byId, isAllowed, surprise, illustrationArt,
+                            tata letak isi surat: templateElements, textRooms, reflowTemplate, freeSpot)
 ```
 
 ## Aturan frontend
@@ -192,7 +196,7 @@ Surat dari link hilang 30 hari setelah dikirim dan fotonya 7 hari setelah dibuka
 
 ## Kotak bareng
 
-Banyak pengirim, satu penerima ([PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat), kontrak 0.3.0, [rancangan backend](backend.md#rancangan-kotak-bareng)). Selama Edge Function `boxes` dan `k` belum ter-deploy, frontend memakai mock, dan semua halamannya 404 kecuali `NUXT_PUBLIC_KOTAK_BARENG=1` (E2E selalu menyalakannya; produksi menyala setelah backend siap).
+Banyak pengirim, satu penerima ([PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kotak-surat), kontrak 0.3.0, [rancangan backend](backend.md#rancangan-kotak-bareng)). Semua halamannya 404 kecuali `NUXT_PUBLIC_KOTAK_BARENG=1`. Di produksi menyala sejak 15 Oktober 2026 (env Vercel production), setelah Edge Function `boxes` dan `k` ter-deploy; E2E dan `pnpm dev` menyalakannya bersama mock API.
 
 - **Pembuat**: `/kotak/baru` memanggil `POST /boxes`, lalu menyimpan `editToken` di IndexedDB (`utils/my-boxes.ts`) seperti surat terkirim. Kalau browser menolak menyimpannya, kedua link langsung ditampilkan di halaman itu. Hanya browser itu yang bisa membuka `/kotak/:id`, dan tokennya hanya dilupakan kalau server menjawab `box_not_found`. Halaman kelola memuat ulang saat dibuka lagi tanpa menimpa hasil aksi yang lebih baru, dan "Buka sekarang" mengirim `openNow`, jadi jam HP tidak dipakai; status terbukanya dari `openable`. Hasil aksi tampil di bagian yang tombolnya ditekan (`BoxMessage`), dan setelah kotak terbuka link titip tidak ditawarkan lagi. `/kotak/baru` mengingatkan bahwa kotak hanya bisa dikelola dari browser itu, apalagi kalau terbuka di browser bawaan aplikasi lain.
 - **Teman yang menitip**: `/titip/:kode` (SSR, `noindex`, OG `og-titip.jpg`) membuka editor dengan `?titip=<kode>`. Draf menyimpan kotak tujuan dan nama pengirim (`draft.box`, `draft.from`); kotaknya tetap saat strip Booth masuk lewat Pakai di surat. Surat titipan dikirim tanpa gambar OG, dan dicatat di Surat terkirim dengan `titip`, jadi bisa ditarik lagi dari halaman titip. Kalau kotaknya gagal dimuat karena koneksi, `?titip=` dikembalikan ke alamat supaya muat ulang mencoba lagi. Titipan yang ditolak karena kotaknya dihapus, ditutup, atau penuh tidak ditawari Coba lagi.
@@ -314,7 +318,21 @@ Login Google sendiri tidak bisa diuji otomatis. Tesnya memakai user yang dibuat 
 - [x] Halaman `/kotak` dengan folder kaca, baca surat satu per satu, hapus surat dan folder
 - [ ] Animasi folder kaca dan penampil dicek di iPhone dan Android sungguhan ([langkah 9](#uji-di-hp-sungguhan))
 - [x] Kotak bareng di atas mock (kontrak 0.3.0): bikin dan kelola kotak, titip dari editor dan Booth, kotak tersegel, baca satu per satu, Simpan semua
-- [ ] Kotak bareng menyala di produksi (`NUXT_PUBLIC_KOTAK_BARENG=1` di Vercel) setelah Edge Function `boxes` dan `k` dari Bintang ter-deploy, lalu dicek dengan langkah 10
+- [x] Kotak bareng menyala di produksi (`NUXT_PUBLIC_KOTAK_BARENG=1` di Vercel) setelah Edge Function `boxes` dan `k` dari Bintang ter-deploy, 15 Oktober 2026. Alur bikin, titip, buka, dan simpan dicek di browser ke produksi (22 dari 22 langkah lolos)
+
+## Keamanan
+
+- **Header keamanan** untuk semua halaman dan aset, dari `routeRules['/**']` di `nuxt.config.ts`:
+  - `Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`, plus `X-Frame-Options: DENY` untuk browser lama, jadi halaman tidak bisa dibingkai situs lain;
+  - `X-Content-Type-Options: nosniff`;
+  - `Referrer-Policy: strict-origin-when-cross-origin`, jadi alamat lengkap (termasuk slug surat) tidak terkirim ke situs lain;
+  - `Permissions-Policy`: hanya kamera (Booth) yang boleh dipakai, mikrofon, lokasi, pembayaran, dan USB dimatikan.
+  
+  CSP untuk skrip sengaja belum dipasang: Nuxt menyisipkan skrip inline (payload, splash), jadi butuh nonce atau hash per halaman. HSTS sudah dikirim Vercel.
+- **Alat uji tidak ikut rilis.** Halaman `/lab` dibuang dari build produksi oleh modul kecil di `nuxt.config.ts`, dan mock API (`server/routes/mock-api`) menjawab 404 kalau `NUXT_MOCK_API` mati (`assertMockEnabled`).
+- **Rahasia.** Frontend hanya memakai URL Supabase dan publishable key. Hook `pre-commit` menolak `.env` dan pola secret (`scripts/check-secrets.sh`), workflow `Web` mengecek ulang semua berkas yang di-track, dan secret scanning GitHub menyala.
+- **Data pribadi di perangkat.** Halaman surat penerima, kotak bareng, dan titip tidak pernah disimpan service worker (`isPrivatePath()`), dan Lapor masalah tidak menyertakan link surat.
+- **Audit dependensi.** `pnpm audit --prod` masih melaporkan dua temuan tanpa versi tambalan: `node-forge` (lewat `listhen`, server `nuxt dev`) dan `braces` (lewat pencarian berkas saat build). Keduanya hanya dipakai alat development dan build, dan tidak menerima masukan dari pengguna. Cek lagi setiap Nuxt naik versi.
 
 ## PWA
 
@@ -343,7 +361,7 @@ Item checklist yang tersisa dicek sekali jalan dengan daftar di bawah:
 - uji di 3 HP (beta);
 - animasi Kotak surat (langkah 9).
 
-Pakai tiga HP: iPhone (Safari), Android kelas menengah (Chrome), dan satu Android lain, lebih bagus lagi kalau yang murah. Semua dibuka di domain produksi, karena kamera butuh HTTPS.
+Pakai tiga HP: iPhone (Safari), Android kelas menengah (Chrome), dan satu Android lain, lebih bagus lagi kalau yang murah. Langkah 3 sampai 10 dibuka di domain produksi. Halaman `/lab` di langkah 1 dan 2 tidak ada di produksi, jadi dibuka dari Mac lewat `pnpm dev --host` (alamat `http://<ip-mac>:3000` di jaringan yang sama), dan kamera di langkah 2 lewat tunnel HTTPS karena kamera butuh HTTPS.
 
 | # | Lakukan | Yang harus terjadi |
 | --- | --- | --- |
@@ -366,9 +384,8 @@ Laporan per HP berisi:
 Kalau ketiga HP lolos, centang item-item itu di checklist.
 
 - `/lab/foil?bench=1` menjalankan benchmark otomatis; hasilnya muncul di pojok kanan atas dan bisa disalin dari langkah 5. Parameter lain: `?flip=1` (sampul belakang) dan `?open=1` (kartu terbuka).
-- `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS: buka di domain produksi, atau `pnpm dev --host` lalu tunnel HTTPS.
-
-Domain produksi: [postpocket.vercel.app/lab/foil?bench=1](https://postpocket.vercel.app/lab/foil?bench=1) dan [postpocket.vercel.app/lab/safari](https://postpocket.vercel.app/lab/safari).
+- `/lab/safari` memeriksa `ctx.filter`, OffscreenCanvas, WebGL2, IndexedDB, dan kamera. Kamera hanya jalan di HTTPS, jadi buka lewat tunnel HTTPS ke `pnpm dev --host`.
+- `/lab/foil` juga menerima `?art=<ilustrasi>`, `?shape=<bentuk>`, dan `?border=1`, misalnya untuk mengecek bingkai foil di simulator iOS tanpa mengetuk layar.
 
 ## Gerbang Sprint 2
 
@@ -401,6 +418,7 @@ Proyek Vercel `postpocket` (Hobby, akun Kall) tersambung ke repo ini lewat GitHu
 | Framework dan Node | Nuxt, 24.x |
 | Region fungsi | `sin1` (Singapura), dekat dengan pengguna di Indonesia. Supabase ada di Sydney (`ap-southeast-2`) |
 | Env production, preview, development | `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, nilainya sama dengan `apps/web/.env` |
+| Env production saja | `NUXT_PUBLIC_KOTAK_BARENG=1` |
 
 - Preview dilindungi Vercel Authentication, jadi hanya bisa dibuka akun pemilik proyek. Domain produksi terbuka untuk siapa saja.
 - Sejak kontrak 0.2.3, Edge Functions hanya menerima origin domain produksi. Di preview, halaman surat masih terbuka lewat SSR, tapi "Buat link" dan menandai surat dibuka ditolak CORS. Alur kirim diuji di E2E (mock) dan tes live (produksi).

@@ -5,7 +5,6 @@ export const iconPaths = {
   'chevron-left': 'M15 6l-6 6 6 6',
   'chevron-right': 'M9 6l6 6-6 6',
   'arrow-left': 'M19 12H5M11 6l-6 6 6 6',
-  'arrow-right': 'M5 12h14M13 6l6 6-6 6',
   close: 'M6 6l12 12M18 6L6 18',
   // Lingkaran dengan huruf i: garis nol panjang di atas jadi titik karena ujungnya bulat.
   info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5.5M12 7.6v.01',

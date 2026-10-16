@@ -49,7 +49,7 @@ export interface SyncBackend {
   download(id: string): Promise<Blob | null>
 }
 
-/** Kuota beta penuh: 100 momen aktif per user (trigger `moments_quota`, kode 23514). */
+/** Kuota penuh: 100 momen aktif per user (trigger `moments_quota`, kode 23514). */
 export class QuotaFull extends Error {
   constructor() {
     super('kuota momen penuh')

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-// Halaman info untuk tester beta: privasi, lisensi, dan halaman galat berbahasa Indonesia.
+// Halaman info: privasi, lisensi, dan halaman galat berbahasa Indonesia.
 
 test('Beranda menautkan halaman privasi dan lisensi', async ({ page }) => {
   await page.goto('/')
@@ -15,7 +15,7 @@ test('Beranda menautkan halaman privasi dan lisensi', async ({ page }) => {
   await expect(page.getByRole('main')).toContainText('log teknis mereka')
   // Hitungan surat dari tabel letter_events di backend, tanpa kolom yang menunjuk ke surat.
   await expect(page.getByRole('main')).toContainText('tanpa mencatat surat yang mana')
-  // Cadangan Pocket (fase 2): kuota beta dan data Google yang disimpan Supabase Auth.
+  // Cadangan Pocket (fase 2): kuota dan data Google yang disimpan Supabase Auth.
   await expect(page.getByRole('main')).toContainText('paling banyak 100 foto per akun')
   await expect(page.getByRole('main')).toContainText('email, nama, dan foto profil')
 
@@ -43,7 +43,8 @@ test('Lapor masalah membuka kanal laporan dengan halaman, versi, dan perangkat',
   // Jangan sampai test membuka GitHub sungguhan.
   await context.route('https://github.com/**', (route) => route.fulfill({ body: 'ok' }))
   await page.goto('/')
-  await expect(page.getByRole('contentinfo')).toContainText('Versi beta (lokal)')
+  await expect(page.getByRole('contentinfo')).toContainText('Versi 1.0.0 (lokal)')
+  await expect(page.getByRole('banner')).not.toContainText('beta')
   const popup = context.waitForEvent('page')
   await page.getByRole('contentinfo').getByTestId('feedback-link').click()
   const report = new URL((await popup).url())
@@ -53,7 +54,7 @@ test('Lapor masalah membuka kanal laporan dengan halaman, versi, dan perangkat',
   const body = report.searchParams.get('body') ?? ''
   expect(body).toContain('bisa dibaca publik')
   expect(body).toContain('Halaman: /')
-  expect(body).toContain('Versi: lokal')
+  expect(body).toContain('Versi: 1.0.0 (lokal)')
   expect(body).toMatch(/Perangkat: Mozilla\//)
 })
 
