@@ -121,3 +121,37 @@ test('kerumunan di atas footer baru dimuat saat hampir terlihat', async ({ page 
     )
     .toBeGreaterThan(1000)
 })
+
+test('Traktir PostPocket membuka perangko dan tautan Sociabuzz di tab baru', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('support-open').click()
+  const dialog = page.getByRole('dialog', { name: 'Traktir PostPocket' })
+  await expect(dialog).toBeVisible()
+  const link = dialog.getByRole('link', { name: /Dukung lewat Sociabuzz/ })
+  await expect(link).toHaveAttribute('href', 'https://sociabuzz.com/byhund/tribe')
+  await expect(link).toHaveAttribute('target', '_blank')
+  await expect(link).toHaveAttribute('rel', /noopener/)
+  // Cap pos bertanggal hari ini, waktu Jakarta.
+  await expect(dialog.locator('.stamp__postmark-date')).toHaveText(/^\d{1,2} [A-Z]{3} \d{4}$/)
+
+  await dialog.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(dialog).toBeHidden()
+
+  // Dari footer juga bisa, dan Esc menutupnya.
+  await page.getByTestId('support-footer').click()
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  // Menekan tautannya membuka Sociabuzz di tab baru dan menutup dialog. Halaman Sociabuzz tidak
+  // dimuat di tes: request-nya dijawab kosong.
+  await page
+    .context()
+    .route('https://sociabuzz.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<title>Sociabuzz</title>' }),
+    )
+  await page.getByTestId('support-open').click()
+  const [popup] = await Promise.all([page.waitForEvent('popup'), link.click()])
+  await expect(popup).toHaveURL('https://sociabuzz.com/byhund/tribe')
+  await expect(dialog).toBeHidden()
+})
