@@ -1,21 +1,27 @@
 // Kotak bareng (kontrak 0.3.0): batas, pencarian kotak, pemakaian, dan bentuk respons yang
 // dipakai fungsi `boxes`, `k`, dan `letters` (surat titipan).
 
-import { type AssetRow, type BoxRow, check, db, type LetterRow, siteUrl } from './db.ts'
+import {
+  type AssetRow,
+  type BoxRow,
+  check,
+  db,
+  iso,
+  type LetterRow,
+  photosDeletedAt,
+  siteUrl,
+} from './db.ts'
 import { ApiError } from './http.ts'
 
 /** Batas per kotak (`BoxLimits` di kontrak), juga dikirim ke `publish_letter()`. */
 export const BOX_LIMITS = { letters: 20, photos: 40 }
 
-export const BOX_SLUG = /^[A-Za-z0-9]{10}$/
+/** Kode titip: 12 karakter base62 dari `newInvite()`. */
 export const INVITE = /^[A-Za-z0-9]{12}$/
-export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Semua 404 kotak berkode `box_not_found` (kontrak), juga untuk id yang bentuknya salah. */
 export const boxNotFound = (message = 'kotak tidak ada atau sudah kedaluwarsa') =>
   new ApiError(404, 'box_not_found', message)
-
-export const iso = (value: string | null) => (value === null ? null : new Date(value).toISOString())
 
 /** Kotak yang masih berlaku (belum lewat `expires_at`), atau `null`. */
 export async function liveBox(
@@ -31,15 +37,6 @@ export async function liveBox(
 
 /** `opens_at` sudah lewat menurut jam server: terbuka untuk penerima, tertutup untuk titipan. */
 export const openable = (box: BoxRow) => Date.parse(box.opens_at) <= Date.now()
-
-/** Foto titipan tidak dikembalikan lagi: sudah dihapus job, atau masanya sudah lewat. */
-export const photosGone = (box: BoxRow) =>
-  box.photos_deleted_at !== null ||
-  (box.photos_expire_at !== null && Date.parse(box.photos_expire_at) <= Date.now())
-
-/** `photosDeletedAt` di kontrak: waktu job menghapusnya, atau `photosExpireAt` begitu lewat. */
-export const photosDeletedAt = (box: BoxRow) =>
-  iso(box.photos_deleted_at ?? (photosGone(box) ? box.photos_expire_at : null))
 
 export type BoxLetter =
   & Pick<LetterRow, 'id' | 'from_name' | 'published_at' | 'design' | 'content'>
@@ -57,7 +54,7 @@ export async function boxLetters(boxId: string, withContent = false): Promise<Bo
 }
 
 /** Foto dan cover di satu titipan (dihitung ke batas 40 foto). */
-export const letterPhotos = (letter: Pick<BoxLetter, 'letter_assets'>) =>
+const letterPhotos = (letter: Pick<BoxLetter, 'letter_assets'>) =>
   letter.letter_assets.filter((asset) => asset.kind === 'photo' || asset.kind === 'cover').length
 
 export function usage(letters: BoxLetter[]) {
@@ -67,7 +64,7 @@ export function usage(letters: BoxLetter[]) {
   }
 }
 
-export const boxUrl = (request: Request, box: BoxRow) => `${siteUrl(request)}/k/${box.slug}`
+const boxUrl = (request: Request, box: BoxRow) => `${siteUrl(request)}/k/${box.slug}`
 export const inviteUrl = (request: Request, box: BoxRow) =>
   `${siteUrl(request)}/titip/${box.invite}`
 

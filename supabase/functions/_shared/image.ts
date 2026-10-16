@@ -1,6 +1,6 @@
-// Membaca tipe dan dimensi gambar dari isinya, lalu membuang metadata (EXIF, XMP, IPTC,
-// komentar) sebagai lapis kedua setelah browser. Piksel tidak disentuh, jadi tidak ada
-// kompres ulang.
+// Membaca tipe dan dimensi gambar dari isinya, lalu membuang metadata (EXIF, XMP, IPTC, C2PA,
+// komentar, gambar kedua) sebagai lapis kedua setelah browser. Yang disimpan hanya bagian yang
+// membentuk gambar. Piksel tidak disentuh, jadi tidak ada kompres ulang.
 
 export type ImageType = 'image/jpeg' | 'image/webp' | 'image/png'
 
@@ -69,20 +69,61 @@ function jpegInfo(b: Uint8Array): ImageInfo | null {
   return { type: 'image/jpeg', height: u16be(b, sof.start + 5), width: u16be(b, sof.start + 7) }
 }
 
-/** APP1 (EXIF, XMP), APP13 (IPTC), dan komentar dibuang. JFIF, ICC, dan Adobe tetap. */
-const JPEG_METADATA = new Set([0xe1, 0xed, 0xfe])
+/**
+ * Segmen yang tetap: semua segmen non-APP (tabel, frame), JFIF (APP0), profil warna ICC (APP2
+ * "ICC_PROFILE"), dan Adobe (APP14, dibutuhkan untuk warna CMYK). APPn lain dibuang, termasuk
+ * EXIF dan XMP (APP1), MPF (APP2, penunjuk gambar kedua), JUMBF/C2PA (APP11), dan IPTC (APP13),
+ * juga komentar.
+ */
+function keepJpegSegment(b: Uint8Array, { marker, start }: JpegSegment): boolean {
+  if (marker === 0xfe) return false
+  if (marker < 0xe0 || marker > 0xef) return true
+  if (marker === 0xe0) return ascii(b, start + 4, 5) === 'JFIF\0'
+  if (marker === 0xe2) return ascii(b, start + 4, 12) === 'ICC_PROFILE\0'
+  return marker === 0xee
+}
+
+const isRst = (marker: number) => marker >= 0xd0 && marker <= 0xd7
+
+/**
+ * Posisi tepat setelah EOI gambar utama, mulai dari SOS pertama. Data scan dilewati sampai marker
+ * berikutnya (selain isian 0xFF00 dan RST), jadi JPEG progresif dengan banyak scan tetap utuh.
+ * Yang sesudah EOI (gambar kedua MPF, video Motion Photo) tidak ikut. Kalau EOI tidak ketemu,
+ * berkas dibiarkan sampai habis.
+ */
+function jpegEnd(b: Uint8Array, scan: number): number {
+  let i = scan
+  while (i + 1 < b.length) {
+    if (b[i] !== 0xff) return b.length
+    const marker = b[i + 1]
+    if (marker === 0xd9) return i + 2
+    if (marker === 0xff) {
+      i++ // byte pengisi
+      continue
+    }
+    if (marker === 0x01 || isRst(marker)) {
+      i += 2
+      continue
+    }
+    if (i + 4 > b.length) return b.length
+    i += 2 + u16be(b, i + 2)
+    if (marker !== 0xda) continue
+    while (i + 1 < b.length && !(b[i] === 0xff && b[i + 1] !== 0x00 && !isRst(b[i + 1]))) i++
+  }
+  return b.length
+}
 
 function stripJpeg(b: Uint8Array): Uint8Array {
   const parsed = jpegSegments(b)
   if (!parsed) return b
-  const drop = parsed.segments.filter((segment) => JPEG_METADATA.has(segment.marker))
-  if (!drop.length) return b
-  const parts: Uint8Array[] = [b.subarray(0, 2)]
-  for (const segment of parsed.segments) {
-    if (!JPEG_METADATA.has(segment.marker)) parts.push(b.subarray(segment.start, segment.end))
-  }
-  parts.push(b.subarray(parsed.scan))
-  return concat(parts)
+  const kept = parsed.segments.filter((segment) => keepJpegSegment(b, segment))
+  const end = jpegEnd(b, parsed.scan)
+  if (kept.length === parsed.segments.length && end === b.length) return b
+  return concat([
+    b.subarray(0, 2),
+    ...kept.map((segment) => b.subarray(segment.start, segment.end)),
+    b.subarray(parsed.scan, end),
+  ])
 }
 
 // ---------- WebP ----------
@@ -130,10 +171,13 @@ function webpInfo(b: Uint8Array): ImageInfo | null {
   return null
 }
 
+/** Chunk yang membentuk gambar. Sisanya dibuang: EXIF, XMP, dan chunk lain seperti C2PA. */
+const WEBP_IMAGE = new Set(['VP8 ', 'VP8L', 'VP8X', 'ALPH', 'ANIM', 'ANMF', 'ICCP'])
+
 function stripWebp(b: Uint8Array): Uint8Array {
   const chunks = webpChunks(b)
-  if (!chunks || !chunks.some((chunk) => chunk.id === 'EXIF' || chunk.id === 'XMP ')) return b
-  const kept = chunks.filter((chunk) => chunk.id !== 'EXIF' && chunk.id !== 'XMP ')
+  if (!chunks || chunks.every((chunk) => WEBP_IMAGE.has(chunk.id))) return b
+  const kept = chunks.filter((chunk) => WEBP_IMAGE.has(chunk.id))
   const out = concat([
     b.subarray(0, 12),
     ...kept.map((chunk) => b.subarray(chunk.start, chunk.end)),
@@ -167,12 +211,36 @@ function pngInfo(b: Uint8Array): ImageInfo | null {
   return { type: 'image/png', width: u32be(b, ihdr.start + 8), height: u32be(b, ihdr.start + 12) }
 }
 
-const PNG_METADATA = new Set(['eXIf', 'tEXt', 'iTXt', 'zTXt', 'tIME'])
+/**
+ * Chunk kritis, warna, transparansi, dan animasi (APNG). Sisanya dibuang: teks, waktu, EXIF
+ * (eXIf), C2PA (caBX), dan chunk privat. Semua yang dibuang chunk tambahan, jadi gambar tetap
+ * terbaca.
+ */
+const PNG_IMAGE = new Set([
+  'IHDR',
+  'PLTE',
+  'IDAT',
+  'IEND',
+  'tRNS',
+  'cHRM',
+  'gAMA',
+  'iCCP',
+  'sBIT',
+  'sRGB',
+  'cICP',
+  'mDCV',
+  'cLLI',
+  'bKGD',
+  'pHYs',
+  'acTL',
+  'fcTL',
+  'fdAT',
+])
 
 function stripPng(b: Uint8Array): Uint8Array {
   const chunks = pngChunks(b)
-  if (!chunks || !chunks.some((chunk) => PNG_METADATA.has(chunk.id))) return b
-  const kept = chunks.filter((chunk) => !PNG_METADATA.has(chunk.id))
+  if (!chunks || chunks.every((chunk) => PNG_IMAGE.has(chunk.id))) return b
+  const kept = chunks.filter((chunk) => PNG_IMAGE.has(chunk.id))
   return concat([b.subarray(0, 8), ...kept.map((chunk) => b.subarray(chunk.start, chunk.end))])
 }
 

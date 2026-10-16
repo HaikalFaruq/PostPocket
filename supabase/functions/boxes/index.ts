@@ -8,50 +8,36 @@ import {
   boxLetters,
   boxNotFound,
   INVITE,
-  iso,
   liveBox,
   openable,
   organizerBox,
   usage,
-  UUID,
 } from '../_shared/box.ts'
-import { type BoxRow, check, clientIp, db, secretKey } from '../_shared/db.ts'
+import { type BoxRow, check, db, iso, UUID } from '../_shared/db.ts'
 import { deleteBoxes, deleteLetters } from '../_shared/files.ts'
 import { ApiError, empty, json, notFound, readJson, serve } from '../_shared/http.ts'
-import {
-  bytea,
-  newEditToken,
-  newInvite,
-  newSlug,
-  rateKey,
-  sameHash,
-  sha256,
-} from '../_shared/token.ts'
+import { type RateLimit, takeRateLimit } from '../_shared/rate-limit.ts'
+import { bytea, newEditToken, newInvite, newSlug, sameHash, sha256 } from '../_shared/token.ts'
 import { parseCreateBox, parseUpdateBox } from '../_shared/validate.ts'
 
-/** Batas awal pembuatan kotak, terpisah dari surat (docs/backend.md, Rancangan kotak bareng). */
-const RATE_LIMIT = { bucket: 'create_box', limit: 5, window: '1 hour' }
-
-async function takeRateLimit(request: Request) {
-  const key = await rateKey(clientIp(request), secretKey())
-  const retryAfter = check(
-    await db().rpc('take_rate_limit', {
-      p_bucket: RATE_LIMIT.bucket,
-      p_key: bytea(key),
-      p_limit: RATE_LIMIT.limit,
-      p_window: RATE_LIMIT.window,
-    }),
-  ) as number
-  if (retryAfter > 0) {
-    throw new ApiError(429, 'rate_limited', 'terlalu banyak kotak dari IP ini', undefined, {
-      'retry-after': String(retryAfter),
-    })
-  }
+/** Batas pembuatan kotak per IP, terpisah dari surat (docs/backend.md, Rancangan kotak bareng). */
+const RATE_LIMIT: RateLimit = {
+  bucket: 'create_box',
+  limit: 5,
+  window: '1 hour',
+  message: 'terlalu banyak kotak dari IP ini',
 }
 
+/**
+ * Batas body `POST` dan `PATCH /boxes`. Body terpanjang yang sah (judul dan nama penerima 40
+ * karakter emoji yang di-escape) sekitar 1 KB; batas umum 100 KB untuk isi surat terlalu longgar
+ * di sini.
+ */
+const BODY_LIMIT = 4096
+
 async function createBox(request: Request) {
-  const body = parseCreateBox(await readJson(request))
-  await takeRateLimit(request)
+  const body = parseCreateBox(await readJson(request, BODY_LIMIT))
+  await takeRateLimit(request, RATE_LIMIT)
   const editToken = newEditToken()
   const hash = bytea(await sha256(editToken))
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -93,7 +79,7 @@ async function getBox(request: Request, id: string) {
 
 async function updateBox(request: Request, id: string) {
   const box = await ownedBox(request, id)
-  const patch = parseUpdateBox(await readJson(request))
+  const patch = parseUpdateBox(await readJson(request, BODY_LIMIT))
   const { data, error } = await db().rpc('update_box', { p_id: box.id, p_patch: patch })
   if ((error as { message?: string } | null)?.message === 'box_closed') {
     throw new ApiError(409, 'box_closed', 'kotak sudah terbuka, jadi tidak bisa diubah')

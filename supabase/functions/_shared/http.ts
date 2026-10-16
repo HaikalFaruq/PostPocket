@@ -2,7 +2,7 @@
 // `account`.
 // Aturannya ada di docs/api/openapi.yaml bagian CORS dan Error.
 
-import { recordError } from './errors.ts'
+import { logError, recordError, routePattern } from './errors.ts'
 
 export type ErrorCode =
   | 'invalid_request'
@@ -54,7 +54,7 @@ function corsHeaders(request: Request): Headers {
   return headers
 }
 
-export function preflight(request: Request): Response {
+function preflight(request: Request): Response {
   const headers = corsHeaders(request)
   headers.set('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   headers.set(
@@ -128,7 +128,7 @@ export function serve(handler: (request: Request, path: string) => Promise<Respo
       return await handler(request, path)
     } catch (error) {
       if (error instanceof ApiError) return errorResponse(request, error)
-      console.error(error)
+      logError(`kesalahan server di ${routePattern(path)}`, error)
       recordError(path, 500, error)
       return errorResponse(request, new ApiError(500, 'internal', 'kesalahan server'))
     }

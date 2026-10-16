@@ -1,7 +1,7 @@
 // Unit test tanpa database. Jalankan dari supabase/functions: deno test tests/unit.test.ts
 
 import { assert, assertEquals, assertNotEquals, assertRejects, assertThrows } from '@std/assert'
-import { errorFields, routePattern } from '../_shared/errors.ts'
+import { errorFields, logError, routePattern } from '../_shared/errors.ts'
 import { chunks } from '../_shared/files.ts'
 import { ApiError, readJson } from '../_shared/http.ts'
 import { imageInfo, stripMetadata } from '../_shared/image.ts'
@@ -39,6 +39,39 @@ Deno.test('stripMetadata mengembalikan berkas yang sama kalau tidak ada metadata
   assert(stripMetadata(file, 'image/jpeg') === file)
   const photo = webp(10, 10)
   assert(stripMetadata(photo, 'image/webp') === photo)
+  const og = png(10, 10)
+  assert(stripMetadata(og, 'image/png') === og)
+})
+
+Deno.test('stripMetadata JPEG: MPF, C2PA, dan gambar kedua sesudah EOI dibuang, ICC tetap', () => {
+  const original = jpeg(800, 600, { extra: true })
+  const clean = stripMetadata(original, 'image/jpeg')
+  assert(hasText(clean, 'ICC_PROFILE'), 'profil warna tetap')
+  for (const text of ['MPF', 'c2pa', 'GPS-kedua']) assert(!hasText(clean, text), text)
+  assertEquals(imageInfo(clean), { type: 'image/jpeg', width: 800, height: 600 })
+  // Semua scan (termasuk isian 0xFF00, RST, dan scan kedua) utuh sampai EOI gambar utama, lalu
+  // berhenti tepat sebelum SOI gambar kedua.
+  const marker = (file: Uint8Array, code: number, from = 0) =>
+    file.findIndex((b, i) => i >= from && b === 0xff && file[i + 1] === code)
+  const second = marker(original, 0xd8, 2)
+  assertEquals(
+    clean.subarray(marker(clean, 0xda)),
+    original.subarray(marker(original, 0xda), second),
+  )
+})
+
+Deno.test('stripMetadata WebP dan PNG: hanya chunk gambar dan warna yang tetap', () => {
+  const photo = stripMetadata(webp(640, 480, { extra: true }), 'image/webp')
+  assert(hasText(photo, 'ICCP'), 'profil warna WebP tetap')
+  assert(!hasText(photo, 'GPS-xmp') && !hasText(photo, 'c2pa'))
+  assertEquals(photo[20], 0x20, 'flag VP8X tinggal ICC')
+  assertEquals(new DataView(photo.buffer).getUint32(4, true), photo.length - 8, 'ukuran RIFF')
+  assertEquals(imageInfo(photo), { type: 'image/webp', width: 640, height: 480 })
+
+  const og = stripMetadata(png(1200, 630, { text: true, extra: true }), 'image/png')
+  assert(hasText(og, 'iCCP'), 'profil warna PNG tetap')
+  for (const text of ['rahasia', 'c2pa', 'prVt']) assert(!hasText(og, text), text)
+  assertEquals(imageInfo(og), { type: 'image/png', width: 1200, height: 630 })
 })
 
 Deno.test('stripMetadata membuang chunk EXIF WebP dan memperbaiki header RIFF', () => {
@@ -210,6 +243,45 @@ Deno.test('parseCreateBox dan parseUpdateBox', () => {
   assertEquals(code(() => parseUpdateBox({ design: 'nggak-ada' })), [422, 'invalid_box'])
 })
 
+Deno.test('BoxText: aturannya sama, waktunya linear untuk teks panjang', () => {
+  const box = { title: 'Ultah Rani', to: 'Rani', design: 'par-avion', opensAt: null }
+  const cases: [string, boolean][] = [
+    ['Ultah Rani 🎉', true],
+    ['  a  ', true],
+    ['a\u3000', true],
+    ['   ', false],
+    ['\t', false],
+    ['\u3000', false],
+    ['a\nb', false],
+    ['a\rb', false],
+    ['a\u0000', false],
+  ]
+  for (const [title, valid] of cases) {
+    const accepted = (() => {
+      try {
+        parseCreateBox({ ...box, title })
+        return true
+      } catch {
+        return false
+      }
+    })()
+    assertEquals(accepted, valid, JSON.stringify(title))
+  }
+
+  // Pola lama mundur-maju kuadratik: satu teks 99,9 KB butuh sekitar 5 detik CPU.
+  const { body } = letterFixture()
+  const started = performance.now()
+  for (const long of ['a'.repeat(99_900) + '\n', ' '.repeat(99_900) + 'a\n']) {
+    assertThrows(() => parseCreateBox({ ...box, title: long }), ApiError)
+    assertThrows(
+      () => parseCreateRequest({ ...body, og: null, box: { invite: 'Ab3dE6gH9jKm', from: long } }),
+      ApiError,
+    )
+  }
+  const elapsed = performance.now() - started
+  assert(elapsed < 1000, `validasi teks panjang ${Math.round(elapsed)} ms`)
+})
+
 Deno.test('parseCreateRequest: batas jumlah elemen sama dengan contentLimits', () => {
   const { body } = letterFixture()
   const text = (i: number) => ({ ...content.elements[1], id: `t${i}` })
@@ -296,6 +368,29 @@ Deno.test('errorFields hanya menyimpan nama dan kode yang cocok pola, tanpa pesa
   )
   assertEquals(errorFields('teks biasa'), { error_name: null, error_code: null })
   assertEquals(errorFields(null), { error_name: null, error_code: null })
+})
+
+Deno.test('logError hanya menulis nama, kode, dan stack, tanpa pesan error', () => {
+  const lines: unknown[][] = []
+  const original = console.error
+  console.error = (...args: unknown[]) => void lines.push(args)
+  try {
+    logError(
+      'kesalahan server di /l/:slug',
+      new TypeError('error sending request for url (https://x.supabase.co/l?slug=eq.AbCdE12345)'),
+    )
+    logError('cleanup gagal', {
+      message: 'new row violates check constraint',
+      details: 'Failing row contains (Rani, rahasia)',
+      code: '23514',
+    })
+  } finally {
+    console.error = original
+  }
+  const logged = JSON.stringify(lines)
+  for (const text of ['AbCdE12345', 'rahasia', 'violates']) assert(!logged.includes(text), text)
+  assert(logged.includes('TypeError') && logged.includes('23514'))
+  assert(logged.includes('unit.test.ts'), 'baris stack tetap ada')
 })
 
 Deno.test('readJson berhenti membaca begitu body lewat batas', async () => {

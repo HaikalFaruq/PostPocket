@@ -1,34 +1,45 @@
 // Fungsi `letters`: POST /letters, POST /letters/{id}/publish, DELETE /letters/{id}.
 // Kontrak: docs/api/openapi.yaml. Surat titipan kotak bareng (0.3.0) lewat jalur yang sama.
 
-import { BOX_LIMITS, boxError, boxLetters, boxReceipt, inviteUrl, usage } from '../_shared/box.ts'
+import {
+  BOX_LIMITS,
+  boxError,
+  boxLetters,
+  boxReceipt,
+  inviteUrl,
+  liveBox,
+  usage,
+} from '../_shared/box.ts'
 import {
   type AssetRow,
   type BoxRow,
   BUCKET,
   check,
-  clientIp,
   db,
   type LetterRow,
-  secretKey,
   siteUrl,
   toPublic,
+  UUID,
 } from '../_shared/db.ts'
 import { deleteLetters } from '../_shared/files.ts'
 import { ApiError, empty, json, notFound, readJson, serve } from '../_shared/http.ts'
 import { imageInfo, type ImageType, stripMetadata } from '../_shared/image.ts'
-import { bytea, newEditToken, newSlug, rateKey, sameHash, sha256 } from '../_shared/token.ts'
+import { type RateLimit, takeRateLimit } from '../_shared/rate-limit.ts'
+import { bytea, newEditToken, newSlug, sameHash, sha256 } from '../_shared/token.ts'
 import { type FileMeta, parseCreateRequest } from '../_shared/validate.ts'
 
-/** Batas awal pembuatan surat, dievaluasi selama beta (docs/backend.md). */
-const RATE_LIMIT = { bucket: 'create_letter', limit: 10, window: '1 hour' }
+/** Batas pembuatan surat per IP (docs/backend.md, Keamanan). */
+const RATE_LIMIT: RateLimit = {
+  bucket: 'create_letter',
+  limit: 10,
+  window: '1 hour',
+  message: 'terlalu banyak surat dari IP ini',
+}
 /**
  * Surat titipan punya bucket sendiri, per IP lintas kotak: teman-teman satu Wi-Fi tetap muat
  * satu kotak penuh (20), tapi satu IP tidak bisa menimbun draf di banyak kotak.
  */
-const BOX_RATE_LIMIT = { bucket: 'box_letter', limit: 30, window: '1 hour' }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const BOX_RATE_LIMIT: RateLimit = { ...RATE_LIMIT, bucket: 'box_letter', limit: 30 }
 
 const EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -55,30 +66,9 @@ async function letterIdOf(slug: string): Promise<string | null> {
   return rows[0]?.id ?? null
 }
 
-async function takeRateLimit(request: Request, limit = RATE_LIMIT) {
-  const key = await rateKey(clientIp(request), secretKey())
-  const retryAfter = check(
-    await db().rpc('take_rate_limit', {
-      p_bucket: limit.bucket,
-      p_key: bytea(key),
-      p_limit: limit.limit,
-      p_window: limit.window,
-    }),
-  ) as number
-  if (retryAfter > 0) {
-    throw new ApiError(429, 'rate_limited', 'terlalu banyak surat dari IP ini', undefined, {
-      'retry-after': String(retryAfter),
-    })
-  }
-}
-
 /** Kotak tujuan surat titipan, kalau masih menerima titipan dan surat ini masih muat. */
 async function boxForEntry(invite: string, photos: number): Promise<BoxRow> {
-  const rows = check(
-    await db().from('boxes').select('*').eq('invite', invite)
-      .gt('expires_at', new Date().toISOString()).limit(1),
-  ) as BoxRow[]
-  const box = rows[0]
+  const box = await liveBox('invite', invite)
   if (!box) throw new ApiError(422, 'box_not_found', 'kode titip tidak ada')
   if (Date.parse(box.opens_at) <= Date.now()) {
     throw new ApiError(422, 'box_closed', 'kotak sudah ditutup untuk titipan')

@@ -53,6 +53,19 @@ export function errorFields(
   }
 }
 
+/**
+ * Tulis error tak terduga ke log fungsi tanpa pesannya, dengan aturan yang sama seperti
+ * function_errors: pesan Postgres bisa membawa isi baris ("Failing row contains …") dan pesan
+ * `fetch` membawa URL berisi slug. Yang ditulis hanya nama, kode, dan baris stack-nya.
+ */
+export function logError(label: string, error: unknown): void {
+  const stack = error instanceof Error
+    ? (error.stack ?? '').split('\n').map((line) => line.trim())
+      .filter((line) => line.startsWith('at ')).slice(0, 8)
+    : []
+  console.error(label, JSON.stringify({ ...errorFields(error), stack }))
+}
+
 interface Runtime {
   waitUntil(promise: Promise<unknown>): void
 }
