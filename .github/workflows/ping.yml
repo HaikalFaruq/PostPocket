@@ -6,6 +6,8 @@ name: Ping produksi
 # uptime: kalau fungsi atau proyeknya mati, job gagal dan GitHub mengirim email.
 #
 # Butuh repository variable SUPABASE_PUBLISHABLE_KEY (publishable key, aman di browser).
+# GitHub mematikan workflow terjadwal kalau repo 60 hari tanpa commit; nyalakan lagi di tab
+# Actions kalau itu terjadi.
 
 on:
   schedule:
@@ -23,7 +25,8 @@ jobs:
     steps:
       - name: GET /l/{slug} untuk slug yang tidak ada harus 404 not_found
         env:
-          URL: https://rmyfkdtqcltawmssollb.supabase.co/functions/v1/l/0000000000
+          # Region yang sama dengan database (Sydney), seperti frontend (kontrak 0.2.2).
+          URL: https://rmyfkdtqcltawmssollb.supabase.co/functions/v1/l/0000000000?forceFunctionRegion=ap-southeast-2
           KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           if [ -z "$KEY" ]; then
