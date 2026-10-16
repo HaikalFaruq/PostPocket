@@ -32,7 +32,7 @@ Spasi Delicious Handrawn sangat sempit ("ulang tahun" terbaca "ulangtahun"), jad
 
 **Satu hal yang berani.** Kartu foil itu sendiri, ditambah kata "surat" yang ditulis tangan. Sejak 15 Oktober 2026 kartu contoh di Beranda, surat penerima, dan gambar OG tidak lagi dibingkai garis par avion merah-biru (Kall: "jatohnya kaya barbershop"). Kartunya melayang di panggung `dot-stage`, kisi titik yang memudar seperti panggung figur Hairline. Bagian lain dibuat tenang.
 
-**Desain kartu siap pakai.** Sejak 16 Oktober 2026 ada lima desain sampul, masing-masing digambar ulang untuk setiap bentuk kartu (Asli, Tegak, Persegi, Mendatar), jadi tidak ada yang terpotong atau membesar. Ulang tahun dan Lebaran baru ditawarkan di editor setelah fungsi `letters` di-deploy ulang ([frontend.md](frontend.md#kartu-dan-isi-surat)):
+**Desain kartu siap pakai.** Sejak 16 Oktober 2026 ada lima desain sampul, masing-masing digambar ulang untuk setiap bentuk kartu (Asli, Tegak, Persegi, Mendatar), jadi tidak ada yang terpotong atau membesar:
 - **Padang bunga:** ladang bunga di bawah, karangan daun foil dan dua kupu-kupu foil di atasnya.
 - **Ranting:** buket eukaliptus, zaitun, dan beri di depan cincin foil ganda, diikat pita foil. Sebagian daunnya hanya garis foil.
 - **Malam berbintang:** bukit berlapis dengan cemara dan pondok berjendela foil; bulan sabit, rasi, dan bintang jatuh dari foil.

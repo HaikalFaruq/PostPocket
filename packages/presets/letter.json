@@ -69,7 +69,6 @@
       "art": "/illustrations/birthday.svg",
       "foil": "/illustrations/birthday-foil.svg",
       "ratio": 0.72,
-      "hidden": true,
       "variants": {
         "portrait": {
           "art": "/illustrations/birthday-portrait.svg",
@@ -91,7 +90,6 @@
       "art": "/illustrations/lebaran.svg",
       "foil": "/illustrations/lebaran-foil.svg",
       "ratio": 0.72,
-      "hidden": true,
       "variants": {
         "portrait": {
           "art": "/illustrations/lebaran-portrait.svg",
