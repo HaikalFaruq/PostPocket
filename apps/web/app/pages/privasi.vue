@@ -63,8 +63,9 @@ useSeoMeta({
       </li>
       <li>cadangan paling banyak 100 foto per akun;</li>
       <li>
-        foto yang kamu hapus di Pocket ikut dihapus dari cadangan. Sisa berkasnya dibersihkan paling
-        lama sekitar satu jam kemudian;
+        foto, kantong, dan album yang kamu hapus di Pocket ikut dihapus dari cadangan. Berkas
+        fotonya dibersihkan paling lama sekitar satu jam kemudian, sedangkan catatan penghapusannya
+        (tanpa foto) disimpan 30 hari supaya penghapusannya sampai juga ke HP lain;
       </li>
       <li>keluar dari akun tidak menghapus cadangan maupun kenangan di perangkat ini.</li>
     </ul>
@@ -88,6 +89,10 @@ useSeoMeta({
       <li>Surat bisa dibuka 30 hari sejak dikirim, lalu dihapus.</li>
       <li>Foto di dalamnya dihapus 7 hari setelah surat pertama kali dibuka.</li>
       <li>
+        Salinan foto di cache CDN, server perantara yang mempercepat pemuatan gambar, bisa masih
+        terbuka sampai sekitar satu jam setelah fotonya dihapus.
+      </li>
+      <li>
         Kalau pembuatan link gagal di tengah jalan, data yang sempat terunggah dihapus otomatis
         sekitar 24 jam kemudian.
       </li>
@@ -106,8 +111,10 @@ useSeoMeta({
           pengirim tiap titipan;
         </li>
         <li>
-          pembuat kotak hanya melihat nama pengirim dan jumlah fotonya, bukan isi suratnya. Isinya
-          terlihat oleh pemegang link buka setelah kotaknya terbuka;
+          pembuat kotak memegang link buka untuk diberikan ke penerima, dan bisa membuka kotaknya
+          lebih awal. Sebelum kotak terbuka, ia hanya melihat nama pengirim dan jumlah fotonya.
+          Setelah terbuka, isi semua surat bisa dibaca siapa pun yang memegang link buka, termasuk
+          pembuat kotak;
         </li>
         <li>
           kotak menerima titipan paling lama 30 hari. Kotak dan semua titipannya dihapus 30 hari
@@ -122,8 +129,8 @@ useSeoMeta({
 
     <h2>Alamat IP dan pembatasan spam</h2>
     <p>
-      Satu jaringan bisa membuat paling banyak 10 surat<template v-if="kotakBareng">
-        dan 5 kotak bareng</template
+      Satu jaringan bisa membuat paling banyak 10 surat<template v-if="kotakBareng"
+        >, 5 kotak bareng, dan 30 titipan surat ke kotak</template
       >
       per jam. Untuk menghitungnya, server menyimpan versi tersandi (hash berkunci) dari alamat IP
       pengirim, bukan alamat
