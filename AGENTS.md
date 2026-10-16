@@ -142,24 +142,25 @@ CI menjalankan lint skema, test pgTAP, lint kontrak, serta lint dan test Edge Fu
 
 ## 7. Struktur repo
 
-Yang bertanda *(belum)* dibuat oleh pemiliknya di Sprint 0.
-
 ```text
-apps/web/               Nuxt, dipegang Kall
+apps/web/               Nuxt, dipegang Kall (halaman /lab hanya ada di development dan E2E)
 supabase/migrations/    skema SQL dan RLS, dipegang Bintang
 supabase/tests/         test pgTAP untuk skema
 supabase/functions/     Edge Functions (Deno) beserta test-nya, dipegang Bintang
-packages/presets/       preset JSON kertas, foil, kantong, bingkai, filter + helper
-docs/prd/               PRD (Markdown dan PDF) beserta gambarnya
+packages/presets/       preset JSON surat, kantong, TV, dan kotak + helper tata letak isi surat
+docs/prd/               PRD beserta gambarnya
 docs/frontend.md        panduan frontend
 docs/backend.md         panduan backend
-docs/spikes/            hasil spike Sprint 0 (kartu foil, Safari)
-docs/api/openapi.yaml   kontrak API (belum)
+docs/desain.md          identitas visual dan aturan desain
+docs/spikes/            hasil spike Sprint 0 (kartu foil, Safari, editor isi surat)
+docs/api/openapi.yaml   kontrak API
+docs/brand/             logo P-amplop dalam berbagai versi
+docs/screenshots/       screenshot untuk README
 docs/reference/         ukuran dan catatan tiga web referensi (screenshot di luar repo)
 docs/assets.md          sumber dan lisensi aset
-scripts/                cek atribusi AI (dipakai hook dan CI) beserta ujinya
-.githooks/              hook commit-msg dan pre-push
-.github/                workflow CI dan template PR
+scripts/                cek atribusi AI dan rahasia (dipakai hook dan CI) beserta ujinya, bundel kontrak
+.githooks/              hook pre-commit, commit-msg, dan pre-push
+.github/                workflow CI (Web, Backend, No AI attribution, Ping produksi) dan template PR
 ```
 
 ## 8. Aturan produk

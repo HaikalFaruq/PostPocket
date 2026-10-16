@@ -65,7 +65,7 @@ Sejak 15 Oktober 2026 logonya **P-amplop**: huruf P yang mangkuknya amplop, deng
 Wordmark-nya Gantari ExtraBold yang sudah dijadikan garis, dengan tracking −0,02 em dan kern optis di Po, tP, ck, dan ke. Jangan mengetik ulang "PostPocket" dengan font sebagai pengganti logo.
 
 **Lockup.**
-- Horizontal: huruf kapital wordmark rata atas dengan P, berjarak 40. Batang P menggantung di bawah garis dasar seperti ekor huruf, jadi teks di sampingnya (misalnya "beta" dan menu di Beranda) disejajarkan dengan garis dasar wordmark.
+- Horizontal: huruf kapital wordmark rata atas dengan P, berjarak 40. Batang P menggantung di bawah garis dasar seperti ekor huruf, jadi teks di sampingnya (misalnya menu di Beranda) disejajarkan dengan garis dasar wordmark.
 - Bertumpuk: P 1,5× di tengah atas.
 - Dengan tagline (header Pocket): wordmark di separuh atas tinggi P, tagline di separuh bawahnya.
 
