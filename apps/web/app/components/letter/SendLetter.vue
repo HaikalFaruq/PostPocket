@@ -14,7 +14,10 @@ import { compressPhoto, renderOgImage, type OgCard } from '~/utils/upload-image'
  * hasilnya "Suratmu sudah masuk kotak".
  */
 const props = defineProps<{ card: OgCard; existing?: SentLetter | null }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{
+  /** `sent` kalau ditutup setelah link atau titipannya jadi. */
+  close: [sent: boolean]
+}>()
 const draft = useLetterDraft()
 const api = useLetterApi()
 
@@ -180,7 +183,7 @@ async function remove() {
 }
 
 function close() {
-  if (state.value !== 'sending') emit('close')
+  if (state.value !== 'sending') emit('close', state.value === 'done')
 }
 
 // Back di HP menutup lembar ini, kecuali selagi link sedang dibuat.
@@ -261,7 +264,6 @@ onMounted(() => {
           >
         </div>
         <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>
-        <SupportNudge class="mt-4" />
         <div class="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -325,7 +327,6 @@ onMounted(() => {
           >
         </div>
         <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>
-        <SupportNudge class="mt-4" />
         <div class="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"

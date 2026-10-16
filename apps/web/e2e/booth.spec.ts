@@ -39,11 +39,8 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   ])
   expect(size[1]!).toBeGreaterThan(size[0]! * 2.5)
 
-  // Ajakan Traktir baru muncul setelah strip-nya disimpan.
-  await expect(result.getByTestId('support-nudge')).toHaveCount(0)
   await result.getByRole('button', { name: 'Simpan ke Pocket' }).click()
   await expect(result).toContainText('Tersimpan di kantong hari ini')
-  await expect(result.getByTestId('support-nudge')).toBeVisible()
   await result.getByRole('button', { name: 'Masukkan ke CD' }).click()
   await expect(result).toContainText('Masuk ke CD Photo Booth')
 
@@ -52,6 +49,11 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   expect((await download).suggestedFilename()).toMatch(/^postpocket-booth-\d{4}-\d{2}-\d{2}\.png$/)
 
   await result.getByRole('button', { name: 'Tutup' }).click()
+  // Strip yang sudah disimpan lalu ditutup memunculkan dialog Traktir.
+  const support = page.getByRole('dialog', { name: 'Traktir PostPocket' })
+  await expect(support).toBeVisible()
+  await support.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(support).toBeHidden()
   await page.getByRole('button', { name: 'KELUAR' }).click()
   // Empat jepretan masuk album bulan ini dan CD Photo Booth, yang langsung terpilih di rak.
   await expect(page.getByTestId('cd-shelf').locator('.cd-case')).toHaveCount(2)

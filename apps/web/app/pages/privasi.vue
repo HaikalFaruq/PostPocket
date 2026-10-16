@@ -150,8 +150,8 @@ useSeoMeta({
     </p>
     <p>
       Tombol Traktir hanya membuka halaman Sociabuzz di tab baru. PostPocket tidak mengirim data apa
-      pun ke sana, dan pembayaran dukungan diatur oleh Sociabuzz. Kalau ajakan Traktir kecil
-      ditutup, waktunya dicatat di perangkat ini saja supaya tidak muncul lagi selama 30 hari.
+      pun ke sana, dan pembayaran dukungan diatur oleh Sociabuzz. Waktu dialog Traktir terakhir
+      muncul sendiri dicatat di perangkat ini saja, supaya tidak muncul lagi selama 30 hari.
     </p>
 
     <h2>Ada pertanyaan atau masalah?</h2>

@@ -291,6 +291,13 @@ const contentSummary = computed(() => {
 // "Buat link": dialog kirim memakai sampul yang sama untuk gambar OG. Draf yang sudah jadi link
 // cukup menampilkan link-nya lagi, dan surat kosong tidak bisa dikirim.
 const sending = ref(false)
+// Setelah lembar "Link surat siap" ditutup, dialog Traktir muncul sendiri (paling sering sekali
+// per 30 hari).
+const { open: supportOpen, offer: offerSupport } = useSupportPrompt()
+function closeSend(sent: boolean) {
+  sending.value = false
+  if (sent) offerSupport()
+}
 const emptyWarning = ref(false)
 const messageField = ref<HTMLTextAreaElement | null>(null)
 watch(
@@ -723,7 +730,8 @@ async function startOver() {
 
     <Teleport to="body">
       <LetterEditor v-if="editing" @close="closeEditor" />
-      <SendLetter v-if="sending" :card="ogCard" :existing="draft.sent" @close="sending = false" />
+      <SendLetter v-if="sending" :card="ogCard" :existing="draft.sent" @close="closeSend" />
+      <SupportDialog v-model:open="supportOpen" />
       <SentLetters v-model:open="showSent" @changed="refreshSent" />
     </Teleport>
   </div>
