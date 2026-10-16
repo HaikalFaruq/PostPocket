@@ -113,7 +113,7 @@ Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
 | `SYNC_E2E=1 pnpm --filter @postpocket/web exec playwright test --project=android --project=iphone` | E2E sinkron Pocket ke stack Supabase lokal, butuh `API_URL`, `PUBLISHABLE_KEY`, dan `SECRET_KEY` dari `supabase status -o env` ([caranya](docs/frontend.md#sinkron-pocket)) |
 | `scripts/check-no-ai.sh --revs origin/main..HEAD` | Cek atribusi AI di commit yang belum masuk `main` |
 | `scripts/test-check-no-ai.sh` | Uji pola cek atribusi AI, wajib lolos setelah polanya diubah |
-| `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`) |
+| `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`; CI mengecek semua berkas lewat `--files`) |
 | `scripts/test-check-secrets.sh` | Uji pola cek rahasia, wajib lolos setelah polanya diubah |
 
 Sebelum push, pastikan `pnpm check` dan `pnpm test:e2e` lolos. Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. CI menjalankan semuanya di setiap PR (workflow `Web` dan `No AI attribution`).
@@ -180,4 +180,4 @@ Repo ini public: commit, PR, issue, dan komentar bisa dibaca siapa saja.
 - Commit memakai email noreply GitHub supaya email pribadi tidak tampil. Alamatnya sama dengan tabel co-author di bagian 2: `git config user.email <id>+<username>@users.noreply.github.com`.
 - Screenshot web referensi tidak disimpan di repo; `docs/reference/` hanya berisi ukuran dan catatan.
 
-Penjaganya berlapis. Hook `.githooks/pre-commit` (`scripts/check-secrets.sh`) menolak file `.env` dan pola secret sebelum commit. Setelah itu, secret scanning dan push protection GitHub menolak push yang memuat secret yang dikenali.
+Penjaganya berlapis. Hook `.githooks/pre-commit` (`scripts/check-secrets.sh`) menolak file `.env` dan pola secret sebelum commit, dan workflow `Web` menjalankan cek yang sama ke semua berkas yang di-track di setiap PR, termasuk commit yang dibuat tanpa hook. Setelah itu, secret scanning dan push protection GitHub menolak push yang memuat secret yang dikenali.

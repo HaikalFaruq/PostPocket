@@ -330,7 +330,7 @@ Login Google sendiri tidak bisa diuji otomatis. Tesnya memakai user yang dibuat 
   
   CSP untuk skrip sengaja belum dipasang: Nuxt menyisipkan skrip inline (payload, splash), jadi butuh nonce atau hash per halaman. HSTS sudah dikirim Vercel.
 - **Alat uji tidak ikut rilis.** Halaman `/lab` dibuang dari build produksi oleh modul kecil di `nuxt.config.ts`, dan mock API (`server/routes/mock-api`) menjawab 404 kalau `NUXT_MOCK_API` mati (`assertMockEnabled`).
-- **Rahasia.** Frontend hanya memakai URL Supabase dan publishable key. Hook `pre-commit` menolak `.env` dan pola secret (`scripts/check-secrets.sh`), dan secret scanning GitHub menyala.
+- **Rahasia.** Frontend hanya memakai URL Supabase dan publishable key. Hook `pre-commit` menolak `.env` dan pola secret (`scripts/check-secrets.sh`), workflow `Web` mengecek ulang semua berkas yang di-track, dan secret scanning GitHub menyala.
 - **Data pribadi di perangkat.** Halaman surat penerima, kotak bareng, dan titip tidak pernah disimpan service worker (`isPrivatePath()`), dan Lapor masalah tidak menyertakan link surat.
 - **Audit dependensi.** `pnpm audit --prod` masih melaporkan dua temuan tanpa versi tambalan: `node-forge` (lewat `listhen`, server `nuxt dev`) dan `braces` (lewat pencarian berkas saat build). Keduanya hanya dipakai alat development dan build, dan tidak menerima masukan dari pengguna. Cek lagi setiap Nuxt naik versi.
 

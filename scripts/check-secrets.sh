@@ -15,6 +15,11 @@ export LC_ALL
 secret='sb_secret_[A-Za-z0-9_-]{16,}'
 private_key='-----BEGIN ([A-Z]+ )?PRIVATE KEY-----'
 service_role='(SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|SERVICE_ROLE_KEY)[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9_.-]{20,}'
+# Key Supabase lama berbentuk JWT (anon maupun service_role). Proyek ini memakai publishable key,
+# jadi JWT apa pun yang tertulis di repo patut dicurigai.
+jwt='eyJ[A-Za-z0-9_-]{8,}[.]eyJ[A-Za-z0-9_-]{8,}[.][A-Za-z0-9_-]{8,}'
+# Client secret OAuth Google (login Google lewat Supabase Auth).
+google_secret='GOCSPX-[A-Za-z0-9_-]{20,}'
 
 found=0
 
@@ -37,6 +42,8 @@ scan() {
   if printf '%s\n' "$text" | grep -Eq "$secret"; then report "$1: secret key Supabase"; fi
   if printf '%s\n' "$text" | grep -Eq -e "$private_key"; then report "$1: private key"; fi
   if printf '%s\n' "$text" | grep -Eq "$service_role"; then report "$1: nilai service role atau secret key"; fi
+  if printf '%s\n' "$text" | grep -Eq "$jwt"; then report "$1: key Supabase lama (JWT)"; fi
+  if printf '%s\n' "$text" | grep -Eq "$google_secret"; then report "$1: client secret Google"; fi
 }
 
 scan_staged() {

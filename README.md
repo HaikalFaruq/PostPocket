@@ -152,7 +152,7 @@ Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. Ta
 
 ## Keamanan dan privasi
 
-- **Tanpa rahasia di repo.** Hook `pre-commit` menolak berkas `.env` dan pola secret; secret scanning dan push protection GitHub menyala. Frontend hanya memakai URL Supabase dan publishable key.
+- **Tanpa rahasia di repo.** Hook `pre-commit` menolak berkas `.env` dan pola secret, CI mengecek ulang semua berkas di setiap PR, dan secret scanning serta push protection GitHub menyala. Frontend hanya memakai URL Supabase dan publishable key.
 - **Akses data dibatasi di database.** Semua tabel memakai RLS, dan pengubahan surat atau kotak butuh token yang hanya dipegang pembuatnya. CORS Edge Functions hanya menerima domain produksi.
 - **Header keamanan.** Halaman tidak bisa dibingkai situs lain, jenis berkas tidak ditebak browser, dan hanya kamera (untuk Booth) yang boleh dipakai.
 - **Data seperlunya.** Tidak ada cookie pelacak atau analitik pihak ketiga, dan fungsi server tidak mencatat alamat IP. Hitungan surat disimpan tanpa menunjuk surat yang mana. Rinciannya ada di [halaman Privasi](https://postpocket.vercel.app/privasi).

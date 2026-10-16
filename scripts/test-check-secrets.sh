@@ -17,6 +17,8 @@ long=$(printf 'x%.0s' $(seq 1 32))
 fake_secret="sb_secret""_${long}"
 fake_key_header="-----BEGIN"" PRIVATE KEY-----"
 fake_service="SUPABASE_SERVICE_ROLE_KEY""=eyJhbGciOiJIUzI1NiJ9.${long}"
+fake_jwt="eyJ""hbGciOiJIUzI1NiJ9.eyJ""yb2xlIjoic2VydmljZV9yb2xlIn0.${long}"
+fake_google="GOCSPX""-${long}"
 
 # $1 = tolak|lolos, $2 = nama file, $3 = isi
 file() {
@@ -40,6 +42,9 @@ file lolos .env.example "NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 file lolos nuxt.config.ts "supabasePublishableKey: ''"
 file lolos AGENTS.md 'Secret key Supabase (`sb_secret_...`) dan SUPABASE_SERVICE_ROLE_KEY tidak pernah di-commit.'
 file lolos client.ts "const key = 'sb_publishable_${long}'"
+file tolak legacy.ts "const anon = '${fake_jwt}'"
+file tolak oauth.json "{ \"client_secret\": \"${fake_google}\" }"
+file lolos oauth.md "Client ID Google berakhiran .apps.googleusercontent.com, aman dibagikan."
 
 # Mode --staged di repo git sementara.
 staged() {  # $1 = tolak|lolos, $2 = nama file, $3 = isi
