@@ -115,6 +115,7 @@ Butuh Node 24 (`.nvmrc`) dan pnpm 9. Semua perintah dijalankan dari root repo.
 | `scripts/test-check-no-ai.sh` | Uji pola cek atribusi AI, wajib lolos setelah polanya diubah |
 | `scripts/check-secrets.sh --staged` | Cek rahasia di perubahan yang di-stage (otomatis lewat hook `pre-commit`; CI mengecek semua berkas lewat `--files`) |
 | `scripts/test-check-secrets.sh` | Uji pola cek rahasia, wajib lolos setelah polanya diubah |
+| `node scripts/promo-readme.mjs` | Buat ulang gambar promo README dari layar produksi (butuh Google Chrome) |
 
 Sebelum push, pastikan `pnpm check` dan `pnpm test:e2e` lolos. Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. CI menjalankan semuanya di setiap PR (workflow `Web` dan `No AI attribution`).
 
@@ -155,10 +156,11 @@ docs/desain.md          identitas visual dan aturan desain
 docs/spikes/            hasil spike Sprint 0 (kartu foil, Safari, editor isi surat)
 docs/api/openapi.yaml   kontrak API
 docs/brand/             logo P-amplop dalam berbagai versi
-docs/screenshots/       screenshot untuk README
+docs/gambar/            gambar promo dan diagram arsitektur untuk README
+docs/arsitektur.*       diagram arsitektur Archify: sumber JSON dan HTML interaktif (GitHub Pages)
 docs/reference/         ukuran dan catatan tiga web referensi (screenshot di luar repo)
 docs/assets.md          sumber dan lisensi aset
-scripts/                cek atribusi AI dan rahasia (dipakai hook dan CI) beserta ujinya, bundel kontrak
+scripts/                cek atribusi AI dan rahasia (dipakai hook dan CI) beserta ujinya, bundel kontrak, gambar promo README
 .githooks/              hook pre-commit, commit-msg, dan pre-push
 .github/                workflow CI (Web, Backend, No AI attribution, Ping produksi) dan template PR
 ```

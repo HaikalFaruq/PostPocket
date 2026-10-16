@@ -26,20 +26,12 @@ Semua dibuka lewat satu link, tanpa daftar dan tanpa aplikasi.
 > **PostPocket 1.0 sudah rilis di [postpocket.vercel.app](https://postpocket.vercel.app) sejak 16 Oktober 2026.**
 > Vercel men-deploy `main` ke produksi. Surat yang dikirim disimpan Supabase di Sydney; Pocket, TV, dan Booth tetap di perangkat pengguna.
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/screenshots/beranda.webp" width="190" alt="Beranda: kartu foil contoh dan judul Kenangan kecil, dikirim jadi surat" /></td>
-    <td align="center"><img src="docs/screenshots/surat.webp" width="190" alt="Editor Surat foil dengan desain Ulang tahun dan pilihan gambar depan" /></td>
-    <td align="center"><img src="docs/screenshots/isi-surat.webp" width="190" alt="Kartu terbuka berisi foto, stiker kue, dan ucapan tulisan tangan" /></td>
-    <td align="center"><img src="docs/screenshots/pocket.webp" width="190" alt="Kalender Pocket dengan kantong berfoto di beberapa hari" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Beranda</b><br /><sub>Contoh surat yang bisa dibuka</sub></td>
-    <td align="center"><b>Surat foil</b><br /><sub>Lima desain di setiap bentuk</sub></td>
-    <td align="center"><b>Isi surat</b><br /><sub>Foto, tulisan tangan, stiker</sub></td>
-    <td align="center"><b>Pocket</b><br /><sub>Satu kantong setiap hari</sub></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/gambar/promo-1-beranda.webp" width="24%" alt="Kirim momenmu jadi surat foil: Beranda dengan kartu foil contoh" />
+  <img src="docs/gambar/promo-2-surat-foil.webp" width="24%" alt="Kartu foil, desainmu sendiri: editor Surat foil dengan lima desain" />
+  <img src="docs/gambar/promo-3-isi-surat.webp" width="24%" alt="Isi surat pakai tulisan tangan: halaman surat berisi foto, ucapan, dan stiker" />
+  <img src="docs/gambar/promo-4-pocket.webp" width="24%" alt="Satu kantong untuk setiap hari: kalender Pocket dengan kantong berfoto" />
+</p>
 
 ## Kenapa PostPocket
 
@@ -66,25 +58,16 @@ Foto di galeri HP jarang dibuka lagi, dan ucapan di chat cepat tenggelam. PostPo
 
 ## Cara kerja
 
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"ui-sans-serif, system-ui","primaryTextColor":"#18204A","lineColor":"#18204A"},"flowchart":{"curve":"basis"}}}%%
-flowchart LR
-    HP["Browser HP<br/>Nuxt PWA"] -->|draf, Pocket, TV| IDB[("IndexedDB<br/>di perangkat")]
-    HP -->|surat, kotak bareng| FN["Supabase Edge Functions<br/>letters, l, boxes, k, account"]
-    HP -->|unggah foto lewat URL bertanda tangan| ST[("Supabase Storage")]
-    FN --> DB[("Postgres + RLS")]
-    PENERIMA["Penerima di WhatsApp"] -->|/l/:slug di-SSR untuk preview| VC["Vercel sin1"]
-    VC --> FN
-    CRON["pg_cron tiap jam"] -->|cleanup| FN
-    PING["GitHub Actions harian"] -->|ping produksi| FN
+<sub>KODE → DIAGRAM · Peta sistem yang menaut ke baris kodenya</sub>
 
-    classDef perangkat fill:#F1F4F8,stroke:#18204A,color:#18204A,stroke-width:1.5px;
-    classDef server fill:#D9B45A,stroke:#18204A,color:#18204A,stroke-width:1.5px;
-    classDef luar fill:#C3B1E1,stroke:#18204A,color:#18204A,stroke-width:1.5px;
-    class HP,IDB perangkat;
-    class FN,ST,DB,VC server;
-    class PENERIMA,CRON,PING luar;
-```
+<a href="https://haikalfaruq.github.io/PostPocket/arsitektur.html">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/gambar/arsitektur-gelap.webp" />
+  <img src="docs/gambar/arsitektur-terang.webp" alt="Arsitektur PostPocket: pengirim menulis surat di PWA, PWA memanggil fungsi surat di Supabase dan mengunggah foto langsung ke Storage, lalu link-nya dibagikan lewat WhatsApp dan dibuka penerima" />
+</picture>
+</a>
+
+**[Buka diagram interaktif ↗](https://haikalfaruq.github.io/PostPocket/arsitektur.html)** · [telusuri jalur Kirim surat ↗](https://haikalfaruq.github.io/PostPocket/arsitektur.html#route=pengirim~penerima) · [sumber JSON](docs/arsitektur.archify.json)
 
 - **Kartu foil tanpa WebGL.** Kartunya CSS 3D, dan lapisan foilnya mask dari ilustrasi atau peta yang dihitung dari foto di browser ([keputusan](docs/spikes/foil-3d.md)).
 - **Server hanya untuk yang dikirim.** Pocket, TV, Booth, dan draf surat ada di IndexedDB. Server menyimpan surat yang dibuat link-nya, kotak bareng, dan cadangan Pocket yang dinyalakan pengguna.
@@ -133,7 +116,8 @@ PostPocket/
 │   ├── migrations/        # skema SQL dan RLS
 │   ├── functions/         # Edge Functions Deno beserta test-nya
 │   └── tests/database/    # test pgTAP
-├── docs/                  # PRD, panduan frontend dan backend, desain, aset, kontrak API
+├── docs/                  # PRD, panduan, desain, aset, kontrak API, diagram arsitektur, gambar README
+├── scripts/               # cek atribusi AI dan rahasia, bundel kontrak, gambar promo README
 └── AGENTS.md              # aturan kerja untuk manusia dan AI agent
 ```
 
@@ -180,6 +164,7 @@ Langkah lengkapnya ada di [docs/frontend.md](docs/frontend.md#deploy) dan [docs/
 | [Identitas visual](docs/desain.md) | Warna, huruf, logo, splash, dan aturan desain |
 | [Aset dan lisensi](docs/assets.md) | Sumber dan lisensi setiap aset |
 | [Kontrak API](docs/api/openapi.yaml) | OpenAPI semua endpoint |
+| [Diagram arsitektur](https://haikalfaruq.github.io/PostPocket/arsitektur.html) | Peta sistem interaktif yang menaut ke baris kode, sumbernya [`docs/arsitektur.archify.json`](docs/arsitektur.archify.json) |
 
 ## Berkontribusi
 

@@ -31,3 +31,6 @@ supabase/.temp/
 test-results/
 playwright-report/
 blob-report/
+
+# Folder kerja Archify: docs/arsitektur.archify.json dirender ke sini, lalu disalin ke docs/
+.archify/

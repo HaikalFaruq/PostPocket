@@ -11,8 +11,9 @@ Setiap aset yang masuk repo dicatat di sini (PRD bagian Risiko: lisensi aset tid
 | Ikon bunga di swatch warna foil | `apps/web/app/components/letter/FoilSwatchIcon.vue` | Digambar sendiri (SVG) | Milik sendiri |
 | Logo P-amplop (simbol, wordmark, lockup) dan favicon | `docs/brand/`, `apps/web/app/utils/brand-logo.ts`, `apps/web/public/favicon.svg` | Digambar sendiri dengan skill [logo-design](https://github.com/kaankiziltug/logo-design-skill) (MIT, hanya dipakai sebagai alat, tidak ada berkasnya yang disalin). Wordmark dari huruf Gantari ExtraBold yang dijadikan garis, hasil `apps/web/scripts/brand.mjs` | Milik sendiri; huruf Gantari SIL Open Font License 1.1 |
 | Ikon aplikasi (PWA dan layar utama iPhone) | `apps/web/public/pwa-*.png`, `maskable-icon-512x512.png`, `apple-touch-icon-180x180.png` | Dibuat sendiri dari logo P-amplop di latar kanvas, hasil `apps/web/scripts/pwa-icons.mjs` | Milik sendiri |
-| Foto contoh pantai senja (halaman `/lab` dan screenshot README) | `apps/web/app/assets/lab/contoh-foto.svg` | Digambar sendiri (SVG) | Milik sendiri |
-| Screenshot README | `docs/screenshots/` | Diambil dari aplikasi sendiri dengan foto contoh di atas | Milik sendiri |
+| Foto contoh pantai senja (halaman `/lab` dan gambar promo README) | `apps/web/app/assets/lab/contoh-foto.svg` | Digambar sendiri (SVG) | Milik sendiri |
+| Gambar promo README (empat, 1320 × 2868) | `docs/gambar/promo-*.webp` | Layar produksi asli dengan foto contoh di atas, dirakit `scripts/promo-readme.mjs`. Bingkai iPhone, ikon status bar, dan amplop digambar sendiri dengan CSS dan SVG; perangkonya seperti `SupportStamp`; stiker dari `apps/web/public/stickers/`; huruf Gantari dan Delicious Handrawn dari Google Fonts | Milik sendiri; stiker MIT (Fluent Emoji); huruf SIL Open Font License 1.1 |
+| Diagram arsitektur | `docs/arsitektur.archify.json`, `docs/arsitektur.html`, `docs/gambar/arsitektur-*.webp` | Isinya ditulis sendiri dari kode, dirender dengan [Archify](https://github.com/tt-a1i/archify) 3.1 (dipakai sebagai alat, tidak dipasang di repo). HTML-nya memuat viewer Archify dan huruf JetBrains Mono | Isi diagram milik sendiri; viewer Archify MIT, pemberitahuannya di [Lisensi kode pihak ketiga](#lisensi-kode-pihak-ketiga); JetBrains Mono SIL Open Font License 1.1, teks lisensinya ikut di HTML |
 | Gambar OG bawaan (`og-surat.jpg`, `og-beranda.jpg`, `og-kotak.jpg`, `og-titip.jpg`) | `apps/web/public/` | Disusun dari ilustrasi padang bunga, logo P-amplop, warna foil emas, dan folder kaca sendiri, hasil `apps/web/scripts/og-images.mjs` (font Gantari dan Delicious Handrawn dari Google Fonts, kanvas berkisi titik) | Milik sendiri; Gantari SIL Open Font License 1.1 |
 | Kantong snack Pocket dan jepitan kayunya | `apps/web/app/components/pocket/SnackPacket.vue` | Digambar sendiri dengan CSS (gradien dan clip-path bergerigi), tanpa file gambar | Milik sendiri |
 | Folder kaca Kotak surat: panel belakang bercorak cairan, kaca buram, dan lembar surat | `apps/web/app/components/kotak/GlassFolder.vue`, `apps/web/app/utils/folder-art.ts`, `apps/web/app/utils/folder-paint.ts`, resepnya di `packages/presets/kotak.json` | Diadaptasi ke Vue dari komponen React [Glassmorphism Folder Cards](https://21st.dev/kedhareswer/glass-folder-cards/default) karya Kedhareswer Naidu di 21st.dev, dibagikan Kall (14 Oktober 2026). Seninya digambar di browser dari resep, tanpa file gambar | MIT, pemberitahuannya di [Lisensi kode pihak ketiga](#lisensi-kode-pihak-ketiga) |
@@ -105,6 +106,35 @@ Sumber: [21st.dev/positronx/offer-button](https://21st.dev/positronx/offer-butto
 MIT License
 
 Copyright (c) shubhu (positronx)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### Archify
+
+Sumber: [github.com/tt-a1i/archify](https://github.com/tt-a1i/archify). `docs/arsitektur.html` adalah keluaran Archify yang memuat viewer-nya.
+
+```text
+MIT License
+
+Copyright (c) 2026 tt-a1i (Archify)
+Copyright (c) 2025 Cocoon AI
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
