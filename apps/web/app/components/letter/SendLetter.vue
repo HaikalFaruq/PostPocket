@@ -261,6 +261,7 @@ onMounted(() => {
           >
         </div>
         <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>
+        <SupportNudge class="mt-4" />
         <div class="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -324,6 +325,7 @@ onMounted(() => {
           >
         </div>
         <p v-if="error" role="alert" class="mt-3 text-caption text-ink-muted">{{ error }}</p>
+        <SupportNudge class="mt-4" />
         <div class="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"

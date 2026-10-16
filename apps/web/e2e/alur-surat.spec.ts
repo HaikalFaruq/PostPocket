@@ -63,6 +63,30 @@ async function writeDraft(page: Page, text: string) {
   await page.waitForTimeout(700)
 }
 
+test('link surat siap mengajak Traktir, dan ajakannya istirahat setelah ditutup', async ({
+  page,
+}) => {
+  await message(page).fill('Halo, terima kasih ya')
+  await createLink(page)
+  const sheet = page.getByTestId('send-letter')
+  const nudge = sheet.getByTestId('support-nudge')
+  await expect(nudge).toBeVisible()
+  const link = nudge.getByRole('link', { name: /Traktir seikhlasnya/ })
+  await expect(link).toHaveAttribute('href', 'https://sociabuzz.com/byhund/tribe')
+  await expect(link).toHaveAttribute('target', '_blank')
+  await expect(link).toHaveAttribute('rel', /noopener/)
+
+  await nudge.getByRole('button', { name: 'Sembunyikan ajakan Traktir' }).click()
+  await expect(nudge).toBeHidden()
+  await sheet.getByRole('button', { name: 'Selesai' }).click()
+
+  // Dibuka lagi setelah dimuat ulang: ajakannya tidak muncul lagi di perangkat ini.
+  await page.reload()
+  await page.getByRole('button', { name: 'Lihat link surat' }).click()
+  await expect(page.getByTestId('sent-url')).toBeVisible()
+  await expect(page.getByTestId('support-nudge')).toHaveCount(0)
+})
+
 test('surat kosong tidak bisa dibuat linknya', async ({ page }) => {
   await page.getByRole('button', { name: 'Buat link untuk dikirim' }).click()
   const warning = page.getByText('Isi suratnya masih kosong')
