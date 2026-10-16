@@ -209,8 +209,13 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 **Rilis 1.0**
 
 - [x] Audit keamanan backend sebelum rilis ([hasil](#audit-sebelum-rilis-10)): migrasi `hardening`, perbaikan fungsi, dan kontrak 0.4.1
-- [ ] Deploy hasil audit: `supabase db push` dulu, baru `supabase functions deploy letters l boxes k cleanup account` (langkah `letterFiles` di `cleanup` butuh `orphan_letter_files()` dari migrasinya)
-- [ ] [Setelan dashboard](#setelan-dashboard) yang belum: audit log Auth, Realtime, dan peringatan pemakaian
+- [x] Deploy hasil audit, 16 Oktober 2026: `supabase db push` (migrasi `hardening`), lalu `supabase functions deploy letters l boxes k cleanup account`. Dicek di produksi:
+  - body `/boxes` 5 KB ditolak `400`;
+  - `box.from` 90 KB divalidasi secepat body kontrol berukuran sama (sekitar 1 detik, termasuk unggah);
+  - job `cleanup` melaporkan `letterFiles`;
+  - `orphan_letter_files()` ditolak `42501` untuk publishable key;
+  - `function_errors` kosong.
+- [ ] [Setelan dashboard](#setelan-dashboard) yang belum: Realtime dan peringatan pemakaian
 
 ## Data model rilis 1
 
@@ -433,7 +438,7 @@ Risiko yang diterima untuk rilis 1:
 
 ### Audit sebelum rilis 1.0
 
-Audit ulang semua fungsi, migrasi, workflow, dan `config.toml`, 16 Oktober 2026. Tidak ada celah akses (IDOR, token bocor, RLS bolong) dan tidak ada rahasia di repo maupun di riwayat git. Yang diperbaiki di migrasi `hardening`, fungsi, dan kontrak 0.4.1 (berlaku di produksi setelah deploy):
+Audit ulang semua fungsi, migrasi, workflow, dan `config.toml`, 16 Oktober 2026. Tidak ada celah akses (IDOR, token bocor, RLS bolong) dan tidak ada rahasia di repo maupun di riwayat git. Yang diperbaiki di migrasi `hardening`, fungsi, dan kontrak 0.4.1 (di-deploy ke produksi 16 Oktober 2026):
 
 | Temuan | Perbaikan |
 | --- | --- |
@@ -449,7 +454,6 @@ Audit ulang semua fungsi, migrasi, workflow, dan `config.toml`, 16 Oktober 2026.
 Yang belum dikerjakan:
 
 - Batas tingkat proyek (semua IP digabung) untuk surat, kotak, dan cadangan. Rate limit sekarang per IP dan per user, jadi banyak IP atau banyak akun masih bisa menghabiskan storage dan egress. Putuskan bareng soal Supabase Pro atau Cloudflare R2 sebelum promosi besar.
-- Supabase Auth menulis audit log (email dan IP) ke `auth.audit_log_entries` tanpa batas waktu, juga setelah akunnya dihapus. Dimatikan lewat [Setelan dashboard](#setelan-dashboard).
 - Belum ada alarm kalau job pembersihan berhenti. Sementara itu, cek `net._http_response` dan `function_errors_daily`.
 - GitHub Actions dipasang lewat tag, bukan hash commit. Dampaknya kecil: semua workflow hanya punya hak baca dan tidak memakai secret.
 - Tabel `profiles` tidak dipakai aplikasi, tapi barisnya dibuat trigger di `auth.users`. Membuang trigger di tabel milik Supabase Auth butuh hak pemilik tabel, jadi dibiarkan.
@@ -459,7 +463,7 @@ Yang belum dikerjakan:
 `supabase/config.toml` hanya untuk stack lokal dan CI, dan sengaja berbeda dari produksi (login email dengan password 6 karakter untuk test). Jangan jalankan `supabase config push` ke produksi. Setelan produksi diatur di dashboard:
 
 - [x] Authentication: hanya provider Google, provider Email mati ([Login Google](#login-google)).
-- [ ] Authentication → Audit Logs: matikan "Write audit logs to the database", lalu kosongkan isi lamanya lewat SQL Editor (`delete from auth.audit_log_entries`). Log audit tetap tersimpan di log penyedia dengan masa simpan sesuai paket, sesuai kalimat log teknis di `/privasi`.
+- [x] Audit log Auth (email dan IP) tidak ditulis ke database: `auth.audit_log_entries` kosong saat dicek 16 Oktober 2026, sedangkan `auth.users` berisi. Jadi catatan login hanya ada di log penyedia, sesuai kalimat log teknis di `/privasi`. Kalau suatu saat tabel itu terisi, matikan Authentication → Audit Logs → "Write audit logs to the database", lalu kosongkan isinya lewat SQL Editor.
 - [ ] Realtime tidak dipakai: matikan akses channel publik di pengaturan Realtime.
 - [ ] Usage: pasang peringatan pemakaian database, storage, dan egress.
 
