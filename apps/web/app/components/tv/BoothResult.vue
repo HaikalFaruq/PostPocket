@@ -129,10 +129,11 @@ const download = () =>
     message.value = 'Strip diunduh ke perangkatmu.'
   })
 
+const kept = computed(() => saved.pocket || saved.cd || saved.file)
+
 /** Strip yang belum disimpan ke mana pun tidak dibuang tanpa bertanya. `false` kalau batal. */
 function discard(then: 'close' | 'retake'): boolean {
-  const kept = saved.pocket || saved.cd || saved.file
-  if (!kept && !window.confirm('Buang strip ini? Strip-nya belum disimpan.')) return false
+  if (!kept.value && !window.confirm('Buang strip ini? Strip-nya belum disimpan.')) return false
   if (then === 'close') emit('close')
   else emit('retake')
   return true
@@ -202,6 +203,8 @@ function focusPrimary(event: Event) {
           </button>
         </div>
         <p v-if="message" role="status" class="mt-3 text-caption text-ink-muted">{{ message }}</p>
+        <!-- Ajakan Traktir baru muncul setelah strip-nya disimpan ke mana pun. -->
+        <SupportNudge v-if="kept" class="mt-3" />
         <button
           type="button"
           class="mt-4 h-10 w-full rounded-control text-body font-semibold inset-ring inset-ring-line hover:bg-panel"

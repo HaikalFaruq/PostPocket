@@ -39,8 +39,11 @@ test('Booth: hitung mundur, 4 jepretan jadi strip, lalu disimpan ke Pocket dan C
   ])
   expect(size[1]!).toBeGreaterThan(size[0]! * 2.5)
 
+  // Ajakan Traktir baru muncul setelah strip-nya disimpan.
+  await expect(result.getByTestId('support-nudge')).toHaveCount(0)
   await result.getByRole('button', { name: 'Simpan ke Pocket' }).click()
   await expect(result).toContainText('Tersimpan di kantong hari ini')
+  await expect(result.getByTestId('support-nudge')).toBeVisible()
   await result.getByRole('button', { name: 'Masukkan ke CD' }).click()
   await expect(result).toContainText('Masuk ke CD Photo Booth')
 

@@ -105,7 +105,8 @@ Ajakan dukungan lewat [Sociabuzz](https://sociabuzz.com/byhund/tribe), ditambahk
 
 - Perangko kertas putih bergerigi (lubang tepi lewat `mask`), wajahnya kertas `canvas` dengan logo P-amplop, nilai "Rp seikhlasnya", dan "Indonesia" seperti perangko sungguhan.
 - Di dialog, perangkonya ditempel dengan sedikit putaran lalu dicap pos bertanggal hari ini (waktu Jakarta). Tulisan kapital di cap pos itu bagian dari bendanya. Tanpa animasi kalau `prefers-reduced-motion`.
-- Pemicunya di Beranda: baris "Traktir PostPocket" di bawah kartu Pasang, dan tautan "Traktir" di footer. Tidak ada popup yang muncul sendiri.
+- Pemicunya di Beranda: baris "Traktir PostPocket" di bawah kartu Pasang, dan tautan "Traktir" di footer.
+- Ajakan kecil (`SupportNudge`): satu baris dengan perangko mini di lembar "Link surat siap", "Suratmu sudah masuk kotak", dan hasil Booth setelah strip-nya disimpan. Tautannya langsung ke Sociabuzz. Setelah ditutup atau ditekan, tidak muncul lagi di perangkat itu selama 30 hari (`localStorage`). Tidak ada popup yang muncul sendiri.
 - Tombol utamanya tautan biasa ke Sociabuzz di tab baru (`rel="noopener noreferrer"`). PostPocket tidak mengirim data apa pun ke sana.
 - Tidak memakai emas foil atau merah pos: emas tetap hanya di kartu dan tutup amplop logo.
 
