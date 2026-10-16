@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useIntervalFn, useNow } from '@vueuse/core'
+import type { QuotaKind } from '~/utils/sync-run'
 
 /**
  * Cadangan Pocket di bawah kalender. Tanpa Supabase atau sebelum login Google dinyalakan, isinya
@@ -43,6 +44,13 @@ function ago(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
 }
 
+/** Kuota foto paling sering penuh; batas kantong dan album jauh di atas pemakaian wajar. */
+const QUOTA_MESSAGES: Record<QuotaKind, string> = {
+  moments: 'Cadangan penuh: 100 foto. Foto baru tetap tersimpan di perangkat ini.',
+  pockets: 'Cadangan kantong penuh. Kantong baru tetap tersimpan di perangkat ini.',
+  albums: 'Cadangan album penuh. Album baru tetap tersimpan di perangkat ini.',
+}
+
 const status = computed(() => {
   const downloading = sync.progress.downloading
   if (sync.syncing) {
@@ -51,9 +59,7 @@ const status = computed(() => {
       : 'Menyinkronkan…'
   }
   if (sync.error) return sync.error
-  if (sync.quotaFull) {
-    return 'Cadangan penuh: 100 foto. Foto baru tetap tersimpan di perangkat ini.'
-  }
+  if (sync.quotaFull) return QUOTA_MESSAGES[sync.quotaFull]
   if (!sync.lastSyncedAt) return 'Belum disinkronkan.'
   const count = sync.backedUp === null ? '' : ` ${sync.backedUp} dari 100 foto tercadang.`
   return `Tersinkron ${ago(sync.lastSyncedAt)}.${count}`

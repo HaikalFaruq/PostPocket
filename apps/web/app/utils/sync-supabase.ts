@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AlbumRow, MomentRow, Outgoing, PocketRow, RemoteChanges } from './sync'
-import { QuotaFull, type SyncBackend } from './sync-run'
+import { QuotaFull, type QuotaKind, type SyncBackend } from './sync-run'
 
 // SyncBackend di atas Supabase: tabel fase 2 lewat PostgREST dengan sesi user (RLS
 // owner_id = auth.uid()) dan berkas di bucket privat `moments` (docs/backend.md, Rancangan skema
@@ -22,6 +22,11 @@ function alreadyExists(error: unknown): boolean {
     value?.statusCode === '409' ||
     /already exists|duplicate/i.test(value?.message ?? '')
   )
+}
+
+/** Trigger kuota di database memakai kode check_violation dengan pesan "kuota … penuh". */
+function quotaError(error: { code?: string; message?: string }, kind: QuotaKind): QuotaFull | null {
+  return error.code === '23514' && /kuota/i.test(error.message ?? '') ? new QuotaFull(kind) : null
 }
 
 export function supabaseBackend(client: SupabaseClient, userId: string): SyncBackend {
@@ -64,18 +69,17 @@ export function supabaseBackend(client: SupabaseClient, userId: string): SyncBac
 
     async upsertMoment(row: Outgoing<MomentRow>) {
       const { error } = await client.from('moments').upsert(row, { onConflict: 'id' })
-      if (!error) return
-      // Trigger moments_quota memakai kode check_violation dengan pesan "kuota momen penuh".
-      if (error.code === '23514' && /kuota/i.test(error.message)) throw new QuotaFull()
-      throw error
+      if (error) throw quotaError(error, 'moments') ?? error
     },
 
     async upsertPockets(rows: Outgoing<PocketRow>[]) {
-      check(await client.from('pockets').upsert(rows, { onConflict: 'owner_id,day' }))
+      const { error } = await client.from('pockets').upsert(rows, { onConflict: 'owner_id,day' })
+      if (error) throw quotaError(error, 'pockets') ?? error
     },
 
     async upsertAlbums(rows: Outgoing<AlbumRow>[]) {
-      check(await client.from('albums').upsert(rows, { onConflict: 'id' }))
+      const { error } = await client.from('albums').upsert(rows, { onConflict: 'id' })
+      if (error) throw quotaError(error, 'albums') ?? error
     },
 
     async removeMoments(ids) {

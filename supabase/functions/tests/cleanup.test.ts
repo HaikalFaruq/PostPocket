@@ -280,6 +280,38 @@ Deno.test({
   },
 })
 
+Deno.test({
+  name: 'cleanup: berkas yang diunggah setelah suratnya dihapus ikut dibersihkan',
+  ignore,
+  async fn() {
+    const { body, files } = letterFixture()
+    const response = await fetch(`${API}/functions/v1/letters`, {
+      method: 'POST',
+      headers: {
+        apikey: KEY,
+        'content-type': 'application/json',
+        'x-forwarded-for': `10.6.${Math.floor(Math.random() * 250)}.${
+          Math.floor(Math.random() * 250)
+        }`,
+      },
+      body: JSON.stringify(body),
+    })
+    const created = await response.json()
+    assertEquals(response.status, 201, JSON.stringify(created))
+    // Surat dihapus sebelum berkasnya diunggah, tapi URL upload tetap berlaku sampai 2 jam.
+    assertEquals((await call('DELETE', `/letters/${created.id}`, created.editToken)).status, 204)
+    await upload(created.uploads.photos.p1, files.photo)
+    const path = created.uploads.photos.p1.path as string
+    const exists = async () => !(await admin().storage.from('letter-assets').download(path)).error
+    assert(await exists(), 'berkas tanpa surat sempat tersimpan')
+
+    const result = await cleanup()
+    assertEquals(result.status, 200, JSON.stringify(result.body))
+    assert(result.body.letterFiles >= 1, JSON.stringify(result.body))
+    assert(!(await exists()), 'berkas tanpa surat sudah dihapus')
+  },
+})
+
 /** Kotak bareng berisi satu titipan berfoto yang sudah terbit. */
 async function boxWithEntry() {
   const headers = {

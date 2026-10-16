@@ -5,7 +5,7 @@ import { deleteAccount } from '~/utils/account-api'
 import { LetterApiError } from '~/utils/letter-api'
 import { withNewIds } from '~/utils/memories'
 import { asksBeforeMerging } from '~/utils/sync'
-import { runSync, type SyncProgress } from '~/utils/sync-run'
+import { type QuotaKind, runSync, type SyncProgress } from '~/utils/sync-run'
 import { backedUpCount, supabaseBackend } from '~/utils/sync-supabase'
 
 const STATE_KEY = 'postpocket:sync'
@@ -50,7 +50,7 @@ export const useSync = defineStore('sync', () => {
   const syncing = ref(false)
   const progress = ref<SyncProgress>({})
   const error = ref('')
-  const quotaFull = ref(false)
+  const quotaFull = ref<QuotaKind | null>(null)
   const lastSyncedAt = ref<string | null>(null)
   const backedUp = ref<number | null>(null)
   /** Email akun lain yang sebelumnya tersinkron di perangkat ini, menunggu konfirmasi user. */
@@ -83,7 +83,7 @@ export const useSync = defineStore('sync', () => {
     const changed = (next?.id ?? null) !== (user.value?.id ?? null)
     user.value = next ? { id: next.id, email: next.email ?? '' } : null
     if (changed) {
-      quotaFull.value = false
+      quotaFull.value = null
       backedUp.value = null
       error.value = ''
       if (user.value) schedule(0)

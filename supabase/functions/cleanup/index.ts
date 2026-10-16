@@ -10,10 +10,12 @@
 //   (termasuk draf) dan berkasnya. Foto titipan lewat jalur foto surat di atas, karena open_box()
 //   mengisi photos_expire_at tiap titipan;
 // - berkas Pocket (bucket moments) yang tidak punya baris moments aktif: momennya sudah dihapus
-//   atau user-nya sudah dihapus. Baris berstatus hapus dibuang public.run_cleanup() setelah 30 hari.
+//   atau user-nya sudah dihapus. Baris berstatus hapus dibuang public.run_cleanup() setelah 30 hari;
+// - berkas surat (bucket letter-assets) tanpa baris letter_assets: diunggah lewat URL upload
+//   (berlaku 2 jam, tidak bisa dicabut) setelah suratnya dihapus (migrasi hardening).
 
-import { type AssetRow, check, db, type LetterRow, ok, secretKey } from '../_shared/db.ts'
-import { recordError } from '../_shared/errors.ts'
+import { type AssetRow, BUCKET, check, db, type LetterRow, ok, secretKey } from '../_shared/db.ts'
+import { logError, recordError } from '../_shared/errors.ts'
 import { deleteBoxes, deleteLetters, frontIsPhoto, removeAssets } from '../_shared/files.ts'
 import { bytea, sameHash, sha256 } from '../_shared/token.ts'
 
@@ -89,6 +91,13 @@ async function orphanMomentFiles(): Promise<string[]> {
   return names
 }
 
+/** Berkas surat yang tidak punya baris letter_assets (migrasi hardening). */
+async function orphanLetterFiles(): Promise<string[]> {
+  const names = check(await db().rpc('orphan_letter_files', { p_limit: BATCH })) as string[]
+  if (names.length) check(await db().storage.from(BUCKET).remove(names))
+  return names
+}
+
 /** Ulangi satu jenis pembersihan sampai antreannya habis atau ROUNDS tercapai. */
 async function drain(step: () => Promise<string[]>): Promise<number> {
   let total = 0
@@ -112,11 +121,12 @@ Deno.serve(async (request) => {
       photos: await drain(expiredPhotos),
       boxes: await drain(expiredBoxes),
       momentFiles: await drain(orphanMomentFiles),
+      letterFiles: await drain(orphanLetterFiles),
     }
     console.log('cleanup', JSON.stringify(result))
     return Response.json(result)
   } catch (error) {
-    console.error(error)
+    logError('cleanup gagal', error)
     recordError('/cleanup', 500, error)
     return Response.json({ error: 'internal' }, { status: 500 })
   }

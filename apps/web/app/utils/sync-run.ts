@@ -49,10 +49,16 @@ export interface SyncBackend {
   download(id: string): Promise<Blob | null>
 }
 
-/** Kuota penuh: 100 momen aktif per user (trigger `moments_quota`, kode 23514). */
+/** Bagian cadangan yang kuotanya penuh. */
+export type QuotaKind = 'moments' | 'pockets' | 'albums'
+
+/**
+ * Kuota cadangan penuh (trigger kuota di database, kode 23514): 100 foto aktif, atau batas baris
+ * kantong, album, dan momen per user yang jauh di atas pemakaian wajar.
+ */
 export class QuotaFull extends Error {
-  constructor() {
-    super('kuota momen penuh')
+  constructor(readonly kind: QuotaKind = 'moments') {
+    super(`kuota ${kind} penuh`)
     this.name = 'QuotaFull'
   }
 }
@@ -65,7 +71,8 @@ export interface SyncProgress {
 export interface SyncOutcome {
   /** `updated_at` terbaru yang sudah diterapkan, untuk tarikan berikutnya. */
   lastPulledAt: string | null
-  quotaFull: boolean
+  /** Kuota yang penuh di putaran ini. Yang tidak muat tetap menunggu di perangkat. */
+  quotaFull: QuotaKind | null
   downloaded: number
   uploaded: number
   /** Foto yang gagal diunduh. Momennya belum ditampilkan dan ditarik lagi di sinkron berikutnya. */
@@ -139,7 +146,16 @@ export async function runSync(
     }
   }
 
-  let quotaFull = false
+  let quotaFull: QuotaKind | null = null
+  /** Kirim satu jenis perubahan. Yang ditolak kuota tetap menunggu, sisanya jalan terus. */
+  const send = async (run: () => Promise<void>) => {
+    try {
+      await run()
+    } catch (problem) {
+      if (!(problem instanceof QuotaFull)) throw problem
+      quotaFull ??= problem.kind
+    }
+  }
   let uploaded = 0
   for (const id of plan.moments.upsert) {
     const moment = data.moments[id]!
@@ -153,7 +169,7 @@ export async function runSync(
       await backend.upsertMoment(momentRow(moment, image))
     } catch (problem) {
       if (problem instanceof QuotaFull) {
-        quotaFull = true
+        quotaFull = problem.kind
         break
       }
       throw problem
@@ -167,8 +183,10 @@ export async function runSync(
     markSent('moments', plan.moments.remove)
   }
   if (plan.days.upsert.length) {
-    await backend.upsertPockets(plan.days.upsert.map((day) => pocketRow(data.days[day]!)))
-    markSent('days', plan.days.upsert)
+    await send(async () => {
+      await backend.upsertPockets(plan.days.upsert.map((day) => pocketRow(data.days[day]!)))
+      markSent('days', plan.days.upsert)
+    })
   }
   if (plan.days.remove.length) {
     await backend.removePockets(plan.days.remove)
@@ -176,8 +194,10 @@ export async function runSync(
   }
   const albums = new Map(data.albums.map((album) => [album.id, album]))
   if (plan.albums.upsert.length) {
-    await backend.upsertAlbums(plan.albums.upsert.map((id) => albumRow(albums.get(id)!)))
-    markSent('albums', plan.albums.upsert)
+    await send(async () => {
+      await backend.upsertAlbums(plan.albums.upsert.map((id) => albumRow(albums.get(id)!)))
+      markSent('albums', plan.albums.upsert)
+    })
   }
   if (plan.albums.remove.length) {
     await backend.removeAlbums(plan.albums.remove)
