@@ -52,7 +52,7 @@ Belum ada. Login sudah diputuskan (fase 2, Google OAuth), lihat [Rancangan skema
 | Batas foto | Maksimal **4 foto per surat** (sesuai template kolase), maksimal **500 KB per foto** setelah dikompres, tipe JPEG atau WebP. Cover (gambar depan dari foto user) punya batas yang sama tapi **tidak dihitung** ke 4 foto. Gambar OG maksimal 300 KB |
 | Masa berlaku surat | Surat (data, link, dan gambar OG) dihapus **30 hari setelah publish** |
 | Masa berlaku foto | Foto dihapus **7 hari setelah surat pertama kali dibuka** (`opened_at`). Kalau tidak pernah dibuka, foto ikut terhapus bersama suratnya di hari ke-30. Kalau gambar depannya foto user, cover dan gambar OG ikut dihapus saat itu karena gambar OG memuat foto yang sama. Setelah dihapus, halaman penerima tetap menampilkan kartu dan teks dengan placeholder, dan memakai gambar OG bawaan |
-| Rate limit | `POST /letters` maksimal **10 surat per jam per IP** untuk awal, dievaluasi selama beta. Operator seluler di Indonesia banyak memakai CGNAT, jadi satu IP bisa dipakai banyak orang; kalau 429 mulai sering muncul, kuncinya digabung dengan penanda per perangkat |
+| Rate limit | `POST /letters` maksimal **10 surat per jam per IP** untuk awal, dievaluasi dari pemakaian. Operator seluler di Indonesia banyak memakai CGNAT, jadi satu IP bisa dipakai banyak orang; kalau 429 mulai sering muncul, kuncinya digabung dengan penanda per perangkat |
 | Repo | **Public**. Alasannya, Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Sudah terbukti di PR #6: commit dari akun Bintang ter-deploy di proyek Vercel milik Kall |
 
 Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karena foto hidup paling lama 7 hari setelah dibuka, yang perlu dipantau adalah jumlah surat aktif, bukan total surat.
@@ -63,7 +63,7 @@ Dengan batas di atas, storage 1 GB muat sekitar 500 surat penuh sekaligus. Karen
 | --- | --- | --- |
 | Supabase Free | Storage 1 GB, 2 proyek aktif | Ditahan oleh batas foto dan masa berlaku di atas. Satu proyek untuk produksi, satu untuk staging |
 | Supabase Free | Egress 5 GB per bulan | Foto yang dibuka penerima ikut dihitung dan kemungkinan habis sebelum storage. Dengan 4 foto × 500 KB, cukup untuk sekitar 2.500 kali surat dibuka per bulan; pantau egress selama beta |
-| Supabase Free | Proyek di-pause setelah 7 hari tanpa request | Selama beta yang sepi, link surat bisa mati. Cron cleanup memanggil fungsi tiap jam lewat URL publik, ditambah ping harian dari luar: workflow `Ping produksi` (`.github/workflows/ping.yml`), yang juga gagal dan mengirim email kalau produksi mati |
+| Supabase Free | Proyek di-pause setelah 7 hari tanpa request | Selama pemakaian masih sepi, link surat bisa mati. Cron cleanup memanggil fungsi tiap jam lewat URL publik, ditambah ping harian dari luar: workflow `Ping produksi` (`.github/workflows/ping.yml`), yang juga gagal dan mengirim email kalau produksi mati |
 | Vercel Hobby | Body fungsi sekitar 4,5 MB, durasi pendek | Foto dan gambar OG selalu diunggah langsung ke storage lewat URL bertanda tangan, tidak lewat fungsi Vercel |
 | Vercel Hobby | Hanya untuk non-komersial | Kalau nanti ada monetisasi, pindah ke Pro atau host lain |
 | Vercel Hobby | Custom event analitik dan cron terbatas | Event analitik disimpan di tabel Postgres ([Analitik](#analitik-dan-monitoring-error)); job pembersihan memakai `pg_cron` di Supabase |
@@ -135,7 +135,7 @@ Untuk sekarang tidak ada layanan luar (Sentry dan sejenisnya), supaya tidak ada 
 - Pencatatannya best effort lewat `EdgeRuntime.waitUntil()`. Respons 500 keluar tanpa menunggu insert, dan kalau insert-nya gagal (biasanya justru saat DB bermasalah), cukup ditulis ke log.
 - Log Edge Function di dashboard Supabase menyimpan nama, kode, dan baris stack error (`logError()` di `_shared/errors.ts`), tanpa pesannya, dengan alasan yang sama. Baris stack menunjuk tempat error terjadi. Log itu dicatat penyedia, sesuai kalimat log teknis di `/privasi`.
 - Hasil panggilan job pembersihan dicek dari `net._http_response`.
-- View `function_errors_daily` merangkum error per fungsi, route, dan kode per hari (WIB). Selama beta, view ini dicek tiap hari bareng pemantauan kuota storage dan egress.
+- View `function_errors_daily` merangkum error per fungsi, route, dan kode per hari (WIB). View ini dicek tiap hari bareng pemantauan kuota storage dan egress.
 - 5xx dari gateway atau platform tidak lewat kode fungsi, jadi tidak masuk `function_errors`. Contohnya boot error, `WORKER_LIMIT`, dan timeout. Pengecekan harian tetap melihat Logs dan Invocations tiap fungsi di dashboard.
 
 Error di browser (frontend) belum tercakup. Kalau nanti perlu, butuh endpoint baru, yang masuk kontrak dulu.
@@ -267,7 +267,7 @@ Disetujui Kall di #47. Migrasinya `supabase/migrations/20261014053904_phase2.sql
 
 **Kuota**
 
-- Selama beta, maksimal **100 momen aktif per user** (sekitar 50 MB). Trigger di `moments` menolak insert, atau update yang mengosongkan `deleted_at`, kalau user sudah punya 100 momen dengan `deleted_at is null`.
+- Maksimal **100 momen aktif per user** (sekitar 50 MB). Trigger di `moments` menolak insert, atau update yang mengosongkan `deleted_at`, kalau user sudah punya 100 momen dengan `deleted_at is null`.
 - Sejak migrasi `hardening`, ada juga batas baris per user, termasuk baris berstatus hapus: **1.500 kantong, 200 album, dan 1.000 baris momen**. Tanpa batas ini satu akun bisa mengisi database 500 MB lewat upsert biasa, misalnya ribuan album berisi 500 UUID acak atau momen yang dikirim sudah berstatus hapus. Hanya baris baru yang dihitung, jadi upsert baris yang sudah ada tetap lolos di batas. Ditolak dengan kode `23514` dan pesan `kuota … penuh`, yang di frontend jadi status "Cadangan … penuh" di kartu Cadangan.
 - Kuota ini hanya berarti kalau setiap berkas punya baris. Karena itu policy unggah di bucket `moments` mensyaratkan baris `moments` milik user dengan `id` sama dengan nama berkas dan `deleted_at is null` (dicatat Kall). Satu baris, satu berkas: tanpa policy update, berkasnya juga tidak bisa ditimpa.
 - Momen yang dihapus berkasnya dihapus browser saat itu juga (policy hapus), dan job pembersihan tiap jam menghapus berkas yang masih tertinggal tanpa baris aktif (lihat [Pembersihan file](#pembersihan-file)). Jadi hapus lalu tambah lagi hanya bisa menumpuk berkas paling lama sejam.
