@@ -1,0 +1,43 @@
+name: Ping produksi
+
+# Supabase Free mem-pause proyek setelah 7 hari tanpa request (docs/backend.md, Risiko). Cron
+# cleanup tiap jam sudah memanggil fungsi lewat URL publik, tapi Supabase tidak menjelaskan apa
+# yang dihitung sebagai aktivitas, jadi ping harian dari luar ini pengamannya. Sekalian jadi cek
+# uptime: kalau fungsi atau proyeknya mati, job gagal dan GitHub mengirim email.
+#
+# Butuh repository variable SUPABASE_PUBLISHABLE_KEY (publishable key, aman di browser).
+
+on:
+  schedule:
+    # 01:17 UTC (08:17 WIB), di luar menit penuh supaya tidak ikut antre jadwal GitHub.
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET /l/{slug} untuk slug yang tidak ada harus 404 not_found
+        env:
+          URL: https://rmyfkdtqcltawmssollb.supabase.co/functions/v1/l/0000000000
+          KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::repository variable SUPABASE_PUBLISHABLE_KEY belum diisi"
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            status=$(curl -s -o body.json -w '%{http_code}' --max-time 30 -H "apikey: $KEY" "$URL" || true)
+            if [ "$status" = 404 ] && grep -q '"not_found"' body.json; then
+              echo "ok: $status"
+              exit 0
+            fi
+            echo "percobaan $attempt: $status"
+            sleep 20
+          done
+          echo "::error::produksi tidak menjawab 404 not_found (terakhir $status)"
+          exit 1
