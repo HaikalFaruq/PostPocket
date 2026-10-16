@@ -9,8 +9,15 @@ const TODAY = '2026-10-10'
 // 5 detik sampai modalnya tertutup, jadi tunggu lebih lama dari batas bawaan expect.
 const SAVE_TIMEOUT = 15_000
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, info) => {
   await page.clock.setFixedTime(new Date(2026, 9, 10, 10, 0))
+  // Dialog Traktir yang muncul sendiri setelah Selesai hanya diuji di tesnya sendiri. Di tes lain
+  // ia dianggap sudah pernah muncul, supaya tidak menutupi langkah berikutnya.
+  if (!info.title.includes('Traktir')) {
+    await page.addInitScript(() =>
+      localStorage.setItem('postpocket:support-prompt', new Date().toISOString()),
+    )
+  }
   await page.goto('/letter/new')
   await expect(page.locator('.foil-rotor')).toBeVisible()
 })
@@ -63,28 +70,25 @@ async function writeDraft(page: Page, text: string) {
   await page.waitForTimeout(700)
 }
 
-test('link surat siap mengajak Traktir, dan ajakannya istirahat setelah ditutup', async ({
+test('setelah link surat siap ditutup, dialog Traktir muncul sekali, lalu istirahat 30 hari', async ({
   page,
 }) => {
   await message(page).fill('Halo, terima kasih ya')
   await createLink(page)
-  const sheet = page.getByTestId('send-letter')
-  const nudge = sheet.getByTestId('support-nudge')
-  await expect(nudge).toBeVisible()
-  const link = nudge.getByRole('link', { name: /Traktir seikhlasnya/ })
+  await page.getByTestId('send-letter').getByRole('button', { name: 'Selesai' }).click()
+  const support = page.getByRole('dialog', { name: 'Traktir PostPocket' })
+  await expect(support).toBeVisible()
+  const link = support.getByRole('link', { name: /Dukung lewat Sociabuzz/ })
   await expect(link).toHaveAttribute('href', 'https://sociabuzz.com/byhund/tribe')
-  await expect(link).toHaveAttribute('target', '_blank')
-  await expect(link).toHaveAttribute('rel', /noopener/)
+  await support.getByRole('button', { name: 'Nanti saja' }).click()
+  await expect(support).toBeHidden()
 
-  await nudge.getByRole('button', { name: 'Sembunyikan ajakan Traktir' }).click()
-  await expect(nudge).toBeHidden()
-  await sheet.getByRole('button', { name: 'Selesai' }).click()
-
-  // Dibuka lagi setelah dimuat ulang: ajakannya tidak muncul lagi di perangkat ini.
-  await page.reload()
+  // Lembar link dibuka dan ditutup lagi: dialognya tidak muncul lagi di perangkat ini.
   await page.getByRole('button', { name: 'Lihat link surat' }).click()
-  await expect(page.getByTestId('sent-url')).toBeVisible()
-  await expect(page.getByTestId('support-nudge')).toHaveCount(0)
+  await page.getByTestId('send-letter').getByRole('button', { name: 'Selesai' }).click()
+  await expect(page.getByTestId('send-letter')).toHaveCount(0)
+  await page.waitForTimeout(600)
+  await expect(support).toHaveCount(0)
 })
 
 test('surat kosong tidak bisa dibuat linknya', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { postmarkDate, SUPPORT_URL, supportNudgeVisible } from '../app/utils/support'
+import { postmarkDate, SUPPORT_URL, supportPromptDue } from '../app/utils/support'
 
 describe('dukungan Sociabuzz', () => {
   it('membuka halaman PostPocket di Sociabuzz lewat https', () => {
@@ -16,12 +16,12 @@ describe('dukungan Sociabuzz', () => {
     expect(postmarkDate(new Date('2026-12-31T18:00:00Z'))).toBe('1 JAN 2027')
   })
 
-  it('ajakan kecil istirahat 30 hari setelah ditutup', () => {
+  it('dialog Traktir istirahat 30 hari setelah muncul sendiri', () => {
     const now = new Date('2026-10-16T03:00:00Z')
-    expect(supportNudgeVisible(null, now)).toBe(true)
-    expect(supportNudgeVisible('bukan tanggal', now)).toBe(true)
-    expect(supportNudgeVisible('2026-10-16T02:00:00Z', now)).toBe(false)
-    expect(supportNudgeVisible('2026-09-17T03:00:01Z', now)).toBe(false)
-    expect(supportNudgeVisible('2026-09-16T03:00:00Z', now)).toBe(true)
+    expect(supportPromptDue(null, now)).toBe(true)
+    expect(supportPromptDue('bukan tanggal', now)).toBe(true)
+    expect(supportPromptDue('2026-10-16T02:00:00Z', now)).toBe(false)
+    expect(supportPromptDue('2026-09-17T03:00:01Z', now)).toBe(false)
+    expect(supportPromptDue('2026-09-16T03:00:00Z', now)).toBe(true)
   })
 })

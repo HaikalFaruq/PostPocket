@@ -672,6 +672,14 @@ function closeResult() {
   captured.value = []
 }
 
+// Hasil Booth yang sudah disimpan lalu ditutup memunculkan dialog Traktir (paling sering sekali
+// per 30 hari).
+const { open: supportOpen, offer: offerSupport } = useSupportPrompt()
+function closeBoothResult(kept: boolean) {
+  closeResult()
+  if (kept) offerSupport()
+}
+
 /** Kamera ditolak: foto dari galeri dipakai sebagai jepretan, dengan filter yang sama. */
 async function onBoothFiles(event: Event) {
   const input = event.target as HTMLInputElement
@@ -1040,10 +1048,11 @@ const marqueeSeconds = computed(() => Math.max(8, marquee.value.length * 0.3))
           v-if="shots"
           :shots="shots"
           :layout="layout"
-          @close="closeResult"
+          @close="closeBoothResult"
           @retake="closeResult"
           @cd="onBoothCd"
         />
+        <SupportDialog v-model:open="supportOpen" />
         <!-- Piringan yang sedang diseret atau terbang ke slot TV. -->
         <div
           v-if="flying && flying.box.width"

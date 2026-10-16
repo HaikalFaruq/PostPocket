@@ -19,18 +19,18 @@ export function postmarkDate(date: Date): string {
 }
 
 /**
- * Kunci localStorage untuk ajakan Traktir kecil sesudah kirim surat dan Booth. Isinya waktu
- * (ISO) ajakan itu terakhir ditutup atau ditekan.
+ * Kunci localStorage untuk dialog Traktir yang muncul sendiri setelah kirim surat dan Booth. Isinya
+ * waktu (ISO) dialog itu terakhir muncul sendiri.
  */
-export const SUPPORT_NUDGE_KEY = 'postpocket:support-nudge'
+export const SUPPORT_PROMPT_KEY = 'postpocket:support-prompt'
 
-/** Lama ajakan kecil tidak muncul lagi setelah ditutup atau ditekan. */
-export const SUPPORT_NUDGE_REST_DAYS = 30
+/** Lama dialog Traktir tidak muncul sendiri lagi setelah sekali muncul. */
+export const SUPPORT_PROMPT_REST_DAYS = 30
 
-/** Ajakan kecil tampil kalau belum pernah ditutup, atau sudah lewat masa istirahatnya. */
-export function supportNudgeVisible(stored: string | null, now: Date): boolean {
+/** Dialog Traktir boleh muncul sendiri kalau belum pernah, atau sudah lewat masa istirahatnya. */
+export function supportPromptDue(stored: string | null, now: Date): boolean {
   if (!stored) return true
   const at = Date.parse(stored)
   if (Number.isNaN(at)) return true
-  return now.getTime() - at >= SUPPORT_NUDGE_REST_DAYS * 24 * 60 * 60 * 1000
+  return now.getTime() - at >= SUPPORT_PROMPT_REST_DAYS * 24 * 60 * 60 * 1000
 }
