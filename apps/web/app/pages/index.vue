@@ -26,6 +26,7 @@ const open = ref(false)
 // Versi rilis dan commit yang sedang di-deploy, juga dikirim bersama Lapor masalah.
 const version = useRuntimeConfig().public.appVersion
 const kotakBareng = !!useRuntimeConfig().public.kotakBareng
+const support = ref(false)
 
 /**
  * Tiga modul, dari kiri ke kanan seperti perjalanan sebuah kenangan: ditulis jadi surat, disimpan
@@ -183,6 +184,26 @@ const modules = [
 
         <InstallCard class="mx-auto mt-6 max-w-md" />
 
+        <!-- Ajakan dukungan: perangko kecil yang membuka dialog Traktir PostPocket. -->
+        <button
+          type="button"
+          class="group mx-auto mt-4 flex w-full max-w-md items-center gap-4 py-2 text-left"
+          data-testid="support-open"
+          @click="support = true"
+        >
+          <span class="grid w-14 shrink-0 place-items-center">
+            <SupportStamp class="w-10 transition-transform group-hover:rotate-[4deg]" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[17px] leading-tight font-semibold">Traktir PostPocket</span>
+            <span class="mt-0.5 block text-ink-muted">
+              Gratis dan tanpa iklan. Kalau suka, kirim dukungan seikhlasnya lewat Sociabuzz.
+            </span>
+          </span>
+          <Icon name="chevron-right" :size="18" class="shrink-0 text-ink-subtle" />
+        </button>
+        <SupportDialog v-model:open="support" />
+
         <section class="mt-20 text-center" aria-labelledby="crowd-title">
           <h2
             id="crowd-title"
@@ -208,6 +229,14 @@ const modules = [
       <p>Versi {{ version }}. Foto, kantong, dan draf suratmu tersimpan di perangkat ini.</p>
       <nav aria-label="Tentang PostPocket" class="flex gap-4">
         <FeedbackLink class="font-semibold text-ink underline underline-offset-2" />
+        <button
+          type="button"
+          class="underline underline-offset-2 hover:text-ink"
+          data-testid="support-footer"
+          @click="support = true"
+        >
+          Traktir
+        </button>
         <NuxtLink to="/privasi" class="underline underline-offset-2 hover:text-ink"
           >Privasi</NuxtLink
         >

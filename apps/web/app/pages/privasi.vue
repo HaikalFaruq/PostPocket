@@ -148,6 +148,10 @@ useSeoMeta({
       menghitung berapa surat dibuat, dibuka, dan dibalas, tanpa mencatat surat yang mana, alamat
       IP, atau perangkat yang dipakai.
     </p>
+    <p>
+      Tombol Traktir hanya membuka halaman Sociabuzz di tab baru. PostPocket tidak mengirim data apa
+      pun ke sana, dan pembayaran dukungan diatur oleh Sociabuzz.
+    </p>
 
     <h2>Ada pertanyaan atau masalah?</h2>
     <p>

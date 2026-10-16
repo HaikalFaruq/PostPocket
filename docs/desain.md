@@ -99,6 +99,16 @@ Emas hanya ada di dalam P, tidak pernah langsung di atas kanvas atau putih.
   - `node scripts/pwa-icons.mjs` untuk ikon PWA;
   - `node scripts/og-images.mjs` untuk gambar OG.
 
+## Traktir PostPocket
+
+Ajakan dukungan lewat [Sociabuzz](https://sociabuzz.com/byhund/tribe), ditambahkan 16 Oktober 2026. Mengikuti aturan "bendanya dulu": dialognya dibuka dengan **perangko** PostPocket (`SupportStamp`), bukan ikon hati atau koin.
+
+- Perangko kertas putih bergerigi (lubang tepi lewat `mask`), wajahnya kertas `canvas` dengan logo P-amplop, nilai "Rp seikhlasnya", dan "Indonesia" seperti perangko sungguhan.
+- Di dialog, perangkonya ditempel dengan sedikit putaran lalu dicap pos bertanggal hari ini (waktu Jakarta). Tulisan kapital di cap pos itu bagian dari bendanya. Tanpa animasi kalau `prefers-reduced-motion`.
+- Pemicunya di Beranda: baris "Traktir PostPocket" di bawah kartu Pasang, dan tautan "Traktir" di footer. Tidak ada popup yang muncul sendiri.
+- Tombol utamanya tautan biasa ke Sociabuzz di tab baru (`rel="noopener noreferrer"`). PostPocket tidak mengirim data apa pun ke sana.
+- Tidak memakai emas foil atau merah pos: emas tetap hanya di kartu dan tutup amplop logo.
+
 ## Splash
 
 Di awal setiap sesi, sebelum Beranda atau halaman aplikasi tampil, logo P-amplop terbentuk di kanvas berkisi titik (`AppSplash`):
