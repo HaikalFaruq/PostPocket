@@ -6,7 +6,7 @@ Sprint 0 · 10 Oktober 2026 · Kall
 
 **Rilis 1 memakai CSS 3D** lewat komponen `FoilCard`. TresJS/WebGL tidak dipasang. Di semua kondisi yang bisa diuji, CSS 3D mencapai batas 60 fps, termasuk tanpa GPU. Versi WebGL baru setara kalau GPU-nya kuat, dan menambah sekitar 136 KB gzip (three.js) plus sekitar 22 KB (TresJS).
 
-Gerbang PRD (di atas 50 fps di HP Android kelas menengah) **belum** terbukti di HP sungguhan. Itu sisa pekerjaan Sprint 0, lihat bagian Belum terbukti.
+Gerbang PRD (di atas 50 fps di HP Android kelas menengah) **lolos** di HP sungguhan, 22 Oktober 2026. Lihat bagian Uji di HP sungguhan.
 
 ## Yang dibangun
 
@@ -39,9 +39,9 @@ Baris Safari hanya membuktikan bahwa kartu dan benchmark jalan di Safari iOS. Si
 - **Properti yang meratakan 3D** (`overflow`, `filter`, `mask`, `opacity < 1`, `mix-blend-mode`) hanya boleh ada di muka kartu, tidak di rotor, spread, atau lembar.
 - **Kecepatan lemparan harus basi kalau jari diam.** Kalau kartu ditahan lalu dilepas, sampel gerakan lama sempat membuat kartu ikut terlempar. Sudah diperbaiki dan diuji E2E.
 
-## Belum terbukti
+## Uji di HP sungguhan
 
-- [ ] Benchmark di HP Android kelas menengah (gerbang PRD) dan satu HP murah: buka `/lab/foil?bench=1`, lalu salin hasilnya ke tabel di atas.
-- [ ] Benchmark di iPhone sungguhan.
+- [x] Benchmark di HP Android kelas menengah (gerbang PRD) dan satu HP Android lain lewat `/lab/foil?bench=1`: lolos, 22 Oktober 2026.
+- [x] Benchmark di iPhone sungguhan: lolos, 22 Oktober 2026.
 
-Kalau HP Android kelas menengah di bawah 50 fps, urutan penghematannya: matikan butiran kilau, ganti blend mode pantulan ke `normal` dengan opacity rendah, kecilkan `inset` lapisan logam, lalu turunkan resolusi mask. Kalau masih kurang, baru pertimbangkan WebGL untuk perangkat yang mampu.
+Kalau suatu saat ada HP yang di bawah 50 fps, urutan penghematannya: matikan butiran kilau, ganti blend mode pantulan ke `normal` dengan opacity rendah, kecilkan `inset` lapisan logam, lalu turunkan resolusi mask. Kalau masih kurang, baru pertimbangkan WebGL untuk perangkat yang mampu.

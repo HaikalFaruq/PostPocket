@@ -209,7 +209,7 @@ Banyak pengirim, satu penerima ([PRD Modul 4](prd/PRD-PostPocket.md#modul-4-kota
 
 ## Checklist per sprint
 
-Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang belum dicentang.
+Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang belum dicentang. Per 22 Oktober 2026 semua item sudah dicentang; pekerjaan baru ditambahkan di sini lewat PR sebelum dikerjakan.
 
 **Sprint 0 (minggu 1)**
 
@@ -219,7 +219,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Preset desain di `packages/presets`
 - [x] Spike kartu foil CSS vs TresJS: CSS 3D dipilih ([hasil](spikes/foil-3d.md))
 - [x] Uji `ctx.filter` di engine Safari dan Chrome ([hasil](spikes/safari.md))
-- [ ] Uji kamera dan benchmark kartu di iPhone dan HP Android kelas menengah sungguhan (`/lab/safari`, `/lab/foil?bench=1`)
+- [x] Uji kamera dan benchmark kartu di iPhone dan HP Android kelas menengah sungguhan (`/lab/safari`, `/lab/foil?bench=1`), lolos 22 Oktober 2026 ([Uji di HP sungguhan](#uji-di-hp-sungguhan))
 - [x] Ukuran dan catatan referensi di `docs/reference/` (screenshot di luar repo karena repo public)
 
 **Sprint 1 (minggu 2–3)**
@@ -229,7 +229,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Peta foil dari gambar di browser: Detail (deteksi tepi), Bayangan (threshold), Satu warna
 - [x] Surprise me memakai `surprise()` dari preset, dengan animasi kartu berputar sekali
 - [x] Draf otomatis di IndexedDB; refresh tidak menghilangkan isi
-- [ ] Gerbang: kartu foil di atas 50 fps di HP Android kelas menengah
+- [x] Gerbang: kartu foil di atas 50 fps di HP Android kelas menengah, lolos 22 Oktober 2026
 
 **Sprint 2 (minggu 4–5)**
 
@@ -251,7 +251,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 
 - [x] Pocket: kalender, modal simpan hari, buka kantong, album otomatis per bulan ke TV
 - [x] `navigator.storage.persist()` dan ajakan pasang PWA ([PWA](#pwa))
-- [ ] Uji di 3 HP; perbaiki bug dari tester
+- [x] Uji di 3 HP; perbaiki bug dari tester. Langkah 1 sampai 10 [Uji di HP sungguhan](#uji-di-hp-sungguhan) lolos 22 Oktober 2026
 
 **Fase 2: login dan sinkron Pocket** (skema sudah di produksi sejak #50, [rancangan](backend.md#rancangan-skema-fase-2))
 
@@ -317,7 +317,7 @@ Login Google sendiri tidak bisa diuji otomatis. Tesnya memakai user yang dibuat 
 
 - [x] Simpan surat dan Unduh foto di halaman penerima; fotonya masuk CD "Surat untukmu" di TV
 - [x] Halaman `/kotak` dengan folder kaca, baca surat satu per satu, hapus surat dan folder
-- [ ] Animasi folder kaca dan penampil dicek di iPhone dan Android sungguhan ([langkah 9](#uji-di-hp-sungguhan))
+- [x] Animasi folder kaca dan penampil dicek di iPhone dan Android sungguhan ([langkah 9](#uji-di-hp-sungguhan)), lolos 22 Oktober 2026
 - [x] Kotak bareng di atas mock (kontrak 0.3.0): bikin dan kelola kotak, titip dari editor dan Booth, kotak tersegel, baca satu per satu, Simpan semua
 - [x] Kotak bareng menyala di produksi (`NUXT_PUBLIC_KOTAK_BARENG=1` di Vercel) setelah Edge Function `boxes` dan `k` dari Bintang ter-deploy, 15 Oktober 2026. Alur bikin, titip, buka, dan simpan dicek di browser ke produksi (22 dari 22 langkah lolos)
 
@@ -358,7 +358,7 @@ PostPocket bisa dipasang ke layar utama lewat `@vite-pwa/nuxt` (manifest dan ser
 
 ## Uji di HP sungguhan
 
-Item checklist yang tersisa dicek sekali jalan dengan daftar di bawah:
+Item checklist yang butuh HP sungguhan dicek sekali jalan dengan daftar di bawah, dan semuanya lolos 22 Oktober 2026. Ulangi daftar ini sebelum rilis besar berikutnya:
 - benchmark dan kamera (Sprint 0);
 - gerbang 50 fps (Sprint 1);
 - uji di 3 HP (beta);

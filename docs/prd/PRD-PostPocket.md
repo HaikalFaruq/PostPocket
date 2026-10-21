@@ -2,7 +2,7 @@
 
 Oct 10, 2026 · @Kall
 
-> **Status:** rilis 1 live di [postpocket.vercel.app](https://postpocket.vercel.app) sejak 16 Oktober 2026, termasuk fase 2 (login Google dan cadangan Pocket) dan kotak bareng. Bagian di bawah adalah rencana awal; keputusan sesudahnya dicatat di [panduan frontend](../frontend.md) dan [panduan backend](../backend.md).
+> **Status:** rilis 1 live di [postpocket.vercel.app](https://postpocket.vercel.app) sejak 16 Oktober 2026, termasuk fase 2 (login Google dan cadangan Pocket) dan kotak bareng. Semua kriteria diterima lolos per 22 Oktober 2026, lewat E2E di CI dan [uji di HP sungguhan](../frontend.md#uji-di-hp-sungguhan). Bagian di bawah adalah rencana awal; keputusan sesudahnya dicatat di [panduan frontend](../frontend.md) dan [panduan backend](../backend.md).
 
 ## Ringkasan
 
@@ -122,7 +122,7 @@ Letter mengubah gambar jadi kartu lipat bercetak foil 3D yang bisa diputar, dibu
 
 **Kirim dan buka**
 
-1. Tap "Buat link" → gambar dikompres di browser → diunggah → server mengembalikan link pendek (contoh `postpocket.app/l/x7Kp2q`).
+1. Tap "Buat link" → gambar dikompres di browser → diunggah → server mengembalikan link pendek (contoh `postpocket.vercel.app/l/x7Kp2q`).
 2. Link punya gambar preview (OG image) berisi sampul kartu, supaya terlihat menarik saat dibagikan di WhatsApp. Gambar dirender browser sekali waktu "Buat link" dari kartu yang sama (JPEG 1200×630, maksimal 300 KB) dan diunggah bersama foto, lalu halaman `/l/:slug` di-SSR karena crawler WhatsApp tidak menjalankan JavaScript.
 5. Surat berlaku 30 hari setelah dikirim. Foto di dalamnya dihapus 7 hari setelah surat pertama kali dibuka; setelah itu kartu dan teks tetap tampil, dengan placeholder di slot foto.
 3. Halaman penerima menampilkan kartu tertutup. Tap untuk membuka; isi surat muncul dengan animasi.
@@ -131,13 +131,13 @@ Letter mengubah gambar jadi kartu lipat bercetak foil 3D yang bisa diputar, dibu
 
 **Kriteria diterima**
 
-- [ ] Kartu bisa diputar dengan drag (mouse dan sentuhan) dan efek kilau foil ikut bergerak sesuai sudut.
-- [ ] Tap kartu membuka dan menutup kartu dengan animasi di bawah 600 ms.
-- [ ] Ganti opsi di langkah 1 sampai 4 langsung terlihat di kartu tanpa reload.
-- [ ] Surprise me selalu menghasilkan kombinasi yang ada di daftar aturan preset.
-- [ ] Draf tersimpan otomatis di browser; refresh tidak menghilangkan isi.
-- [ ] Link yang dibuat bisa dibuka di HP lain tanpa login, dan preview-nya tampil di WhatsApp.
-- [ ] Rata-rata frame di atas 50 fps saat memutar kartu di HP Android kelas menengah.
+- [x] Kartu bisa diputar dengan drag (mouse dan sentuhan) dan efek kilau foil ikut bergerak sesuai sudut.
+- [x] Tap kartu membuka dan menutup kartu dengan animasi di bawah 600 ms.
+- [x] Ganti opsi di langkah 1 sampai 4 langsung terlihat di kartu tanpa reload.
+- [x] Surprise me selalu menghasilkan kombinasi yang ada di daftar aturan preset.
+- [x] Draf tersimpan otomatis di browser; refresh tidak menghilangkan isi.
+- [x] Link yang dibuat bisa dibuka di HP lain tanpa login, dan preview-nya tampil di WhatsApp.
+- [x] Rata-rata frame di atas 50 fps saat memutar kartu di HP Android kelas menengah.
 
 ## Modul 2: Pocket (referensi Day Pocket)
 
@@ -177,12 +177,12 @@ Pocket adalah kalender bulanan tempat setiap hari bisa diisi foto lalu "dibungku
 
 **Kriteria diterima**
 
-- [ ] Kalender bisa pindah bulan dan tahun; hari ini ditandai.
-- [ ] Ganti warna kantong, stiker, atau bingkai langsung terlihat di preview modal.
-- [ ] Foto HEIC dari iPhone bisa dipilih dan tampil.
-- [ ] Foto dikompres maksimal sisi panjang 2048 px sebelum disimpan.
-- [ ] Setelah "Simpan", sel kalender langsung menampilkan kantong mini dan penghitung bertambah.
-- [ ] Data tetap ada setelah browser ditutup dan dibuka lagi.
+- [x] Kalender bisa pindah bulan dan tahun; hari ini ditandai.
+- [x] Ganti warna kantong, stiker, atau bingkai langsung terlihat di preview modal.
+- [x] Foto HEIC dari iPhone bisa dipilih dan tampil.
+- [x] Foto dikompres maksimal sisi panjang 2048 px sebelum disimpan.
+- [x] Setelah "Simpan", sel kalender langsung menampilkan kantong mini dan penghitung bertambah.
+- [x] Data tetap ada setelah browser ditutup dan dibuka lagi.
 
 ## Modul 3: TV dan Booth (referensi Memory TV)
 
@@ -213,12 +213,12 @@ TV adalah televisi jadul bergaya clay yang memutar album foto berbentuk CD denga
 
 **Kriteria diterima**
 
-- [ ] Ganti warna clay mengubah warna badan TV tanpa memuat gambar baru.
-- [ ] Coverflow bisa digeser dengan swipe, panah, dan keyboard.
-- [ ] Memasukkan CD memulai slideshow; ganti filter berlaku langsung pada foto yang sedang tampil.
-- [ ] Booth jalan di Chrome Android dan Safari iOS terbaru, kamera depan default, bisa ganti ke kamera belakang.
-- [ ] Strip hasil Booth yang diunduh memuat filter yang sama dengan yang terlihat di layar.
-- [ ] Bila izin kamera ditolak, muncul pesan jelas dan opsi upload foto sebagai gantinya.
+- [x] Ganti warna clay mengubah warna badan TV tanpa memuat gambar baru.
+- [x] Coverflow bisa digeser dengan swipe, panah, dan keyboard.
+- [x] Memasukkan CD memulai slideshow; ganti filter berlaku langsung pada foto yang sedang tampil.
+- [x] Booth jalan di Chrome Android dan Safari iOS terbaru, kamera depan default, bisa ganti ke kamera belakang.
+- [x] Strip hasil Booth yang diunduh memuat filter yang sama dengan yang terlihat di layar.
+- [x] Bila izin kamera ditolak, muncul pesan jelas dan opsi upload foto sebagai gantinya.
 
 ## Modul 4: Kotak surat
 
@@ -245,7 +245,7 @@ Surat dari link hilang 30 hari setelah dikirim, dan fotonya 7 hari setelah dibuk
 - [x] Surat yang disimpan tetap terbuka lengkap dengan fotonya setelah foto dan suratnya dihapus server.
 - [x] Surat dibaca satu per satu dengan animasi keluar dari folder dan bergeser antarsurat, dan `prefers-reduced-motion` langsung ke keadaan akhir.
 - [x] Lembar surat bisa dipilih dengan sentuhan, mouse, dan keyboard.
-- [ ] Animasi folder dan penampil mulus di iPhone dan Android kelas menengah sungguhan.
+- [x] Animasi folder dan penampil mulus di iPhone dan Android kelas menengah sungguhan.
 
 **Kotak bareng: banyak pengirim, satu penerima**
 
@@ -269,7 +269,7 @@ Untuk ulang tahun, perpisahan, wisuda, atau kejutan lain: teman-teman menitip su
 - [x] Kotak dibuat, dititip dua teman, dibuka penerima, dibaca satu per satu, dan disimpan semua, lewat mock (`e2e/kotak-bareng.spec.ts`).
 - [x] Titipan ditolak setelah kotak dibuka atau penuh, dan bisa ditarik pengirimnya atau dihapus pembuatnya.
 - [x] Membuka surat pertama menandai kotak dibuka; pembuat yang melihat link penerima tidak menandainya.
-- [ ] Edge Function `boxes` dan `k` sesuai kontrak 0.3.0 (Bintang), lalu saklar dinyalakan di produksi.
+- [x] Edge Function `boxes` dan `k` sesuai kontrak 0.3.0 (Bintang), lalu saklar dinyalakan di produksi.
 
 ## Design system dan aset
 
@@ -446,16 +446,16 @@ Risiko terbesar ada di performa kartu 3D di HP murah dan di Safari iOS yang bisa
 
 **Pertanyaan terbuka**
 
-- [ ] Domain dan handle sosial untuk PostPocket (nama sudah final); cek ketersediaan.
+- [x] Domain dan handle sosial untuk PostPocket (nama sudah final); cek ketersediaan. **Diputuskan: tetap `postpocket.vercel.app`**, gratis; domain sendiri dibeli kalau mau promosi besar. Dicek 22 Oktober 2026: `postpocket.com` sudah dipegang orang sejak 2011, dan `postpocket.app` dipakai produk lain (manajemen media sosial, terdaftar September 2026). `postpocket.id`, `.my.id`, `.web.id`, `.co`, `.io`, dan `.me` masih kosong. Handle Instagram, TikTok, dan X tidak bisa dicek tanpa login, jadi dicek langsung di aplikasinya saat dibutuhkan.
 - [x] Backend tetap Supabase atau stack sendiri? **Diputuskan: tetap Supabase**, proyeknya sudah dibuat. Kalau storage gratis 1 GB tidak cukup, foto dipindah ke Cloudflare R2 tanpa mengganti database.
 - [x] Gambar OG dirender di mana? **Diputuskan: browser waktu "Buat link"**, supaya sampulnya persis sama dengan kartu. Diunggah lewat URL bertanda tangan, divalidasi backend saat publish, dicatat sebagai `letter_assets` berjenis `og`. Frontend tidak memakai Nuxt OG Image; `/l/**` di-SSR lewat `routeRules` dengan header `X-Robots-Tag: noindex`.
 - [x] Repo public atau private? **Diputuskan: public**, karena Vercel Hobby memblokir deploy dari commit yang author-nya bukan pemilik akun di repo private. Terbukti di PR #6: commit dari akun Bintang ter-deploy di proyek Vercel milik Kall.
 - [x] Bucket `letter-assets` publik atau bertanda tangan? **Diputuskan: publik untuk baca** dengan path acak; upload tetap lewat URL bertanda tangan.
 - [x] Surat yang dikirim berlaku selamanya atau kedaluwarsa? **Diputuskan: surat 30 hari setelah dikirim; foto 7 hari setelah surat pertama kali dibuka.** Dievaluasi lagi setelah beta.
 - [x] Maksimal foto per surat dan ukuran file. **Diputuskan: 4 foto, maksimal 500 KB per foto setelah kompres; gambar OG maksimal 300 KB.**
-- [ ] Bahasa UI: Indonesia, Inggris, atau keduanya.
+- [x] Bahasa UI: Indonesia, Inggris, atau keduanya. **Diputuskan: Indonesia saja.** Inggris dipertimbangkan kalau ada yang minta.
 - [x] Login masuk rilis 1 atau fase 2. **Diputuskan: fase 2, dengan Google OAuth dulu.** Login hanya untuk sinkron Pocket; surat tetap bisa dibuat dan dibuka tanpa login. Magic link email menyusul kalau ada yang minta.
-- [ ] Model bisnis (gratis, premium preset, atau cetak kartu fisik) setelah ada data pemakaian.
+- [x] Model bisnis (gratis, premium preset, atau cetak kartu fisik) setelah ada data pemakaian. **Diputuskan untuk sekarang: gratis**, dengan dukungan sukarela lewat Traktir (Sociabuzz). Premium preset atau cetak kartu fisik ditinjau lagi setelah ada data pemakaian.
 
 **Langkah berikutnya: repo GitHub**
 
