@@ -40,10 +40,10 @@ Catatan: efek tambahan di preset (`rgb-split` untuk Glitch, `scanlines` dan `noi
 
 ## Kamera
 
-Belum diuji di perangkat sungguhan. Simulator iOS tidak punya kamera, dan `getUserMedia` butuh HTTPS. Halaman `/lab/safari` sudah siap untuk itu: nyalakan kamera depan, ganti ke kamera belakang, ambil foto dengan filter, lalu bandingkan video live (CSS filter) dengan hasil ekspor. Kalau izin kamera ditolak, halaman menampilkan pesan dan opsi upload foto.
+Simulator iOS tidak punya kamera, dan `getUserMedia` butuh HTTPS, jadi kamera diuji di HP sungguhan lewat `/lab/safari`: nyalakan kamera depan, ganti ke kamera belakang, ambil foto dengan filter, lalu bandingkan video live (CSS filter) dengan hasil ekspor. Kalau izin kamera ditolak, halaman menampilkan pesan dan opsi upload foto.
 
-- [ ] Uji di iPhone (Safari) lewat HTTPS: preview deploy, atau `pnpm dev --host` ditambah tunnel HTTPS.
-- [ ] Uji di Chrome Android.
+- [x] Uji di iPhone (Safari) lewat HTTPS: preview deploy, atau `pnpm dev --host` ditambah tunnel HTTPS. Lolos 22 Oktober 2026.
+- [x] Uji di Chrome Android. Lolos 22 Oktober 2026.
 
 ## Dampak ke rencana
 

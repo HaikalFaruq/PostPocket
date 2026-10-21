@@ -28,7 +28,7 @@ sequenceDiagram
     P->>S: Upload foto dan gambar OG
     P->>B: POST /letters/:id/publish (edit_token)
     B->>B: Validasi foto dan gambar OG, buat slug, status sent
-    B-->>P: Link pendek postpocket.app/l/:slug
+    B-->>P: Link pendek postpocket.vercel.app/l/:slug
     P-)R: Kirim link lewat WhatsApp
     R->>B: GET /l/:slug
     B-->>R: design, content, URL foto
@@ -157,7 +157,7 @@ supabase db query --linked "select * from function_errors_daily where day > curr
 
 ## Checklist per sprint
 
-Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang belum dicentang.
+Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang belum dicentang. Per 22 Oktober 2026 semua item sudah dicentang; pekerjaan baru ditambahkan di sini lewat PR sebelum dikerjakan.
 
 **Sprint 0 (minggu 1)**
 
@@ -194,8 +194,8 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
 - [x] Skema fase 2 (`profiles`, `pockets`, `moments`, `albums`) beserta RLS: [Rancangan skema fase 2](#rancangan-skema-fase-2), migrasi `phase2` dan test `phase2.test.sql`
 - [x] Login Google: OAuth client dan provider di dashboard, dipasang bareng Kall 15 Oktober 2026, provider Email dimatikan 16 Oktober ([Login Google](#login-google)). Hapus akun (#62, #63) sudah dicek di produksi lewat akun tester dan UI
 - [x] Edge Function `account` untuk `DELETE /account` (kontrak 0.4.0): hapus berkas `moments/<user_id>/…` lewat Storage API, lalu `auth.admin.deleteUser`; sesi dicek dengan `auth.getUser(token)`. Test integrasi `tests/account.test.ts`: tanpa token, token salah, dan akun yang sudah dihapus `401`, akun lain tidak tersentuh, berkas dan baris hilang
-- [ ] Lingkungan beta
-- [ ] Selama beta: perbaiki bug, pantau kuota storage dan error
+- [x] Lingkungan beta: tidak dibuat terpisah. Rilis 1.0 langsung memakai produksi (`postpocket.vercel.app` dan proyek Supabase di Sydney) sejak 16 Oktober 2026, dengan client OAuth Google berstatus In production dan ping harian `.github/workflows/ping.yml`
+- [x] Selama beta: perbaiki bug, pantau kuota storage dan error. Dicek 22 Oktober 2026: `function_errors` kosong, ping harian lolos setiap hari sejak 17 Oktober, storage terpakai sekitar 3 MB, dan tidak ada issue terbuka. Pemantauan rutin tetap mengikuti [Monitoring error](#monitoring-error)
 
 **Kotak bareng** (kontrak 0.3.0, [rancangan](#rancangan-kotak-bareng))
 
@@ -215,7 +215,7 @@ Centang item di PR yang menyelesaikannya. Agent mulai dari item pertama yang bel
   - job `cleanup` melaporkan `letterFiles`;
   - `orphan_letter_files()` ditolak `42501` untuk publishable key;
   - `function_errors` kosong.
-- [ ] [Setelan dashboard](#setelan-dashboard) yang belum: billing email organisasi untuk pemberitahuan kuota
+- [x] [Setelan dashboard](#setelan-dashboard): billing email organisasi untuk pemberitahuan kuota, dikonfirmasi 22 Oktober 2026
 
 ## Data model rilis 1
 
@@ -451,7 +451,7 @@ Audit ulang semua fungsi, migrasi, workflow, dan `config.toml`, 16 Oktober 2026.
 | `letters.owner_id` tidak pernah diisi | Dibuang |
 | CI hanya mengecek tipe tiga fungsi dan tidak memindai rahasia | `deno check */index.ts`, dan workflow `Web` menjalankan `scripts/check-secrets.sh` ke semua berkas |
 
-Yang belum dikerjakan:
+Yang belum dikerjakan, sengaja dibiarkan sebagai risiko yang diterima (diputuskan 22 Oktober 2026, ditinjau lagi sebelum promosi besar):
 
 - Batas tingkat proyek (semua IP digabung) untuk surat, kotak, dan cadangan. Rate limit sekarang per IP dan per user, jadi banyak IP atau banyak akun masih bisa menghabiskan storage dan egress. Putuskan bareng soal Supabase Pro atau Cloudflare R2 sebelum promosi besar.
 - Belum ada alarm kalau job pembersihan berhenti. Sementara itu, cek `net._http_response` dan `function_errors_daily`.
@@ -465,7 +465,7 @@ Yang belum dikerjakan:
 - [x] Authentication: hanya provider Google, provider Email mati ([Login Google](#login-google)).
 - [x] Audit log Auth (email dan IP) tidak ditulis ke database: `auth.audit_log_entries` kosong saat dicek 16 Oktober 2026, sedangkan `auth.users` berisi. Jadi catatan login hanya ada di log penyedia, sesuai kalimat log teknis di `/privasi`. Kalau suatu saat tabel itu terisi, matikan Authentication → Audit Logs → "Write audit logs to the database", lalu kosongkan isinya lewat SQL Editor.
 - [x] Realtime tidak dipakai, jadi "Allow public access to channels" dimatikan (Realtime → Settings, 16 Oktober 2026). Join ke channel publik dengan publishable key sekarang ditolak `PrivateOnly`. Peringatan "No Realtime RLS policies found" di halaman itu sengaja dibiarkan: tanpa policy di `realtime.messages`, channel privat pun tidak menerima pesan.
-- [ ] Pemakaian: paket Free tidak punya setelan peringatan sendiri. Begitu kuota terlewati, Supabase mengirim email ke billing email organisasi lalu memberi masa tenggang, jadi Owner memastikan billing email di Organization Settings → Billing memang dibaca. Angka pemakaian ada di panel "Free plan usage" halaman organisasi; per 16 Oktober 2026: database 28 dari 500 MB, egress 0,01 dari 5 GB, storage 0 dari 1 GB, 4 user aktif bulanan.
+- [x] Pemakaian: paket Free tidak punya setelan peringatan sendiri. Begitu kuota terlewati, Supabase mengirim email ke billing email organisasi lalu memberi masa tenggang, jadi Owner memastikan billing email di Organization Settings → Billing memang dibaca (dikonfirmasi 22 Oktober 2026). Angka pemakaian ada di panel "Free plan usage" halaman organisasi; per 16 Oktober 2026: database 28 dari 500 MB, egress 0,01 dari 5 GB, storage 0 dari 1 GB, 4 user aktif bulanan.
 
 ## Yang dibutuhkan frontend
 
