@@ -147,7 +147,7 @@ test('piringan diseret ke TV mulai diputar; dilepas di luar TV kembali ke rak', 
   await expect(page.getByTestId('tv-slot')).toHaveAttribute('data-state', 'loaded')
 })
 
-test('CD baru bisa dibuat dan diberi nama; CD kosong belum bisa diputar; rak bisa digeser keyboard', async ({
+test('CD baru bisa dibuat dan diberi nama; CD kosong belum bisa diputar; rak bisa digeser tombol panah dan keyboard', async ({
   page,
 }) => {
   await addPhotos(page, [40])
@@ -162,6 +162,12 @@ test('CD baru bisa dibuat dan diberi nama; CD kosong belum bisa diputar; rak bis
   await page.getByLabel('Nama album').fill('Liburan')
   await page.getByRole('button', { name: 'Simpan', exact: true }).click()
   await expect(page.locator('.cd-item.is-current .cd-case')).toHaveAccessibleName(/Liburan/)
+
+  // Tombol panah di bawah rak pindah album.
+  await page.getByRole('button', { name: 'Album sebelumnya' }).click()
+  await expect(shelf).toHaveAttribute('data-index', '0')
+  await page.getByRole('button', { name: 'Album berikutnya' }).click()
+  await expect(shelf).toHaveAttribute('data-index', '1')
 
   // CD kosong: Enter tidak memutar apa-apa, dan user diminta menambah foto dulu.
   await shelf.focus()
@@ -179,4 +185,42 @@ test('CD baru bisa dibuat dan diberi nama; CD kosong belum bisa diputar; rak bis
 
   await page.reload()
   await expect(page.getByTestId('cd-shelf').locator('.cd-item')).toHaveCount(2)
+})
+
+test('rak CD bisa digeser dengan jari', async ({ page, browserName, hasTouch }) => {
+  test.skip(browserName !== 'chromium' || !hasTouch, 'Sentuhan lewat CDP, khusus HP Chromium')
+  await addPhotos(page, [40])
+  await expect(page.getByTestId('cd-notice')).toBeVisible()
+  await page.getByRole('button', { name: 'CD baru' }).click()
+  await page.getByLabel('Nama album').fill('Liburan')
+  await page.getByRole('button', { name: 'Simpan', exact: true }).click()
+  const shelf = page.getByTestId('cd-shelf')
+  await expect(shelf).toHaveAttribute('data-index', '1')
+
+  const cdp = await page.context().newCDPSession(page)
+  async function swipe(distance: number) {
+    // Posisi rak diukur ulang tiap kali, karena pemberitahuan di atasnya bisa hilang.
+    await shelf.scrollIntoViewIfNeeded()
+    const box = (await shelf.boundingBox())!
+    // Jari mulai di pinggir bawah rak, bukan di piringan yang bisa diseret ke TV.
+    const x = box.x + box.width / 2
+    const y = box.y + box.height - 10
+    const touch = (type: string, dx?: number) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: dx === undefined ? [] : [{ x: x + dx, y }],
+      })
+    await touch('touchStart', 0)
+    for (let step = 1; step <= 8; step++) {
+      await touch('touchMove', (distance * step) / 8)
+      await page.waitForTimeout(16)
+    }
+    await touch('touchEnd')
+  }
+
+  // Geser ke kanan ke album sebelumnya, ke kiri ke album berikutnya.
+  await swipe(120)
+  await expect(shelf).toHaveAttribute('data-index', '0')
+  await swipe(-120)
+  await expect(shelf).toHaveAttribute('data-index', '1')
 })
