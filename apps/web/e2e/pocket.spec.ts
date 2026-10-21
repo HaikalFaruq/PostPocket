@@ -485,6 +485,57 @@ test('foto HEIC bisa dipilih dan tampil, juga di browser yang tidak membuka HEIC
   await expect(page.getByTestId('line-photo')).toHaveCount(1)
 })
 
+test('foto besar diperkecil sampai sisi panjang 2048 px sebelum disimpan', async ({ page }) => {
+  await page.goto('/pocket')
+  await page.locator(`[data-day="${TODAY}"]`).click()
+  const dialog = page.getByRole('dialog')
+  // Foto 3000×2000, kira-kira sebesar foto kamera HP.
+  const base64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 3000
+    canvas.height = 2000
+    const ctx = canvas.getContext('2d')!
+    const gradient = ctx.createLinearGradient(0, 0, 3000, 2000)
+    gradient.addColorStop(0, '#f2a65a')
+    gradient.addColorStop(1, '#5a8ef2')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 3000, 2000)
+    return canvas.toDataURL('image/jpeg', 0.8).split(',')[1]!
+  })
+  await page.getByTestId('moment-upload').setInputFiles({
+    name: 'besar.jpg',
+    mimeType: 'image/jpeg',
+    buffer: Buffer.from(base64, 'base64'),
+  })
+  await expect(dialog.getByRole('button', { name: /^Hapus foto/ })).toHaveCount(1)
+  await dialog.getByRole('button', { name: 'Simpan kantong' }).click()
+  await expect(dialog).toBeHidden({ timeout: SAVE_TIMEOUT })
+
+  const data = (await stored(page, 'postpocket:memories')) as MemoryData
+  const [id] = Object.keys(data.moments)
+  expect(data.moments[id!]).toMatchObject({ width: 2048, height: 1365 })
+  // Gambar yang tersimpan memang sebesar itu, bukan cuma catatannya.
+  const size = await page.evaluate(
+    (key) =>
+      new Promise<number[]>((resolve, reject) => {
+        const open = indexedDB.open('keyval-store')
+        open.onerror = () => reject(open.error)
+        open.onsuccess = () => {
+          const request = open.result.transaction('keyval').objectStore('keyval').get(key)
+          request.onerror = () => reject(request.error)
+          request.onsuccess = async () => {
+            open.result.close()
+            const photo = request.result as { bytes: ArrayBuffer; type: string }
+            const bitmap = await createImageBitmap(new Blob([photo.bytes], { type: photo.type }))
+            resolve([bitmap.width, bitmap.height])
+          }
+        }
+      }),
+    `postpocket:moment:${id}`,
+  )
+  expect(size).toEqual([2048, 1365])
+})
+
 /** Satu nilai idb-keyval (database `keyval-store`) langsung dari IndexedDB. */
 async function stored(page: Page, key: string): Promise<unknown> {
   return page.evaluate(
