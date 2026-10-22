@@ -40,8 +40,10 @@ test('kena batas kiriman per jaringan: diminta menunggu, Coba lagi bukan tombol 
   await page.getByRole('textbox', { name: 'Isi surat' }).fill('Halo')
   await page.getByRole('button', { name: 'Buat link untuk dikirim' }).click()
   const sheet = page.getByTestId('send-letter')
+  // Sebelum dikirim, gambar OG-nya dirender dulu; di WebKit CI tanpa GPU itu bisa lebih dari 5 s.
   await expect(sheet.getByRole('alert')).toContainText(
     'Coba lagi dalam 30 menit, atau kirim lewat data seluler',
+    { timeout: 20_000 },
   )
   await expect(sheet.getByRole('button', { name: 'Tutup' })).toHaveClass(/bg-ink/)
   await expect(sheet.getByRole('button', { name: 'Coba lagi' })).not.toHaveClass(/bg-ink/)
