@@ -504,17 +504,18 @@ test('ketukan ganda yang pelan tidak membuka surat yang baru naik ke bawah jari'
   const point = { x: glass.x + glass.width / 2, y: glass.y + glass.height / 2 }
   // Kedua ketukan dijalankan di halaman dengan jeda 200 ms yang pasti, bukan lewat Playwright
   // yang jedanya bisa melar saat mesin sibuk. Kipasnya membuat kaca turun, jadi ketukan kedua di
-  // titik yang sama jatuh di lembar surat.
+  // titik yang sama jatuh di lembar depan; di HP lambat kacanya belum sempat turun, dan ketukan
+  // di kaca sudah diabaikan sendiri. Ketukan keduanya dikirim ke lembar depan, supaya jalur
+  // lembar yang diuji.
   const second = await page.evaluate(async ({ x, y }) => {
     // Klik jari: koordinat dan hitungan ketukannya ada, tidak seperti click() dari skrip.
     const tap = (el: Element | null | undefined, detail: number) =>
       el?.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y, detail }))
-    const at = () => document.elementFromPoint(x, y)
-    tap(at(), 1)
+    tap(document.elementFromPoint(x, y), 1)
     await new Promise((resolve) => setTimeout(resolve, 200))
-    const sheet = at()?.closest('.gf-sheet')
-    tap(sheet, 2)
-    return sheet ? 'lembar' : at()?.className
+    const front = document.querySelector('[data-testid=saved-folder] .gf-sheet')
+    tap(front, 2)
+    return front ? 'lembar' : null
   }, point)
   expect(second).toBe('lembar')
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
@@ -582,7 +583,7 @@ test('ketukan di lembar lain tepat setelah folder dibuka langsung membuka suratn
   )
 })
 
-test('kembali dari TV, folder yang tadi terbuka tampil lagi di posisi gulir yang sama', async ({
+test('kembali dari TV, folder yang tadi terbuka tampil lagi di tempat yang sama', async ({
   page,
   request,
 }) => {
@@ -593,17 +594,20 @@ test('kembali dari TV, folder yang tadi terbuka tampil lagi di posisi gulir yang
   const toggle = page.getByTestId('folder-toggle')
   await toggle.click()
   const tv = page.getByTestId('folder-tv')
-  // Di tengah layar, jadi klik Playwright tidak menggulirnya lagi.
+  // Setelah kipas dan tombol di bawahnya selesai bergerak, tombol TV ditaruh di tengah layar,
+  // jadi klik Playwright tidak menggulirnya lagi.
+  await page.waitForTimeout(900)
   await tv.evaluate((el) => el.scrollIntoView({ block: 'center' }))
-  const top = await page.evaluate(() => Math.round(window.scrollY))
-  expect(top).toBeGreaterThan(0)
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  const onScreen = () => tv.evaluate((el) => Math.round(el.getBoundingClientRect().top))
+  const before = await onScreen()
   await tv.click()
   await expect(page.getByTestId('tv-slideshow')).toBeVisible()
   await page.goBack()
   await expect(page).toHaveURL(/\/kotak$/)
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(top)
-  await expect(tv).toBeInViewport()
+  // Foldernya terbuka di tempat yang sama di layar, jadi tombol TV juga.
+  await expect.poll(async () => Math.abs((await onScreen()) - before)).toBeLessThanOrEqual(2)
 })
 
 /**

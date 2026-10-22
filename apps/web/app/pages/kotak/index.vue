@@ -41,11 +41,15 @@ const storageNearlyFull = ref(false)
 interface LeftAt {
   top: number
   folder: string | null
+  /** Tepi atas kaca folder yang terbuka di layar, tempat folder itu dipasang lagi saat kembali. */
+  glass?: number
 }
 onBeforeRouteLeave(() => {
   // Saat folder terbuka, useBackToClose membatalkan pindah halaman yang pertama, mengambil entri
   // tambahannya, lalu pindah lagi; yang tercatat entri halaman ini, di percobaan kedua.
-  const left: LeftAt = { top: Math.round(window.scrollY), folder: openFolder.value }
+  const folder = openFolder.value
+  const glass = folder ? folderRefs.get(folder)?.glassRect()?.top : undefined
+  const left: LeftAt = { top: Math.round(window.scrollY), folder, glass }
   history.replaceState({ ...history.state, kotak: left }, '')
 })
 
@@ -87,7 +91,13 @@ onMounted(async () => {
   await nextTick()
   if (link) await openLink(link)
   else if (left) {
-    window.scrollTo({ top: left.top, behavior: 'instant' })
+    // Folder yang terbuka dipasang lagi di tempatnya di layar, walau isi di atasnya berubah;
+    // tanpa folder, posisi gulirnya. Ditahan sebentar, karena browser (WebKit) atau isi yang
+    // tampil belakangan masih bisa menggeser halamannya.
+    const folder = openFolder.value
+    if (folder && left.glass !== undefined) {
+      holdAt(() => folderRefs.get(folder)?.glassRect()?.top, left.glass)
+    } else holdAt(() => -window.scrollY, -left.top)
     // Sekali pakai: muat ulang nanti memakai posisi gulirnya sendiri.
     history.replaceState({ ...history.state, kotak: null }, '')
   }
@@ -249,24 +259,24 @@ function toggleFolder(id: string, value: boolean) {
   if (value) warmFolder(id)
   const el = sections.get(id)
   if (!value || !previous || previous === id || !el) return
-  holdInPlace(() => el.getBoundingClientRect().top)
+  holdAt(() => el.getBoundingClientRect().top)
 }
 
 // Folder yang menutup sendiri (diketuk lagi, atau Back): kacanya ditahan di tempatnya di layar.
 // Ruang kipas di atasnya mengecil, jadi tanpa ini kacanya naik sejauh itu, bisa sampai keluar
 // layar.
 watch(openFolder, (now, before) => {
-  if (before && !now) holdInPlace(() => folderRefs.get(before)?.glassRect()?.top)
+  if (before && !now) holdAt(() => folderRefs.get(before)?.glassRect()?.top)
 })
 
 /**
- * Menahan posisi `measure()` di layar selama folder bergerak (0,75 s ditambah satu frame): tiap
- * frame selisihnya digulir balik. Berhenti kalau pengguna menggulir sendiri. Di ujung atas dan
- * bawah halaman, gulirnya tertahan browser, jadi yang ditahan ikut bergeser.
+ * Menahan posisi `measure()` di layar di `target` (bawaannya posisinya sekarang) selama folder
+ * bergerak (0,75 s ditambah satu frame): tiap frame selisihnya digulir balik. Berhenti kalau
+ * pengguna menggulir sendiri. Di ujung atas dan bawah halaman, gulirnya tertahan browser, jadi
+ * yang ditahan ikut bergeser.
  */
-function holdInPlace(measure: () => number | undefined) {
-  const start = measure()
-  if (start === undefined) return
+function holdAt(measure: () => number | undefined, target = measure()) {
+  if (target === undefined) return
   const until = performance.now() + 800
   let stopped = false
   const events = ['wheel', 'touchstart', 'keydown'] as const
@@ -277,12 +287,12 @@ function holdInPlace(measure: () => number | undefined) {
   for (const name of events) window.addEventListener(name, stop, { passive: true })
   const hold = () => {
     if (stopped) return
-    const drift = (measure() ?? start) - start
+    const drift = (measure() ?? target) - target
     if (Math.abs(drift) >= 0.5) window.scrollBy({ top: drift, behavior: 'instant' })
     if (performance.now() < until) requestAnimationFrame(hold)
     else stop()
   }
-  requestAnimationFrame(hold)
+  hold()
 }
 
 /**
