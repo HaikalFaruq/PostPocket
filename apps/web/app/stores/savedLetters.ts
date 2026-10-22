@@ -72,9 +72,9 @@ export const useSavedLetters = defineStore('savedLetters', () => {
         next = change(stored === undefined ? emptySaved() : normalizeSaved(stored))
         return JSON.parse(JSON.stringify(next))
       })
-    } catch {
+    } catch (problem) {
       saveFailed.value = true
-      throw new Error('Surat tidak bisa disimpan di browser ini')
+      throw new Error('Surat tidak bisa disimpan di browser ini', { cause: problem })
     }
     data.value = next
     saveFailed.value = false

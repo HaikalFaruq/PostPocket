@@ -26,6 +26,15 @@ const { data: letter, error } = await useAsyncData(`surat-${slug}`, () =>
 )
 const missing = computed(() => !error.value && !letter.value)
 const shown = computed(() => (letter.value ? shownFromApi(letter.value) : null))
+// Link yang sudah mati tapi suratnya pernah disimpan di HP ini: arahkan ke salinannya di Kotak
+// surat, bukan cuma bilang suratnya hilang.
+const keptHere = ref(false)
+onMounted(async () => {
+  if (!missing.value) return
+  const saved = useSavedLetters()
+  await saved.load()
+  keptHere.value = saved.has(slug)
+})
 if (import.meta.server && (missing.value || error.value)) {
   const event = useRequestEvent()
   if (event) setResponseStatus(event, missing.value ? 404 : 503)
@@ -224,18 +233,33 @@ const formatDate = (value: string | null | undefined) =>
         {{ missing ? 'Surat ini sudah tidak tersedia' : 'Surat belum bisa dimuat' }}
       </h1>
       <p class="mt-2 max-w-sm text-pretty text-ink-muted">
-        <template v-if="missing">
+        <template v-if="missing && keptHere">
+          Tapi kamu sudah menyimpannya, jadi suratnya masih ada di Kotak surat di HP ini, lengkap
+          dengan foto yang sempat tersimpan.
+        </template>
+        <template v-else-if="missing">
           Mungkin sudah lewat 30 hari, pengirimnya menghapusnya, atau
           <span class="whitespace-nowrap">link-nya</span> terpotong saat disalin.
         </template>
         <template v-else>Coba muat ulang halaman ini sebentar lagi.</template>
       </p>
-      <NuxtLink
-        to="/letter/new"
-        class="mt-6 inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white"
-      >
-        Bikin surat sendiri
-      </NuxtLink>
+      <div class="mt-6 flex flex-wrap justify-center gap-2">
+        <NuxtLink
+          v-if="keptHere"
+          :to="`/kotak?surat=${slug}&baca=1`"
+          class="inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white"
+          data-testid="letter-kept"
+        >
+          Buka di Kotak surat
+        </NuxtLink>
+        <NuxtLink
+          to="/letter/new"
+          class="inline-flex h-11 items-center rounded-control px-6 text-body font-semibold"
+          :class="keptHere ? 'inset-ring inset-ring-line' : 'bg-ink text-white'"
+        >
+          Bikin surat sendiri
+        </NuxtLink>
+      </div>
     </main>
 
     <footer class="py-6 text-center text-caption text-ink-muted">

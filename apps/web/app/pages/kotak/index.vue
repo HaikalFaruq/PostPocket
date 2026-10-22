@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { byId, letter as letterPresets } from '@postpocket/presets'
 import type { FolderFile } from '~/components/kotak/GlassFolder.vue'
+import { warmCardFront } from '~/composables/useCardFront'
 import { folderSeed } from '~/utils/folder-art'
 import { formatDay } from '~/utils/box-time'
 import { letterFront, type ShownLetter } from '~/utils/letter-view'
 import { listBoxes, type MyBox } from '~/utils/my-boxes'
-import type { SavedLetter } from '~/utils/saved-letters'
+import { LETTERS_FOLDER, type SavedLetter } from '~/utils/saved-letters'
 
 /**
  * Kotak surat: surat yang disimpan penerima di perangkat ini, dikelompokkan per folder kaca.
@@ -20,16 +21,51 @@ const ready = ref(false)
 // Kotak bareng yang dibuat dari browser ini (kontrak 0.3.0), kalau fiturnya sudah dinyalakan.
 const kotakBareng = !!useRuntimeConfig().public.kotakBareng
 const myBoxes = ref<MyBox[]>([])
+const route = useRoute()
+const router = useRouter()
 onMounted(async () => {
   await Promise.all([saved.load(), memories.load()])
   if (kotakBareng) myBoxes.value = await listBoxes()
   ready.value = true
+  await openFromLink()
 })
+
+// Folder "Surat untukmu" terus bertambah seperti kotak masuk, jadi surat terbaru di depan: yang
+// baru disimpan langsung terlihat di kipas. Folder kotak bareng tetap urut titipannya.
+const folders = computed(() =>
+  saved.folders.map((folder) =>
+    folder.id === LETTERS_FOLDER ? { ...folder, items: [...folder.items].reverse() } : folder,
+  ),
+)
+
+/**
+ * Dibuka dari "Buka Kotak surat" (`?surat=<id>` atau `?folder=<id>`): folder suratnya langsung
+ * terbuka dan terlihat. Dengan `baca=1` suratnya sekalian dibuka di penampil, misalnya dari link
+ * surat yang sudah mati tapi suratnya masih tersimpan di sini.
+ */
+async function openFromLink() {
+  const { surat, folder: folderId, baca } = route.query
+  if (typeof surat !== 'string' && typeof folderId !== 'string') return
+  // Alamatnya dibersihkan dulu, baru penampil dibuka: Back yang menutup penampil kembali ke
+  // /kotak, bukan ke alamat yang membuka suratnya lagi.
+  await router.replace({ query: {} })
+  const folder = folders.value.find((entry) =>
+    typeof surat === 'string'
+      ? entry.items.some((item) => item.id === surat)
+      : entry.id === folderId,
+  )
+  if (!folder) return
+  openFolder.value = folder.id
+  await nextTick()
+  sections.get(folder.id)?.scrollIntoView({ block: 'start' })
+  const at = folder.items.findIndex((item) => item.id === surat)
+  if (baca === '1' && at >= 0) read(folder.id, at)
+}
 
 // URL foto tiap momen yang dipakai surat tersimpan, dibuat sekali lalu dipakai ulang.
 const urls = ref<Record<string, string | null>>({})
 watch(
-  () => saved.folders.flatMap((folder) => folder.items),
+  () => folders.value.flatMap((folder) => folder.items),
   async (items) => {
     for (const item of items) {
       for (const id of [item.cover?.moment, ...Object.values(item.photos)]) {
@@ -70,7 +106,12 @@ function snippet(item: SavedLetter): string | null {
   )
   if (text?.kind !== 'text') return null
   const line = Array.from(text.text.trim().split('\n')[0]!)
-  return line.length > 28 ? `${line.slice(0, 28).join('').trimEnd()}…` : line.join('')
+  if (line.length <= 28) return line.join('')
+  // Tanda baca di ujung potongan dibuang, supaya tidak jadi "foto.…".
+  return `${line
+    .slice(0, 28)
+    .join('')
+    .replace(/[\s.,;:!?-]+$/, '')}…`
 }
 
 /** Lembar surat di folder: gambar depannya, nama pengirim (atau potongan tulisan), dan tanggal. */
@@ -86,6 +127,56 @@ function file(item: SavedLetter): FolderFile {
 
 // Satu folder terbuka dalam satu waktu.
 const openFolder = ref<string | null>(null)
+const sections = new Map<string, HTMLElement>()
+function setSection(id: string, el: unknown) {
+  if (el instanceof HTMLElement) sections.set(id, el)
+  else sections.delete(id)
+}
+
+/**
+ * Buka atau tutup folder `id`; folder lain yang sedang terbuka ikut menutup. Folder yang menutup
+ * di atasnya mengecil, jadi selama animasinya halaman ikut digulir supaya folder yang diketuk
+ * tetap di tempatnya, tidak terlempar ke atas layar. Berhenti kalau pengguna menggulir sendiri.
+ */
+function toggleFolder(id: string, value: boolean) {
+  const previous = openFolder.value
+  openFolder.value = value ? id : null
+  if (value) warmFolder(id)
+  const el = sections.get(id)
+  if (!value || !previous || previous === id || !el) return
+  const top = el.getBoundingClientRect().top
+  const until = performance.now() + 750
+  let stopped = false
+  const events = ['wheel', 'touchstart', 'keydown'] as const
+  const stop = () => {
+    stopped = true
+    for (const name of events) window.removeEventListener(name, stop)
+  }
+  for (const name of events) window.addEventListener(name, stop, { passive: true })
+  const hold = () => {
+    if (stopped) return
+    const drift = el.getBoundingClientRect().top - top
+    if (Math.abs(drift) >= 0.5) window.scrollBy({ top: drift, behavior: 'instant' })
+    if (performance.now() < until) requestAnimationFrame(hold)
+    else stop()
+  }
+  requestAnimationFrame(hold)
+}
+
+/**
+ * Dua surat terdepan di folder yang baru dibuka disiapkan satu per satu setelah kipasnya selesai
+ * bergerak, saat browser senggang, jadi kartu yang diketuk langsung tampil utuh.
+ */
+function warmFolder(id: string) {
+  const items = folders.value.find((entry) => entry.id === id)?.items.slice(0, 2) ?? []
+  const wanted = () => openFolder.value === id
+  setTimeout(async () => {
+    for (const item of items) {
+      if (!wanted()) return
+      await warmCardFront(item.design, shown(item).cover?.url, wanted)
+    }
+  }, 700)
+}
 /** Judul halaman: tujuan fokus kalau folder yang membuka penampil ikut terhapus. */
 const heading = ref<HTMLElement | null>(null)
 const folderRefs = new Map<string, { sheetRect: (id: string) => DOMRect | null }>()
@@ -110,7 +201,7 @@ const viewer = reactive({
   index: 0,
   origin: null as DOMRect | null,
 })
-const viewerFolder = computed(() => saved.folders.find((folder) => folder.id === viewer.folder))
+const viewerFolder = computed(() => folders.value.find((folder) => folder.id === viewer.folder))
 const viewerLetters = computed(() => viewerFolder.value?.items.map(shown) ?? [])
 
 function read(folderId: string, index: number, fileId?: string) {
@@ -137,11 +228,11 @@ async function removeLetter(item: ShownLetter) {
 }
 
 function folderExists(id: string) {
-  return saved.folders.some((entry) => entry.id === id)
+  return folders.value.some((entry) => entry.id === id)
 }
 
 async function removeFolder(id: string, title: string) {
-  const folder = saved.folders.find((entry) => entry.id === id)
+  const folder = folders.value.find((entry) => entry.id === id)
   const cd = folder ? cdOf(folder.album) : undefined
   const note = cd ? ` Fotonya tetap ada di CD "${cd.title}".` : ''
   if (!window.confirm(`Hapus folder "${title}" beserta suratnya dari HP ini?${note}`)) return
@@ -187,13 +278,14 @@ async function removeFolder(id: string, title: string) {
       </p>
 
       <div
-        v-if="ready && saved.folders.length"
+        v-if="ready && folders.length"
         class="mt-10 grid justify-items-center gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3"
       >
         <section
-          v-for="(folder, position) in saved.folders"
+          v-for="(folder, position) in folders"
           :key="folder.id"
-          class="flex w-full flex-col items-center"
+          :ref="(el) => setSection(folder.id, el)"
+          class="flex w-full scroll-mt-4 flex-col items-center"
           :aria-label="folder.title"
           data-testid="saved-folder"
         >
@@ -206,59 +298,65 @@ async function removeFolder(id: string, title: string) {
             :files="folder.items.map(file)"
             :width="folderWidth"
             :appear-delay="Math.min(position, 2) * 120"
-            @update:open="(value: boolean) => (openFolder = value ? folder.id : null)"
+            @update:open="(value: boolean) => toggleFolder(folder.id, value)"
             @select="(item: FolderFile, index: number) => read(folder.id, index, item.id)"
           />
-          <div
-            v-if="openFolder === folder.id"
-            class="mt-5 flex w-full max-w-[340px] flex-col gap-3 animate-rise-in"
-            data-testid="folder-actions"
-          >
-            <ol
-              v-if="folder.items.length > 4"
-              class="divide-y divide-line-soft rounded-[16px] bg-surface shadow-raised"
+          <Transition name="reveal">
+            <div
+              v-if="openFolder === folder.id"
+              class="reveal w-full max-w-[340px]"
+              data-testid="folder-actions"
             >
-              <li v-for="(item, index) in folder.items" :key="item.id">
-                <button
-                  type="button"
-                  class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-panel"
-                  @click="read(folder.id, index, item.id)"
-                >
-                  <span class="min-w-0 flex-1 truncate text-body font-semibold">{{
-                    file(item).name
-                  }}</span>
-                  <span class="shrink-0 text-caption text-ink-muted">{{
-                    date(item.publishedAt)
-                  }}</span>
-                </button>
-              </li>
-            </ol>
-            <div class="flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
-                data-testid="folder-read"
-                @click="read(folder.id, 0, folder.items[0]?.id)"
-              >
-                Baca dari awal
-              </button>
-              <NuxtLink
-                v-if="cdOf(folder.album)"
-                :to="`/tv?album=${folder.album}`"
-                class="inline-flex h-11 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
-                data-testid="folder-tv"
-              >
-                <Icon name="play" :size="14" /> Putar fotonya di TV
-              </NuxtLink>
+              <div>
+                <div class="flex flex-col gap-3 pt-5">
+                  <ol
+                    v-if="folder.items.length > 4"
+                    class="divide-y divide-line-soft rounded-[16px] bg-surface shadow-raised"
+                  >
+                    <li v-for="(item, index) in folder.items" :key="item.id">
+                      <button
+                        type="button"
+                        class="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-panel"
+                        @click="read(folder.id, index, item.id)"
+                      >
+                        <span class="min-w-0 flex-1 truncate text-body font-semibold">{{
+                          file(item).name
+                        }}</span>
+                        <span class="shrink-0 text-caption text-ink-muted">{{
+                          date(item.publishedAt)
+                        }}</span>
+                      </button>
+                    </li>
+                  </ol>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+                      data-testid="folder-read"
+                      @click="read(folder.id, 0, folder.items[0]?.id)"
+                    >
+                      Baca dari awal
+                    </button>
+                    <NuxtLink
+                      v-if="cdOf(folder.album)"
+                      :to="`/tv?album=${folder.album}`"
+                      class="inline-flex h-11 items-center gap-2 rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
+                      data-testid="folder-tv"
+                    >
+                      <Icon name="play" :size="14" /> Putar fotonya di TV
+                    </NuxtLink>
+                  </div>
+                  <button
+                    type="button"
+                    class="inline-flex min-h-11 items-center self-start text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+                    @click="removeFolder(folder.id, folder.title)"
+                  >
+                    Hapus folder ini dari HP
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              class="inline-flex min-h-11 items-center self-start text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
-              @click="removeFolder(folder.id, folder.title)"
-            >
-              Hapus folder ini dari HP
-            </button>
-          </div>
+          </Transition>
         </section>
       </div>
 

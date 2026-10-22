@@ -7,9 +7,18 @@ import type { ShownLetter } from '~/utils/letter-view'
  * dibuka. Dipakai halaman surat, kotak bareng, dan Kotak surat. Hanya dirender di browser
  * karena peta foil dibuat di kanvas.
  */
-const props = withDefaults(defineProps<{ letter: ShownLetter; label?: string }>(), {
-  label: 'Surat untukmu',
-})
+const props = withDefaults(
+  defineProps<{
+    letter: ShownLetter
+    label?: string
+    /** Diteruskan ke FoilCard: penampil Kotak surat memakai panah untuk pindah surat. */
+    arrowHint?: boolean
+  }>(),
+  {
+    label: 'Surat untukmu',
+    arrowHint: true,
+  },
+)
 const open = defineModel<boolean>('open', { default: false })
 /** Tampilan baca selebar layar (LetterReader). */
 const reading = defineModel<boolean>('reading', { default: false })
@@ -39,6 +48,7 @@ const ratio = computed(() => cardRatio(props.letter.design, props.letter.cover))
     :ratio="ratio"
     :foil-border="letter.design.foilBorder"
     :label="label"
+    :arrow-hint="arrowHint"
   >
     <template #inside>
       <LetterPage

@@ -96,7 +96,11 @@
     }
   }
 
+  /* `--fade-from`: kepekatan saat mulai menutup, kalau popup ditutup selagi masih memudar masuk. */
   @keyframes fade-out {
+    from {
+      opacity: var(--fade-from, 1);
+    }
     to {
       opacity: 0;
     }
@@ -175,6 +179,42 @@
   background-color: color-mix(in srgb, var(--color-ink) 22%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.15);
   backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/*
+ * Bagian yang muncul atau hilang di bawah folder kaca (`<Transition name="reveal">`, elemennya
+ * berkelas `reveal`): tingginya ikut bergerak 0,6 s bersama folder, jadi isi halaman di bawahnya
+ * tidak melompat dalam satu frame. Anak langsungnya dipotong hanya selama bergerak, supaya
+ * bayangan dan cincin fokusnya tidak terpotong saat diam. Anak langsungnya tidak boleh punya
+ * padding (taruh di elemen di dalamnya), karena padding tidak ikut mengecil sampai 0. Kolomnya
+ * `minmax(0, 1fr)`, jadi nama pengirim yang panjang tidak melebarkan daftar.
+ */
+.reveal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr;
+}
+
+.reveal > * {
+  min-height: 0;
+}
+
+.reveal-enter-active,
+.reveal-leave-active {
+  transition:
+    grid-template-rows 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.45s ease;
+}
+
+.reveal-enter-active > *,
+.reveal-leave-active > * {
+  overflow: hidden;
+}
+
+.reveal-enter-from,
+.reveal-leave-to {
+  grid-template-rows: 0fr;
+  opacity: 0;
 }
 
 /*

@@ -156,18 +156,22 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
     await page.getByTestId('keep-save').click()
     await expect(page.getByTestId('keep-letter')).toHaveAttribute('data-state', 'saved')
   }
+  // "Buka Kotak surat" langsung membuka folder suratnya.
   await page.getByTestId('keep-open-box').click()
   await expect(page).toHaveURL(/\/kotak$/)
 
   const folder = page.getByTestId('saved-folder')
-  await folder.getByTestId('folder-toggle').click()
-  // Lembar paling depan diketuk di bagian yang menyembul di atas kaca.
-  const first = folder.getByRole('button', { name: /Surat pertama/ })
-  const box = (await first.boundingBox())!
-  await first.click({ position: { x: box.width / 2, y: 24 } })
+  await expect(folder.getByTestId('folder-toggle')).toHaveAttribute('aria-expanded', 'true')
+  // Surat untukmu seperti kotak masuk: yang terbaru di depan. Lembar paling depan diketuk di
+  // bagian yang menyembul di atas kaca.
+  const newest = folder.getByRole('button', { name: /Surat kedua/ })
+  const box = (await newest.boundingBox())!
+  await newest.click({ position: { x: box.width / 2, y: 24 } })
   const viewer = page.getByTestId('letter-viewer')
   await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 1 dari 2')
   await expect(viewer.getByTestId('viewer-prev')).toBeDisabled()
+  // Fokus awal di kartunya, bukan di tombol Hapus.
+  await expect(shownCard(viewer).getByRole('button', { name: /Surat untukmu/ })).toBeFocused()
   // Dengan keyboard: di surat terakhir tombol Berikutnya nonaktif, jadi fokusnya pindah ke
   // Sebelumnya dan tidak lepas dari penampil.
   await viewer.getByTestId('viewer-next').focus()
@@ -178,12 +182,12 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
   await shownCard(viewer)
     .getByRole('button', { name: /Surat untukmu/ })
     .click()
-  await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Surat kedua')
+  await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Surat pertama')
 
   // Lembar di belakang juga bisa dipilih dengan keyboard.
   await viewer.getByRole('button', { name: 'Tutup' }).click()
   await expect(viewer).toBeHidden()
-  await folder.getByRole('button', { name: /Surat kedua/ }).focus()
+  await folder.getByRole('button', { name: /Surat pertama/ }).focus()
   await page.keyboard.press('Enter')
   await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 2 dari 2')
   await viewer.getByTestId('viewer-prev').click()
@@ -191,12 +195,12 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
   const card = shownCard(viewer).getByRole('button', { name: /Surat untukmu/ })
   await expect(card).toHaveAttribute('aria-pressed', 'false')
   await card.click()
-  await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Surat pertama')
+  await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Surat kedua')
 
   // Baca lebih besar memakai halaman yang sama.
   await viewer.getByRole('button', { name: 'Baca lebih besar' }).click()
   const reader = page.getByTestId('letter-reader')
-  await expect(reader).toContainText('Surat pertama')
+  await expect(reader).toContainText('Surat kedua')
   // Tampilan baca menutupi penampil sepenuhnya, termasuk kepala dan kaki penampil.
   const layers = await page.evaluate(() => {
     const z = (id: string) =>
@@ -284,4 +288,125 @@ test('Kotak surat yang masih kosong mengajak menulis surat', async ({ page }) =>
     'href',
     '/letter/new',
   )
+})
+
+test('link surat yang sudah mati mengarah ke salinannya di Kotak surat', async ({
+  page,
+  request,
+}) => {
+  const sent = await letterWithPhotos(request, 'Masih ada di HP')
+  await openLetter(page, sent.slug)
+  await page.getByTestId('keep-save').click()
+  await expect(page.getByTestId('keep-letter')).toHaveAttribute('data-state', 'saved')
+  await request.delete(`/mock-api/letters/${sent.id}`, {
+    headers: { 'x-edit-token': sent.editToken },
+  })
+
+  expect((await page.goto(`/l/${sent.slug}`))?.status()).toBe(404)
+  await expect(page.getByTestId('letter-missing')).toContainText('kamu sudah menyimpannya')
+  await page.getByTestId('letter-kept').click()
+  const viewer = page.getByTestId('letter-viewer')
+  await expect(viewer).toBeVisible()
+  await shownCard(viewer)
+    .getByRole('button', { name: /Surat untukmu/ })
+    .click()
+  await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Masih ada di HP')
+})
+
+test('penampil: panah keyboard pindah surat, bukan membalik kartu', async ({ page, request }) => {
+  for (const text of ['Surat satu', 'Surat dua', 'Surat tiga']) {
+    const sent = await letterWithPhotos(request, text)
+    await openLetter(page, sent.slug)
+    await page.getByTestId('keep-save').click()
+    await expect(page.getByTestId('keep-letter')).toHaveAttribute('data-state', 'saved')
+  }
+  await page.goto('/kotak')
+  await page.getByTestId('folder-toggle').click()
+  await page.getByTestId('folder-read').click()
+  const viewer = page.getByTestId('letter-viewer')
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 1 dari 3')
+  await page.keyboard.press('ArrowRight')
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 2 dari 3')
+  // Fokusnya pindah ke kartu baru, tidak hilang bersama kartu yang bergeser keluar.
+  await expect(shownCard(viewer).getByRole('button', { name: /Surat untukmu/ })).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 3 dari 3')
+  await page.keyboard.press('ArrowLeft')
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 2 dari 3')
+  // Kartunya tetap menghadap depan.
+  await expect(shownCard(viewer).locator('.foil-rotor')).not.toHaveAttribute(
+    'style',
+    /rotateY\(180/,
+  )
+})
+
+test('penampil di HP: geser ke samping di luar kartu pindah surat, geser ke bawah menutup', async ({
+  page,
+  request,
+  browserName,
+  hasTouch,
+}) => {
+  test.skip(browserName !== 'chromium' || !hasTouch, 'Sentuhan lewat CDP, khusus HP Chromium')
+  for (const text of ['Surat satu', 'Surat dua']) {
+    const sent = await letterWithPhotos(request, text)
+    await openLetter(page, sent.slug)
+    await page.getByTestId('keep-save').click()
+    await expect(page.getByTestId('keep-letter')).toHaveAttribute('data-state', 'saved')
+  }
+  await page.goto('/kotak')
+  await page.getByTestId('folder-toggle').click()
+  await page.getByTestId('folder-read').click()
+  const viewer = page.getByTestId('letter-viewer')
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 1 dari 2')
+
+  // Jari di bawah kartu, di ruang kosong panggung penampil.
+  const footer = (await viewer.locator('footer').boundingBox())!
+  const y = footer.y - 24
+  const cdp = await page.context().newCDPSession(page)
+  async function drag(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const point = (t: number) => [
+      { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t },
+    ]
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(0) })
+    for (let step = 1; step <= 8; step++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: point(step / 8),
+      })
+      await page.waitForTimeout(16)
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  }
+  const middle = footer.x + footer.width / 2
+  await drag({ x: middle + 80, y }, { x: middle - 80, y })
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 2 dari 2')
+  await page.waitForTimeout(400)
+  await drag({ x: middle - 80, y }, { x: middle + 80, y })
+  await expect(viewer.getByTestId('viewer-count')).toHaveText('Surat 1 dari 2')
+  await page.waitForTimeout(400)
+  const header = (await viewer.locator('header').boundingBox())!
+  await drag(
+    { x: 24, y: header.y + header.height + 30 },
+    { x: 24, y: header.y + header.height + 200 },
+  )
+  await expect(viewer).toBeHidden()
+})
+
+test('memori HP penuh: Simpan surat memberi tahu, bukan menyalahkan browser', async ({
+  page,
+  request,
+}) => {
+  const sent = await letterWithPhotos(request, 'Memori penuh')
+  await openLetter(page, sent.slug)
+  // IndexedDB menolak tulisan karena kuotanya habis.
+  await page.evaluate(() => {
+    IDBObjectStore.prototype.put = function () {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+    }
+  })
+  await page.getByTestId('keep-save').click()
+  const keep = page.getByTestId('keep-letter')
+  await expect(keep).toHaveAttribute('data-state', 'idle')
+  await expect(keep.getByRole('status')).toContainText('Memori HP untuk browser ini sudah penuh')
+  await expect(keep.getByRole('status')).toBeInViewport()
 })

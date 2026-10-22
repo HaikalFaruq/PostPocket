@@ -7,6 +7,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui'
+import { warmCardFront } from '~/composables/useCardFront'
 import type { ShownLetter } from '~/utils/letter-view'
 import { calmMotion } from '~/utils/render'
 
@@ -43,14 +44,31 @@ const cardOpen = ref(false)
 const reading = ref(false)
 const direction = ref(1)
 const stage = ref<HTMLElement | null>(null)
+const overlay = ref<{ $el: HTMLElement } | null>(null)
+const content = ref<{ $el: HTMLElement } | null>(null)
 const prevButton = ref<{ $el: HTMLElement } | null>(null)
 const nextButton = ref<{ $el: HTMLElement } | null>(null)
+
+// Ketukan Sebelumnya dan Berikutnya selama kartu masih bergeser digabung: begitu geseran itu
+// selesai, kartunya langsung bergeser ke surat tujuannya, tanpa memasang setiap surat di antaranya.
+const SLIDE_MS = 340
+const pending = ref<number | null>(null)
+/** Surat yang dituju: yang sedang tampil, atau tujuan ketukan yang masih menunggu. */
+const target = computed(() => pending.value ?? index.value)
+let slideUntil = 0
+let pendingTimer: ReturnType<typeof setTimeout> | undefined
+
+function cancelPending() {
+  clearTimeout(pendingTimer)
+  pending.value = null
+}
 
 // Daftar berubah (misalnya surat dihapus): indeks tetap di dalam daftar, dan penampil ditutup
 // kalau suratnya habis. Surat sebelumnya masuk dari kiri, sesuai arahnya.
 watch(
   () => props.letters.length,
   (count) => {
+    cancelPending()
     if (!count) open.value = false
     else if (index.value > count - 1) {
       direction.value = -1
@@ -79,11 +97,32 @@ function retire(el: Element) {
   el.setAttribute('aria-hidden', 'true')
 }
 
-function go(step: number) {
-  const next = index.value + step
-  if (next < 0 || next > props.letters.length - 1) return
-  direction.value = step
+function slideTo(next: number) {
+  // Fokus di kartu yang bergeser keluar ikut hilang bersama kartunya, jadi pindah ke kartu baru.
+  const hadFocus = !!stage.value?.contains(document.activeElement)
+  direction.value = next > index.value ? 1 : -1
   index.value = next
+  slideUntil = calmMotion() ? 0 : performance.now() + SLIDE_MS
+  if (!hadFocus) return
+  // Sampai kartu barunya terukur, fokus dititipkan di penampil, supaya tombol yang ditekan di
+  // antaranya tidak jatuh ke halaman di belakang.
+  content.value?.$el.focus({ preventScroll: true })
+  void nextTick(() => whenMeasured((card) => card?.focus({ preventScroll: true })))
+}
+
+function go(step: number) {
+  const next = target.value + step
+  if (next < 0 || next > props.letters.length - 1) return
+  const wait = slideUntil - performance.now()
+  if (wait > 0) {
+    pending.value = next
+    clearTimeout(pendingTimer)
+    pendingTimer = setTimeout(() => {
+      const queued = pending.value
+      pending.value = null
+      if (queued !== null && queued !== index.value) slideTo(queued)
+    }, wait)
+  } else slideTo(next)
   // Di surat pertama atau terakhir tombolnya nonaktif. Kalau fokus keyboard ada di sana, fokusnya
   // dipindah ke tombol arah sebaliknya, supaya tidak lepas dari penampil.
   const pressed = (step > 0 ? nextButton : prevButton).value?.$el
@@ -93,7 +132,8 @@ function go(step: number) {
 }
 
 // Tombol yang membuka penampil. Kalau tombol itu hilang selama penampil terbuka (suratnya dihapus
-// dan foldernya ikut hilang), fokus kembali ke `fallbackFocus`, bukan ke <body>.
+// dan foldernya ikut hilang), fokus kembali ke `fallbackFocus`, bukan ke <body>, tanpa menggulir
+// halaman di belakangnya.
 let opener: Element | null = null
 watch(open, (isOpen) => isOpen && (opener = document.activeElement), { flush: 'sync' })
 function onCloseFocus(event: Event) {
@@ -101,8 +141,23 @@ function onCloseFocus(event: Event) {
   const target = props.fallbackFocus?.()
   if (!target) return
   event.preventDefault()
-  target.focus()
+  target.focus({ preventScroll: true })
 }
+
+// Ditutup selagi masih memudar masuk: memudar keluarnya mulai dari kepekatan saat itu, bukan dari
+// penuh, jadi latarnya tidak berkedip (`--fade-from` di keyframes fade-out).
+watch(
+  open,
+  (isOpen) => {
+    if (isOpen) return
+    cancelPending()
+    for (const el of [overlay.value?.$el, content.value?.$el]) {
+      if (el instanceof HTMLElement)
+        el.style.setProperty('--fade-from', getComputedStyle(el).opacity)
+    }
+  },
+  { flush: 'sync' },
+)
 
 // Back di HP menutup penampil, bukan meninggalkan halaman.
 useBackToClose(open, () => {
@@ -110,22 +165,90 @@ useBackToClose(open, () => {
 })
 
 /**
+ * Jalankan `task` begitu FoilCard surat yang tampil (bukan yang sedang bergeser keluar) selesai
+ * mengukur kartunya, paling lama 12 frame.
+ */
+function whenMeasured(task: (card: HTMLElement | null) => void) {
+  let frames = 0
+  const check = () => {
+    const card =
+      stage.value?.querySelector<HTMLElement>(
+        '[data-testid="viewer-letter"]:not([aria-hidden="true"]) .foil-rotor',
+      ) ?? null
+    if (card?.classList.contains('is-measuring') && frames++ < 12) requestAnimationFrame(check)
+    else task(card)
+  }
+  check()
+}
+
+// Fokus awal di kartunya, bukan di tombol pertama (Hapus): pembaca layar langsung menyebut
+// suratnya, dan Enter langsung membukanya. Sebelum kartunya terukur fokusnya di penampil.
+function onOpenFocus(event: Event) {
+  event.preventDefault()
+  content.value?.$el.focus({ preventScroll: true })
+  whenMeasured((card) => card?.focus({ preventScroll: true }))
+}
+
+// Panah kiri dan kanan pindah surat, seperti penampil foto. Di sini panah tidak membalik kartu.
+function onKeydown(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey || reading.value) return
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  event.preventDefault()
+  event.stopPropagation()
+  go(event.key === 'ArrowRight' ? 1 : -1)
+}
+
+// Gestur yang biasa di HP: geser ke samping di luar kartu untuk pindah surat, geser ke bawah untuk
+// menutup. Di atas kartunya, geseran tetap memutar kartu.
+let swipe: { id: number; x: number; y: number } | null = null
+function onStageDown(event: PointerEvent) {
+  swipe = null
+  if (event.pointerType === 'mouse' || !(event.target instanceof Element)) return
+  if (event.target.closest('.foil-rotor, button, a')) return
+  swipe = { id: event.pointerId, x: event.clientX, y: event.clientY }
+}
+function onStageUp(event: PointerEvent) {
+  const start = swipe
+  swipe = null
+  if (!start || start.id !== event.pointerId) return
+  const dx = event.clientX - start.x
+  const dy = event.clientY - start.y
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) go(dx < 0 ? 1 : -1)
+  else if (dy > 80 && dy > Math.abs(dx) * 1.4) open.value = false
+}
+function onStageCancel() {
+  swipe = null
+}
+
+/**
  * Kartu tumbuh dari lembar suratnya di folder ke tengah layar. Tanpa lembar asal (dibuka dari
  * daftar, atau lembarnya di luar layar), kartunya naik dari bawah. Selama bergerak kartunya tidak
  * bisa diketuk, supaya ketukan kedua di lembar tadi tidak langsung membuka kartu yang lewat.
+ *
+ * FoilCard menyembunyikan kartunya sampai ukuran panggungnya terbaca, jadi animasinya baru dimulai
+ * setelah itu, dari ukuran kartu yang sebenarnya. Selama menunggu panggungnya transparan, supaya
+ * kartunya tidak sempat tampil di tempat akhirnya.
  */
 function rise() {
   const el = stage.value
   if (!el || calmMotion()) return
   const to = el.getBoundingClientRect()
   if (!to.width || !to.height) return
+  el.style.opacity = '0'
+  el.style.pointerEvents = 'none'
+  whenMeasured((card) => {
+    el.style.opacity = ''
+    play(el, to, card?.getBoundingClientRect())
+  })
+}
+
+function play(el: HTMLElement, to: DOMRect, card: DOMRect | undefined) {
   const from = props.origin
   const visible = !!from && from.bottom > 0 && from.top < window.innerHeight
   let keyframes: Keyframe[]
   if (from && visible) {
     // Kartunya (bukan seluruh panggung) dicocokkan ke lembar: ukurannya muat di lembar, lalu
     // titik tengahnya mendarat di titik tengah lembar.
-    const card = el.querySelector('.foil-rotor')?.getBoundingClientRect()
     const target = card && card.width > 0 && card.height > 0 ? card : null
     const fit = target
       ? Math.min(from.width / target.width, from.height / target.height)
@@ -147,7 +270,6 @@ function rise() {
       { transform: 'none', opacity: 1 },
     ]
   }
-  el.style.pointerEvents = 'none'
   const done = () => (el.style.pointerEvents = '')
   el.animate(keyframes, {
     duration: visible ? 480 : 360,
@@ -172,6 +294,26 @@ watch(
   { flush: 'post', immediate: true },
 )
 
+// Surat sesudah dan sebelum yang tampil disiapkan satu per satu saat browser senggang (gambar
+// cetak dan mask foil), jadi kartunya langsung utuh begitu digeser ke sana. Antreannya diganti
+// setiap kali surat tujuannya berubah.
+let warmRun = 0
+watch(
+  [open, target],
+  async ([isOpen, at]) => {
+    const run = ++warmRun
+    if (!isOpen) return
+    const wanted = () => run === warmRun
+    for (const i of [at + 1, at - 1, at + 2]) {
+      const letter = props.letters[i]
+      if (!letter) continue
+      await warmCardFront(letter.design, letter.cover?.url, wanted)
+      if (!wanted()) return
+    }
+  },
+  { immediate: true },
+)
+
 const label = computed(() =>
   current.value?.from ? `Surat dari ${current.value.from}` : 'Surat untukmu',
 )
@@ -182,16 +324,21 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
   <DialogRoot v-model:open="open">
     <DialogPortal>
       <DialogOverlay
+        ref="overlay"
         class="scrim fixed inset-0 z-40 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
       />
       <DialogContent
-        class="fixed inset-0 z-50 flex flex-col px-4 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] outline-none data-[state=closed]:animate-fade-out"
+        ref="content"
+        class="fixed inset-0 z-50 flex flex-col px-4 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in [@media(max-height:440px)]:pt-[max(6px,env(safe-area-inset-top))] [@media(max-height:440px)]:pb-[max(6px,env(safe-area-inset-bottom))]"
         :aria-describedby="undefined"
+        tabindex="-1"
         data-testid="letter-viewer"
+        @open-auto-focus="onOpenFocus"
         @close-auto-focus="onCloseFocus"
+        @keydown.capture="onKeydown"
       >
         <header
-          class="mx-auto flex w-full max-w-xl items-center gap-3 rounded-[18px] bg-surface/90 py-2 pr-2 pl-4 shadow-float"
+          class="mx-auto flex w-full max-w-xl items-center gap-3 rounded-[18px] bg-surface/90 py-2 pr-2 pl-4 shadow-float [@media(max-height:440px)]:py-0.5"
         >
           <div class="min-w-0 flex-1">
             <DialogTitle class="truncate text-body font-semibold" data-testid="viewer-title">
@@ -199,11 +346,11 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
             </DialogTitle>
             <p
               v-if="letters.length > 1"
-              class="text-caption text-ink-muted"
+              class="text-caption text-ink-muted [@media(max-height:440px)]:sr-only"
               aria-live="polite"
               data-testid="viewer-count"
             >
-              Surat {{ index + 1 }} dari {{ letters.length }}
+              Surat {{ target + 1 }} dari {{ letters.length }}
             </p>
           </div>
           <slot v-if="current" name="actions" :letter="current" />
@@ -214,7 +361,13 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
           </DialogClose>
         </header>
 
-        <div ref="stage" class="relative min-h-0 flex-1 overflow-hidden">
+        <div
+          ref="stage"
+          class="relative min-h-0 flex-1 touch-none overflow-hidden"
+          @pointerdown="onStageDown"
+          @pointerup="onStageUp"
+          @pointercancel="onStageCancel"
+        >
           <Transition :name="direction > 0 ? 'viewer-next' : 'viewer-prev'" @before-leave="retire">
             <div
               v-if="current"
@@ -227,20 +380,21 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
                 v-model:reading="reading"
                 :letter="current"
                 :label="label"
+                :arrow-hint="false"
               />
             </div>
           </Transition>
         </div>
 
         <footer
-          class="mx-auto flex w-full max-w-xl items-center gap-2 rounded-[18px] bg-surface/90 p-2 shadow-float"
+          class="mx-auto flex w-full max-w-xl items-center gap-2 rounded-[18px] bg-surface/90 p-2 shadow-float [@media(max-height:440px)]:py-0.5"
         >
           <IconButton
             ref="prevButton"
             label="Surat sebelumnya"
             variant="ghost"
             size="lg"
-            :disabled="index === 0"
+            :disabled="target === 0"
             data-testid="viewer-prev"
             @click="go(-1)"
           >
@@ -264,7 +418,7 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
             label="Surat berikutnya"
             variant="ghost"
             size="lg"
-            :disabled="index >= letters.length - 1"
+            :disabled="target >= letters.length - 1"
             data-testid="viewer-next"
             @click="go(1)"
           >
@@ -296,5 +450,15 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
 .viewer-prev-enter-from {
   transform: translateX(-28%) rotate(-4deg);
   opacity: 0;
+}
+</style>
+
+<style>
+/* Tanpa GPU kartunya langsung berganti, sama seperti dengan gerakan dikurangi (calmMotion). */
+[data-render='cpu'] .viewer-next-enter-active,
+[data-render='cpu'] .viewer-next-leave-active,
+[data-render='cpu'] .viewer-prev-enter-active,
+[data-render='cpu'] .viewer-prev-leave-active {
+  transition: none;
 }
 </style>

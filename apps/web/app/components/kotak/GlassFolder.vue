@@ -120,26 +120,36 @@ function sheetStyle(file: FolderFile, index: number) {
   }
 }
 
-// Folder yang disegel bergoyang sedikit saat diketuk, tanda belum bisa dibuka.
+// Folder yang disegel bergoyang sedikit saat diketuk, tanda belum bisa dibuka. Ketukan selama
+// masih bergoyang diabaikan, supaya goyangannya tidak terpotong lalu melompat ke tengah.
 const nudging = ref(false)
+let nudgeTimer: ReturnType<typeof setTimeout> | undefined
 function toggle() {
   if (props.sealed) {
-    nudging.value = false
-    requestAnimationFrame(() => (nudging.value = true))
+    if (nudging.value) return
+    nudging.value = true
+    // Cadangan kalau animationend tidak datang (gerakan dikurangi mematikan animasinya).
+    nudgeTimer = setTimeout(() => (nudging.value = false), 600)
     return
   }
   open.value = !open.value
 }
 function endNudge(event: AnimationEvent) {
-  if (event.target === event.currentTarget) nudging.value = false
+  if (event.target !== event.currentTarget) return
+  clearTimeout(nudgeTimer)
+  nudging.value = false
 }
 
-// Seni panel belakang dilukis sekali per resep dan ukuran, lalu dipakai bersama.
+// Seni panel belakang dilukis sekali per resep dan ukuran, lalu dipakai bersama. Kalau hanya
+// ukurannya yang berubah (layar diputar), gambar lama tetap tampil sampai yang baru selesai, jadi
+// seninya tidak memudar dan kabur lagi.
+let painted = ''
 async function paint() {
   const art = recipe.value
   const canvas = artCanvas.value
   if (!art || !canvas) return
-  artReady.value = false
+  const id = `${art.id}:${props.seed}`
+  if (painted !== id) artReady.value = false
   const cpu = document.documentElement.dataset.render === 'cpu'
   const density =
     Math.min(1.5, Math.max(1, cpu ? 1 : window.devicePixelRatio || 1)) * Math.min(1, k.value)
@@ -153,6 +163,7 @@ async function paint() {
   canvas.width = source.width
   canvas.height = source.height
   canvas.getContext('2d')?.drawImage(source, 0, 0)
+  painted = id
   artReady.value = true
 }
 
@@ -181,6 +192,7 @@ watch([recipe, () => props.seed, k], () => void paint())
 onBeforeUnmount(() => {
   io?.disconnect()
   clearTimeout(enterTimer)
+  clearTimeout(nudgeTimer)
 })
 
 // Cahaya dan paralaks mengikuti kursor (bukan sentuhan), tanpa render ulang.
@@ -410,8 +422,9 @@ defineExpose({
   transition: transform 0.6s var(--gf-ease);
 }
 
+/* Tiap ayunan pelan di awal dan akhir (ease-in-out per segmen), bukan melompat lalu diam. */
 .gf-root[data-nudge] .gf-tilt {
-  animation: gf-nudge 0.46s var(--gf-ease);
+  animation: gf-nudge 0.46s ease-in-out;
 }
 
 @keyframes gf-nudge {
@@ -776,9 +789,13 @@ defineExpose({
 }
 
 .gf-title {
+  /* Judul kotak bisa 40 huruf: paling banyak dua baris, baru dipotong. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-size: 21px;
   font-weight: 700;
   line-height: 1.15;
@@ -786,10 +803,12 @@ defineExpose({
 }
 
 .gf-meta {
+  overflow: hidden;
   font-size: 14px;
   font-weight: 500;
   /* Lebih pekat dari ink-muted: kacanya bisa gelap di belakang seni atau surat bergambar. */
   color: rgb(24 32 74 / 0.8);
+  text-overflow: ellipsis;
   white-space: nowrap;
   animation: gf-roll 0.5s var(--gf-ease) both;
 }
@@ -807,11 +826,12 @@ defineExpose({
   }
 }
 
-/* Cap tanggal di kaca folder yang masih disegel. */
+/* Cap tanggal di kaca folder yang masih disegel: di kanan atas seperti cap pos, jadi tidak
+   menimpa judul dan nama penerima yang panjang di kiri bawah. */
 .gf-seal {
   position: absolute;
-  right: 24px;
-  bottom: 28px;
+  top: 46px;
+  right: 22px;
   z-index: 2;
   max-width: 132px;
   padding: 7px 10px;

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { byId, isFilledElement, letter, templateForPhotos } from '@postpocket/presets'
 import { BottomSheet, SidePanel } from '#components'
+import type { BoxLimits } from '~/utils/box-api'
+import { boxRoom, letterPhotoCount, roomProblem, type BoxRoom } from '~/utils/box-room'
 import { PhotoError, preparePhoto } from '~/utils/front-image'
 import { looksLikeImage } from '~/utils/heic'
 import { LetterApiError, errorMessage } from '~/utils/letter-api'
@@ -99,10 +101,17 @@ async function startTitip(invite: string) {
     } else notice.value = errorMessage(problem)
     return
   }
-  if (info.closed) {
-    notice.value = `Kotak "${info.title}" sudah ditutup, jadi tidak bisa menerima titipan lagi.`
+  const left = boxRoom(info.limits, info.usage)
+  if (info.closed || !left.letters) {
+    // Titipan yang sudah terkirim ke kotak lain tidak ditampilkan di bawah pesan ini, supaya
+    // "Bikin surat baru" tidak diam-diam menitip ke kotak lain itu.
+    if (draft.sent && draft.box) await draft.reset()
+    notice.value = info.closed
+      ? `Kotak "${info.title}" sudah ditutup, jadi tidak bisa menerima titipan lagi.`
+      : `Kotak "${info.title}" sudah penuh (${info.limits.letters} surat), jadi tidak bisa menerima titipan lagi.`
     return
   }
+  room.value = { invite, limits: info.limits, left }
   const target = { invite, title: info.title, to: info.to }
   if (draft.blank || draft.sent) {
     if (draft.sent) await draft.reset()
@@ -121,6 +130,78 @@ async function startTitip(invite: string) {
 }
 
 const notice = ref('')
+
+// Sisa tempat kotak tujuan titipan (20 surat dan 40 foto, `BoxLimits` di kontrak). Tampil di
+// banner titip dan dicek lagi tepat sebelum mengirim, supaya surat yang tidak muat tidak sempat
+// diunggah lalu ditolak.
+const room = ref<{ invite: string; limits: BoxLimits; left: BoxRoom } | null>(null)
+async function loadRoom(invite: string) {
+  try {
+    const info = await useBoxApi().invite(invite)
+    if (draft.box?.invite === invite) {
+      room.value = { invite, limits: info.limits, left: boxRoom(info.limits, info.usage) }
+    }
+    return info
+  } catch {
+    return null
+  }
+}
+watch(
+  () => draft.box?.invite,
+  (invite) => {
+    if (invite && room.value?.invite !== invite) void loadRoom(invite)
+    else if (!invite) room.value = null
+  },
+)
+// Surat berikutnya untuk kotak yang sama: sisa tempatnya sudah berkurang satu titipan.
+watch(
+  () => !!draft.sent,
+  (sent, before) => {
+    if (before && !sent && draft.box) void loadRoom(draft.box.invite)
+  },
+)
+const titipPhotos = computed(() =>
+  letterPhotoCount(draft.content, draft.isPhotoFront && !!draft.photo),
+)
+const roomWarning = computed(() => {
+  const box = draft.box
+  const current = room.value
+  if (!box || !current || current.invite !== box.invite || draft.sent) return ''
+  const { left, limits } = current
+  const problem = roomProblem(left, titipPhotos.value)
+  if (problem === 'letters') {
+    return `Kotak ini sudah penuh (${limits.letters} surat), jadi suratmu tidak bisa masuk lagi. Tekan Batal titip untuk mengirimnya sebagai link biasa.`
+  }
+  if (problem !== 'photos') return ''
+  const count = `Suratmu punya ${titipPhotos.value} foto${draft.isPhotoFront ? ' (termasuk gambar depan)' : ''}`
+  const front = draft.isPhotoFront ? ', atau pakai gambar depan bawaan' : ''
+  return left.photos
+    ? `${count}, padahal kotak ini cuma muat ${left.photos} foto lagi. Kurangi fotonya dulu${front}.`
+    : `${count}, padahal foto di kotak ini sudah penuh. Hapus fotonya dulu${front}, supaya suratmu bisa masuk.`
+})
+const roomAlert = ref<HTMLElement | null>(null)
+const checkingRoom = ref(false)
+
+/**
+ * Cek sisa tempat kotak tepat sebelum mengirim titipan. Kalau kotaknya gagal dimuat (misalnya
+ * sinyal putus), pengiriman tetap jalan dan server yang memutuskan.
+ */
+async function titipFits(invite: string): Promise<boolean> {
+  checkingRoom.value = true
+  const info = await loadRoom(invite)
+  checkingRoom.value = false
+  if (!info) return true
+  if (info.closed) {
+    notice.value =
+      'Kotak ini sudah ditutup. Suratmu tetap ada di draf: tekan Batal titip untuk mengirimnya sebagai link biasa.'
+    return false
+  }
+  if (!roomWarning.value) return true
+  expanded.value = true
+  await nextTick()
+  roomAlert.value?.focus()
+  return false
+}
 
 /**
  * Jalankan `reset` sambil mempertahankan kotak tujuan dan nama pengirim, misalnya saat mulai
@@ -317,7 +398,8 @@ watch(
   },
 )
 
-function startSending() {
+async function startSending() {
+  if (checkingRoom.value) return
   if (draft.sent) {
     sending.value = true
     return
@@ -334,6 +416,7 @@ function startSending() {
     nextTick(() => messageField.value?.focus())
     return
   }
+  if (draft.box && !(await titipFits(draft.box.invite))) return
   sending.value = true
 }
 
@@ -484,6 +567,27 @@ async function startOver() {
             Suratmu masuk ke kotak bareng untuk {{ draft.box.to }}, bukan jadi link sendiri. Isinya
             rahasia sampai kotaknya dibuka.
           </p>
+          <p
+            v-if="roomWarning"
+            ref="roomAlert"
+            role="alert"
+            tabindex="-1"
+            class="mt-2 font-semibold text-[#7a5a14] outline-none"
+            data-testid="titip-room-warning"
+          >
+            {{ roomWarning }}
+          </p>
+          <p
+            v-else-if="room && room.invite === draft.box.invite && !draft.sent"
+            class="mt-2 text-ink-muted"
+            data-testid="titip-room-left"
+          >
+            {{
+              room.left.photos
+                ? `Kotak ini masih muat ${room.left.letters} surat dan ${room.left.photos} foto.`
+                : `Foto di kotak ini sudah penuh, jadi suratmu hanya bisa masuk tanpa foto. Masih muat ${room.left.letters} surat.`
+            }}
+          </p>
           <label for="titip-from" class="mt-2.5 block font-semibold text-ink">Nama kamu</label>
           <input
             id="titip-from"
@@ -491,7 +595,7 @@ async function startOver() {
             v-model="draft.from"
             :maxlength="BOX_TEXT_LIMIT"
             autocomplete="nickname"
-            :placeholder="`Biar ${draft.box.to} tahu ini dari siapa`"
+            placeholder="Nama panggilanmu"
             :aria-invalid="fromWarning || undefined"
             aria-describedby="titip-from-hint"
             class="mt-1 h-10 w-full rounded-control bg-surface px-3 text-body inset-ring inset-ring-line placeholder:text-ink-subtle focus:outline-2 focus:outline-ink"
@@ -716,7 +820,7 @@ async function startOver() {
       </div>
 
       <template #footer>
-        <StickyCTA :disabled="!draft.ready || maskBusy" @click="startSending">{{
+        <StickyCTA :disabled="!draft.ready || maskBusy || checkingRoom" @click="startSending">{{
           draft.box
             ? draft.sent
               ? 'Lihat titipanmu'

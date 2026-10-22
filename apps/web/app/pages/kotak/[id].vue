@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OrganizerBox } from '~/utils/box-api'
+import { boxRoom } from '~/utils/box-room'
 import {
   deviceTimeZone,
   formatDay as formatDayIn,
@@ -101,12 +102,7 @@ useIntervalFn(() => {
 }, 30_000)
 const open = computed(() => !!box.value?.openable)
 const room = computed(() =>
-  box.value
-    ? {
-        letters: Math.max(0, box.value.limits.letters - box.value.usage.letters),
-        photos: Math.max(0, box.value.limits.photos - box.value.usage.photos),
-      }
-    : { letters: 0, photos: 0 },
+  box.value ? boxRoom(box.value.limits, box.value.usage) : { letters: 0, photos: 0 },
 )
 const files = computed(() =>
   (box.value?.letters ?? []).slice(0, 4).map((item) => ({
@@ -380,7 +376,8 @@ async function removeBox() {
             </template>
             <template v-else>
               Kirim kapan saja. Sebelum kotaknya dibuka, {{ box.to }} hanya melihat kotak tersegel
-              dan jumlah suratnya.
+              dan jumlah suratnya. Foto di dalamnya dihapus 7 hari setelah dia membuka surat
+              pertama.
             </template>
           </p>
           <div class="mt-3 flex gap-2">
@@ -486,7 +483,15 @@ async function removeBox() {
             Titipan ({{ box.usage.letters }})
           </h2>
           <p class="mt-1 text-caption text-ink-muted" data-testid="box-room">
-            <template v-if="!open">
+            <template v-if="!open && !room.letters">
+              Kotaknya sudah penuh ({{ box.limits.letters }} surat). Hapus titipan kalau mau memberi
+              tempat untuk surat lain.
+            </template>
+            <template v-else-if="!open && !room.photos">
+              Fotonya sudah penuh ({{ box.limits.photos }} foto). Masih muat
+              {{ room.letters }} surat, asal tanpa foto.
+            </template>
+            <template v-else-if="!open">
               Masih muat {{ room.letters }} surat dan {{ room.photos }} foto.
             </template>
             Isinya rahasia, jadi yang terlihat di sini hanya nama pengirimnya.

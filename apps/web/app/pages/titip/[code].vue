@@ -7,6 +7,7 @@ import {
 } from '~/utils/box-time'
 import { folderSeed } from '~/utils/folder-art'
 import { missingBox } from '~/utils/box-api'
+import { boxRoom } from '~/utils/box-room'
 import { LetterApiError, errorMessage } from '~/utils/letter-api'
 import { forgetSent, sentToBox, type SentRecord } from '~/utils/sent-letters'
 
@@ -90,12 +91,7 @@ const { width: windowWidth } = useWindowSize()
 const folderWidth = computed(() => Math.max(240, Math.min(340, windowWidth.value - 32)))
 
 const room = computed(() =>
-  invite.value
-    ? {
-        letters: Math.max(0, invite.value.limits.letters - invite.value.usage.letters),
-        photos: Math.max(0, invite.value.limits.photos - invite.value.usage.photos),
-      }
-    : { letters: 0, photos: 0 },
+  invite.value ? boxRoom(invite.value.limits, invite.value.usage) : { letters: 0, photos: 0 },
 )
 const full = computed(() => room.value.letters === 0)
 const files = computed(() =>
@@ -131,6 +127,7 @@ async function withdraw(item: SentRecord) {
     await letterApi.remove(item.id, item.editToken)
     await forgotten(item)
     await reload()
+    message.value = `Suratmu sudah ditarik dari kotak "${invite.value.title}".`
   } catch (problem) {
     // Sudah dihapus pembuat kotak, atau kotaknya sudah dihapus: cukup dibuang dari daftar.
     if (problem instanceof LetterApiError && problem.code === 'not_found') await forgotten(item)
@@ -209,7 +206,8 @@ async function withdraw(item: SentRecord) {
         </p>
         <p class="mt-2 text-caption text-ink-muted" data-testid="titip-room">
           <template v-if="full">
-            Kotak ini sudah penuh, jadi titipan baru tidak muat lagi.
+            Kotak ini sudah penuh ({{ invite.limits.letters }} surat), jadi titipan baru tidak muat
+            lagi.
           </template>
           <template v-else>
             {{
@@ -217,7 +215,13 @@ async function withdraw(item: SentRecord) {
                 ? `${invite.usage.letters} surat sudah masuk.`
                 : 'Belum ada surat yang masuk.'
             }}
-            Masih muat {{ room.letters }} surat dan {{ room.photos }} foto.
+            <template v-if="room.photos">
+              Masih muat {{ room.letters }} surat dan {{ room.photos }} foto.
+            </template>
+            <template v-else>
+              Masih muat {{ room.letters }} surat, tapi fotonya sudah penuh: suratmu hanya bisa
+              masuk tanpa foto.
+            </template>
           </template>
         </p>
         <NuxtLink
@@ -228,8 +232,22 @@ async function withdraw(item: SentRecord) {
         >
           Tulis surat
         </NuxtLink>
-        <p v-if="!full" class="mt-3 max-w-sm text-caption text-ink-muted">
+        <NuxtLink
+          v-else
+          to="/letter/new"
+          class="mt-5 inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white hover:bg-ink/90"
+        >
+          Tulis surat sendiri
+        </NuxtLink>
+        <p v-if="!full && room.photos" class="mt-3 max-w-sm text-caption text-ink-muted">
           Mau pakai strip foto Booth? Mulai tulis suratnya, lalu pilih Ambil foto di Booth.
+        </p>
+        <p v-else-if="full" class="mt-3 max-w-sm text-caption text-ink-muted">
+          Kamu tetap bisa mengirim surat sendiri lewat link ke {{ invite.to }}.
+        </p>
+        <p class="mt-3 max-w-sm text-caption text-ink-muted" data-testid="titip-photos-note">
+          Foto di kotak ini dihapus 7 hari setelah {{ invite.to }} membuka suratnya, kecuali dia
+          menyimpannya.
         </p>
       </template>
 
@@ -255,8 +273,16 @@ async function withdraw(item: SentRecord) {
             </button>
           </li>
         </ul>
-        <p v-if="message" role="status" class="mt-2 text-caption text-ink-muted">{{ message }}</p>
       </section>
+      <!-- Di luar daftarnya: kabar surat terakhir yang ditarik tetap terbaca walau daftarnya hilang. -->
+      <p
+        v-if="message"
+        role="status"
+        class="mt-3 w-full max-w-md text-left text-caption text-ink-muted"
+        data-testid="titip-message"
+      >
+        {{ message }}
+      </p>
     </main>
 
     <main

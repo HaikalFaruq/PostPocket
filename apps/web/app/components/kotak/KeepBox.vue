@@ -9,8 +9,9 @@ import {
   sharesToPhotos,
   type RemotePhoto,
 } from '~/utils/letter-photos'
+import { deviceTimeZone, formatDay } from '~/utils/box-time'
 import { dayKey } from '~/utils/memories'
-import { isInAppBrowser } from '~/utils/pwa'
+import { isInAppBrowser, isStorageFull } from '~/utils/pwa'
 
 /**
  * "Simpan semua" di kotak bareng: semua surat titipan disimpan ke Kotak surat di perangkat ini,
@@ -29,6 +30,17 @@ const exporting = ref(false)
 const inApp = ref(false)
 
 const missing = computed(() => props.box.letters.filter((item) => !saved.has(item.id)))
+// Kapan foto dan kotaknya dihapus server, supaya "tidak disimpan selamanya" punya tanggal.
+const day = (value: string) => formatDay(value, deviceTimeZone())
+const expiry = computed(() => {
+  const { photosDeletedAt, photosExpireAt, expiresAt } = props.box
+  if (photosDeletedAt)
+    return `Foto di kotak ini sudah dihapus, dan kotaknya hilang ${day(expiresAt)}.`
+  if (photosExpireAt) {
+    return `Fotonya dihapus ${day(photosExpireAt)}, dan kotaknya hilang ${day(expiresAt)}.`
+  }
+  return `Kotak ini hilang ${day(expiresAt)}, dan fotonya dihapus 7 hari setelah surat pertama dibuka.`
+})
 const album = computed(() => {
   const id = saved.data.folders.find((folder) => folder.id === folderId.value)?.album
   return id ? memories.data.albums.find((item) => item.id === id && item.moments.length) : undefined
@@ -73,9 +85,11 @@ async function keepAll() {
     message.value =
       problem instanceof PhotoFetchError
         ? 'Sebagian foto gagal diunduh. Cek sinyal, lalu simpan lagi untuk melanjutkan.'
-        : remotePhotos.value.length
-          ? 'Surat tidak bisa disimpan di browser ini. Coba unduh fotonya saja.'
-          : 'Surat tidak bisa disimpan di browser ini.'
+        : isStorageFull(problem)
+          ? `Memori HP untuk browser ini sudah penuh: ${progress.value.done} dari ${progress.value.total} surat tersimpan. Kosongkan sedikit memori HP, lalu simpan lagi untuk melanjutkan.`
+          : remotePhotos.value.length
+            ? 'Surat tidak bisa disimpan di browser ini. Coba unduh fotonya saja.'
+            : 'Surat tidak bisa disimpan di browser ini.'
   }
 }
 
@@ -164,8 +178,7 @@ async function prepareFiles(): Promise<File[]> {
     <template v-else>
       <h2 id="keep-box-title" class="text-body font-semibold">Simpan semua jadi kenangan</h2>
       <p class="mt-1 text-caption text-ink-muted">
-        Kotak ini tidak disimpan selamanya. Simpan semua suratnya di HP ini<template
-          v-if="remotePhotos.length"
+        {{ expiry }} Simpan semua suratnya di HP ini<template v-if="remotePhotos.length"
           >, dan fotonya sekalian jadi satu CD di TV</template
         >.
       </p>
@@ -186,7 +199,7 @@ async function prepareFiles(): Promise<File[]> {
           <Icon name="play" :size="14" /> Putar di TV
         </NuxtLink>
         <NuxtLink
-          to="/kotak"
+          :to="`/kotak?folder=${folderId}`"
           class="inline-flex h-11 items-center rounded-control px-4 text-body font-semibold inset-ring inset-ring-line hover:bg-panel"
           data-testid="keep-box-open"
         >

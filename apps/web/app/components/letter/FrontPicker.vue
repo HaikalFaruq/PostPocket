@@ -38,6 +38,8 @@ const emit = defineEmits<{ file: [file: File] }>()
 const illustrations = offeredIllustrations()
 const model = defineModel<string>({ required: true })
 const input = ref<HTMLInputElement | null>(null)
+// Surat titipan tidak dibuatkan link, jadi keterangan fotonya menyebut menitip.
+const titip = computed(() => !!useLetterDraft().box)
 
 function onChange(event: Event) {
   const target = event.target as HTMLInputElement
@@ -227,7 +229,7 @@ onMounted(showChecked)
     />
     <p class="min-w-0 flex-1 basis-40 text-caption text-ink-muted">
       <span class="pointer-coarse:hidden">atau tarik ke halaman ini, atau tempel. </span>Foto tetap
-      di perangkatmu sampai kamu membuat link.
+      di perangkatmu sampai kamu {{ titip ? 'menitipkannya' : 'membuat link' }}.
     </p>
   </div>
   <p
