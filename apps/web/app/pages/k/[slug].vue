@@ -129,6 +129,10 @@ const files = computed<FolderFile[]>(() =>
 const unreadCount = computed(() => letters.value.filter((item) => !read.value.has(item.id)).length)
 
 const folderOpen = ref(false)
+// Back di HP menutup folder yang terbuka dulu (penampil di atasnya lebih dulu lagi).
+useBackToClose(folderOpen, () => {
+  folderOpen.value = false
+})
 const folder = ref<{ sheetRect: (id: string) => DOMRect | null } | null>(null)
 const viewer = reactive({ open: false, index: 0, origin: null as DOMRect | null })
 

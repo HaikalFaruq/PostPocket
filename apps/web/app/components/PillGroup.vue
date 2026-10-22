@@ -18,12 +18,14 @@ const model = defineModel<string>({ required: true })
 </script>
 
 <template>
+  <!-- Jarak antarbaris 14 px: bidang ketuk 44 px tiap pil (7 px di atas dan bawahnya) bertemu di
+       tengah celah, jadi ketukan di celah tidak diambil pil di baris lain. -->
   <RadioGroupRoot
     v-model="model"
     :aria-label="label"
     orientation="horizontal"
     loop
-    class="flex flex-wrap gap-2"
+    class="flex flex-wrap gap-x-2 gap-y-3.5"
   >
     <slot>
       <PillChip

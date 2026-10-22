@@ -3,6 +3,7 @@ import { byId, letter as letterPresets } from '@postpocket/presets'
 import type { FolderFile } from '~/components/kotak/GlassFolder.vue'
 import { warmCardFront } from '~/composables/useCardFront'
 import { folderSeed } from '~/utils/folder-art'
+import { calmMotion } from '~/utils/render'
 import { formatDay } from '~/utils/box-time'
 import { letterFront, type ShownLetter } from '~/utils/letter-view'
 import { listBoxes, type MyBox } from '~/utils/my-boxes'
@@ -14,6 +15,11 @@ import { LETTERS_FOLDER, type SavedLetter } from '~/utils/saved-letters'
  * untuk membukanya, lalu ketuk suratnya untuk membaca satu per satu.
  */
 useSeoMeta({ title: 'Kotak surat · PostPocket', robots: 'noindex' })
+definePageMeta({
+  // Back ke halaman ini digulir halaman ini sendiri setelah folder-foldernya tampil (`LeftAt`),
+  // bukan digulir router ke atas selagi halamannya masih kosong.
+  scrollToTop: () => !(history.state as { kotak?: unknown } | null)?.kotak,
+})
 
 const saved = useSavedLetters()
 const memories = useMemories()
@@ -23,12 +29,101 @@ const kotakBareng = !!useRuntimeConfig().public.kotakBareng
 const myBoxes = ref<MyBox[]>([])
 const route = useRoute()
 const router = useRouter()
+/** Kabar dari halaman kelola setelah kotak bareng dihapus (`?dihapus=<judul>`). */
+const deleted = ref('')
+/** Ruang simpan browser untuk situs ini hampir habis, jadi surat baru bisa gagal disimpan. */
+const storageNearlyFull = ref(false)
+/**
+ * Posisi gulir dan folder yang terbuka saat halaman ini ditinggal, disimpan di entri riwayatnya
+ * (`history.state.kotak`), supaya Back ke sini (misalnya dari TV) mendarat di tempat yang sama.
+ * Router sendiri baru menyimpan posisi gulir setelah beberapa kali pindah halaman.
+ */
+interface LeftAt {
+  top: number
+  folder: string | null
+}
+onBeforeRouteLeave(() => {
+  // Saat folder terbuka, useBackToClose membatalkan pindah halaman yang pertama, mengambil entri
+  // tambahannya, lalu pindah lagi; yang tercatat entri halaman ini, di percobaan kedua.
+  const left: LeftAt = { top: Math.round(window.scrollY), folder: openFolder.value }
+  history.replaceState({ ...history.state, kotak: left }, '')
+})
+
+/** Folder dari link yang dibuka saat halaman dimuat, dan surat yang sekalian dibaca. */
+interface LinkTarget {
+  folder: string
+  letter?: number
+}
+/**
+ * Folder tujuan link tampil sudah tersusun (tanpa animasi masuk), lalu dibuka seperti diketuk.
+ * Animasi masuk dan animasi buka yang berjalan bersamaan saling menumpuk: kipasnya naik lalu turun
+ * lagi.
+ */
+const settled = ref<string | null>(null)
+/**
+ * Halaman dipulihkan lewat Back: folder-foldernya langsung tampil seperti saat ditinggal, tanpa
+ * animasi masuk.
+ */
+const restored = ref(false)
+
 onMounted(async () => {
+  const left = (history.state as { kotak?: LeftAt | null } | null)?.kotak
   await Promise.all([saved.load(), memories.load()])
   if (kotakBareng) myBoxes.value = await listBoxes()
+  if (typeof route.query.dihapus === 'string') {
+    deleted.value = `Kotak "${route.query.dihapus}" sudah dihapus, beserta link titip dan link bukanya.`
+    await router.replace({ query: {} })
+  }
+  const link = await linkTarget()
+  restored.value = !link && !!left
+  if (link) settled.value = link.folder
+  else if (left?.folder && folders.value.some((folder) => folder.id === left.folder)) {
+    // Folder yang terbuka saat halaman ditinggal (misalnya ke TV) sudah terbuka lagi sejak tampil.
+    openFolder.value = left.folder
+    warmFolder(left.folder)
+  }
   ready.value = true
-  await openFromLink()
+  void checkStorage()
+  await nextTick()
+  if (link) await openLink(link)
+  else if (left) {
+    window.scrollTo({ top: left.top, behavior: 'instant' })
+    // Sekali pakai: muat ulang nanti memakai posisi gulirnya sendiri.
+    history.replaceState({ ...history.state, kotak: null }, '')
+  }
 })
+
+/**
+ * Folder dari link tampil tertutup di tempatnya dulu, lalu terbuka seperti diketuk. Dengan
+ * `baca=1`, suratnya tumbuh dari lembarnya setelah kipasnya hampir selesai terbuka.
+ */
+async function openLink(target: LinkTarget) {
+  sections.get(target.folder)?.scrollIntoView({ block: 'start' })
+  // Keadaan tertutupnya harus sempat tergambar satu frame. Tanpa itu browser langsung menggambar
+  // folder yang sudah terbuka, tanpa animasi.
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  toggleFolder(target.folder, true)
+  if (target.letter === undefined) return
+  // Kipasnya bergerak 0,75 s, tapi sudah hampir diam setelah 0,6 s.
+  await new Promise((resolve) => setTimeout(resolve, calmMotion() ? 0 : 600))
+  const item = folders.value.find((entry) => entry.id === target.folder)?.items[target.letter]
+  if (item && openFolder.value === target.folder && !viewer.open) {
+    read(target.folder, target.letter, item.id)
+  }
+}
+
+/**
+ * Peringatan sebelum memori penuh: Kotak surat tidak punya batas jumlah, batasnya ruang simpan
+ * browser di HP ini. Di atas 90% terpakai, surat dan foto baru bisa gagal disimpan.
+ */
+async function checkStorage() {
+  try {
+    const { usage, quota } = (await navigator.storage?.estimate?.()) ?? {}
+    storageNearlyFull.value = !!usage && !!quota && usage / quota > 0.9
+  } catch {
+    // Browser yang tidak memberi angkanya tetap memberi tahu saat menyimpan gagal.
+  }
+}
 
 // Folder "Surat untukmu" terus bertambah seperti kotak masuk, jadi surat terbaru di depan: yang
 // baru disimpan langsung terlihat di kipas. Folder kotak bareng tetap urut titipannya.
@@ -43,9 +138,9 @@ const folders = computed(() =>
  * terbuka dan terlihat. Dengan `baca=1` suratnya sekalian dibuka di penampil, misalnya dari link
  * surat yang sudah mati tapi suratnya masih tersimpan di sini.
  */
-async function openFromLink() {
+async function linkTarget(): Promise<LinkTarget | null> {
   const { surat, folder: folderId, baca } = route.query
-  if (typeof surat !== 'string' && typeof folderId !== 'string') return
+  if (typeof surat !== 'string' && typeof folderId !== 'string') return null
   // Alamatnya dibersihkan dulu, baru penampil dibuka: Back yang menutup penampil kembali ke
   // /kotak, bukan ke alamat yang membuka suratnya lagi.
   await router.replace({ query: {} })
@@ -54,12 +149,9 @@ async function openFromLink() {
       ? entry.items.some((item) => item.id === surat)
       : entry.id === folderId,
   )
-  if (!folder) return
-  openFolder.value = folder.id
-  await nextTick()
-  sections.get(folder.id)?.scrollIntoView({ block: 'start' })
+  if (!folder) return null
   const at = folder.items.findIndex((item) => item.id === surat)
-  if (baca === '1' && at >= 0) read(folder.id, at)
+  return { folder: folder.id, letter: baca === '1' && at >= 0 ? at : undefined }
 }
 
 // URL foto tiap momen yang dipakai surat tersimpan, dibuat sekali lalu dipakai ulang.
@@ -96,8 +188,8 @@ function shown(item: SavedLetter): ShownLetter {
   }
 }
 
-const date = (value: string) =>
-  new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+const dayFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' })
+const date = (value: string) => dayFormat.format(new Date(value))
 
 /** Potongan tulisan pertama surat, supaya surat tanpa nama pengirim tetap mudah dikenali. */
 function snippet(item: SavedLetter): string | null {
@@ -125,8 +217,21 @@ function file(item: SavedLetter): FolderFile {
   }
 }
 
-// Satu folder terbuka dalam satu waktu.
+// Lembar tiap folder dihitung sekali per perubahan surat, bukan setiap halaman digambar ulang
+// (misalnya saat folder dibuka), supaya ketukan di folder tetap ringan di HP lambat.
+const folderFiles = computed(
+  () => new Map(folders.value.map((folder) => [folder.id, folder.items.map(file)])),
+)
+
+// Satu folder terbuka dalam satu waktu. Back di HP menutup folder yang terbuka dulu (penampil di
+// atasnya lebih dulu lagi), baru meninggalkan halaman.
 const openFolder = ref<string | null>(null)
+useBackToClose(
+  () => openFolder.value !== null,
+  () => {
+    openFolder.value = null
+  },
+)
 const sections = new Map<string, HTMLElement>()
 function setSection(id: string, el: unknown) {
   if (el instanceof HTMLElement) sections.set(id, el)
@@ -135,8 +240,8 @@ function setSection(id: string, el: unknown) {
 
 /**
  * Buka atau tutup folder `id`; folder lain yang sedang terbuka ikut menutup. Folder yang menutup
- * di atasnya mengecil, jadi selama animasinya halaman ikut digulir supaya folder yang diketuk
- * tetap di tempatnya, tidak terlempar ke atas layar. Berhenti kalau pengguna menggulir sendiri.
+ * di atasnya mengecil, jadi selama animasinya folder yang diketuk ditahan di tempatnya, tidak
+ * terlempar ke atas layar.
  */
 function toggleFolder(id: string, value: boolean) {
   const previous = openFolder.value
@@ -144,8 +249,25 @@ function toggleFolder(id: string, value: boolean) {
   if (value) warmFolder(id)
   const el = sections.get(id)
   if (!value || !previous || previous === id || !el) return
-  const top = el.getBoundingClientRect().top
-  const until = performance.now() + 750
+  holdInPlace(() => el.getBoundingClientRect().top)
+}
+
+// Folder yang menutup sendiri (diketuk lagi, atau Back): kacanya ditahan di tempatnya di layar.
+// Ruang kipas di atasnya mengecil, jadi tanpa ini kacanya naik sejauh itu, bisa sampai keluar
+// layar.
+watch(openFolder, (now, before) => {
+  if (before && !now) holdInPlace(() => folderRefs.get(before)?.glassRect()?.top)
+})
+
+/**
+ * Menahan posisi `measure()` di layar selama folder bergerak (0,75 s ditambah satu frame): tiap
+ * frame selisihnya digulir balik. Berhenti kalau pengguna menggulir sendiri. Di ujung atas dan
+ * bawah halaman, gulirnya tertahan browser, jadi yang ditahan ikut bergeser.
+ */
+function holdInPlace(measure: () => number | undefined) {
+  const start = measure()
+  if (start === undefined) return
+  const until = performance.now() + 800
   let stopped = false
   const events = ['wheel', 'touchstart', 'keydown'] as const
   const stop = () => {
@@ -155,7 +277,7 @@ function toggleFolder(id: string, value: boolean) {
   for (const name of events) window.addEventListener(name, stop, { passive: true })
   const hold = () => {
     if (stopped) return
-    const drift = el.getBoundingClientRect().top - top
+    const drift = (measure() ?? start) - start
     if (Math.abs(drift) >= 0.5) window.scrollBy({ top: drift, behavior: 'instant' })
     if (performance.now() < until) requestAnimationFrame(hold)
     else stop()
@@ -179,9 +301,13 @@ function warmFolder(id: string) {
 }
 /** Judul halaman: tujuan fokus kalau folder yang membuka penampil ikut terhapus. */
 const heading = ref<HTMLElement | null>(null)
-const folderRefs = new Map<string, { sheetRect: (id: string) => DOMRect | null }>()
+interface FolderHandle {
+  sheetRect: (id: string) => DOMRect | null
+  glassRect: () => DOMRect | null
+}
+const folderRefs = new Map<string, FolderHandle>()
 function setFolderRef(id: string, el: unknown) {
-  if (el) folderRefs.set(id, el as { sheetRect: (id: string) => DOMRect | null })
+  if (el) folderRefs.set(id, el as FolderHandle)
   else folderRefs.delete(id)
 }
 
@@ -276,6 +402,15 @@ async function removeFolder(id: string, title: string) {
       >
         Browser ini menolak menyimpan perubahan, jadi surat bisa hilang kalau halaman ditutup.
       </p>
+      <p
+        v-else-if="storageNearlyFull"
+        role="status"
+        class="mt-2 max-w-md rounded-control bg-[#fbefd2] px-3 py-2 text-caption text-[#7a5a14]"
+        data-testid="storage-nearly-full"
+      >
+        Memori HP untuk browser ini hampir penuh. Surat dan foto baru bisa gagal disimpan, jadi
+        hapus surat atau kenangan yang tidak dipakai, atau kosongkan sedikit memori HP.
+      </p>
 
       <div
         v-if="ready && folders.length"
@@ -295,8 +430,9 @@ async function removeFolder(id: string, title: string) {
             :label="folder.title"
             :art="folder.art"
             :seed="folderSeed(folder.id.replace(/^kotak-/, ''))"
-            :files="folder.items.map(file)"
+            :files="folderFiles.get(folder.id)"
             :width="folderWidth"
+            :appear="!restored && settled !== folder.id"
             :appear-delay="Math.min(position, 2) * 120"
             @update:open="(value: boolean) => toggleFolder(folder.id, value)"
             @select="(item: FolderFile, index: number) => read(folder.id, index, item.id)"
@@ -387,6 +523,14 @@ async function removeFolder(id: string, title: string) {
         data-testid="kotak-bareng"
       >
         <h2 id="bareng-title" class="text-[24px] font-bold tracking-[-0.03em]">Kotak bareng</h2>
+        <p
+          v-if="deleted"
+          role="status"
+          class="mt-2 rounded-control bg-fill px-3 py-2 text-caption"
+          data-testid="box-deleted"
+        >
+          {{ deleted }}
+        </p>
         <p class="mt-1 text-pretty text-ink-muted">
           Kumpulkan surat dan foto Booth dari teman-teman untuk satu orang, misalnya untuk ulang
           tahunnya. Dia membuka semuanya dari satu link.
@@ -434,6 +578,7 @@ async function removeFolder(id: string, title: string) {
         <IconButton
           label="Hapus surat ini dari HP"
           variant="ghost"
+          size="lg"
           data-testid="viewer-remove"
           @click="removeLetter(letter)"
         >

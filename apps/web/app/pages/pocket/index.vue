@@ -186,6 +186,17 @@ function openDay(day: string) {
       </section>
 
       <BackupCard />
+
+      <!-- Surat yang disimpan dari link ada di Kotak surat, bukan di kalender ini. -->
+      <p class="mt-6 text-center text-caption text-pocket-muted">
+        Surat yang kamu simpan ada di
+        <NuxtLink
+          to="/kotak"
+          class="inline-flex min-h-11 items-center font-semibold text-pocket-ink underline underline-offset-2"
+          data-testid="pocket-kotak"
+          >Kotak surat</NuxtLink
+        >
+      </p>
     </main>
 
     <SaveDayModal v-model:open="modalOpen" :day="modalDay" />

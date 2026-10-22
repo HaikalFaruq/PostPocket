@@ -730,12 +730,20 @@ const marqueeSeconds = computed(() => Math.max(8, marquee.value.length * 0.3))
 <template>
   <div class="min-h-dvh bg-tv-page">
     <main class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
-      <header class="py-4">
+      <header class="flex items-center justify-between gap-3 py-4">
         <NuxtLink
           to="/"
           class="-ml-1 inline-flex min-h-11 items-center gap-1 px-1 text-body text-ink-muted hover:text-ink"
         >
           <Icon name="chevron-left" :size="14" /> PostPocket
+        </NuxtLink>
+        <!-- Foto surat yang disimpan ada di CD "Surat untukmu"; suratnya sendiri di Kotak surat. -->
+        <NuxtLink
+          to="/kotak"
+          class="-mr-1 inline-flex min-h-11 items-center px-1 text-body text-ink-muted hover:text-ink"
+          data-testid="tv-kotak"
+        >
+          Kotak surat
         </NuxtLink>
       </header>
 

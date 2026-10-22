@@ -4,6 +4,8 @@ import { RadioGroupItem } from 'reka-ui'
 /**
  * Satu pilihan warna di dalam <SwatchGroup>.
  * `sm` 30 px (kertas), `md` 40 px (kantong), `lg` 48 px dengan ikon di slot (warna foil).
+ * Bidang ketuk `sm` dan `md` lebih besar dari bulatannya (`before:` yang tidak terlihat), sampai
+ * setengah jarak ke swatch sebelahnya (gap-2.5 di SwatchGroup), jadi 40 dan 44 px.
  */
 withDefaults(
   defineProps<{
@@ -17,8 +19,8 @@ withDefaults(
 )
 
 const sizes = {
-  sm: 'size-[30px]',
-  md: 'size-10',
+  sm: "size-[30px] before:absolute before:-inset-[5px] before:content-['']",
+  md: "size-10 before:absolute before:-inset-[2px] before:content-['']",
   lg: 'size-12',
 }
 </script>

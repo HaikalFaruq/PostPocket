@@ -227,7 +227,9 @@ function onStageCancel() {
  *
  * FoilCard menyembunyikan kartunya sampai ukuran panggungnya terbaca, jadi animasinya baru dimulai
  * setelah itu, dari ukuran kartu yang sebenarnya. Selama menunggu panggungnya transparan, supaya
- * kartunya tidak sempat tampil di tempat akhirnya.
+ * kartunya tidak sempat tampil di tempat akhirnya. Kartunya tidak menunggu mask foil: surat yang
+ * belum sempat disiapkan langsung naik, dan foilnya memudar masuk begitu siap (`foil-in` di
+ * FoilCard), karena menunggu membuat ketukan terasa lambat dan di HP lambat foilnya tetap telat.
  */
 function rise() {
   const el = stage.value
@@ -355,7 +357,7 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
           </div>
           <slot v-if="current" name="actions" :letter="current" />
           <DialogClose as-child>
-            <IconButton label="Tutup" variant="ghost">
+            <IconButton label="Tutup" variant="ghost" size="lg">
               <Icon name="close" :size="18" />
             </IconButton>
           </DialogClose>
@@ -363,7 +365,7 @@ const heading = computed(() => (current.value?.from ? `Dari ${current.value.from
 
         <div
           ref="stage"
-          class="relative min-h-0 flex-1 touch-none overflow-hidden"
+          class="relative min-h-0 flex-1 touch-pinch-zoom overflow-hidden"
           @pointerdown="onStageDown"
           @pointerup="onStageUp"
           @pointercancel="onStageCancel"

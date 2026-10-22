@@ -86,11 +86,14 @@ test('tombol bertag memutar efek tekannya dulu, lalu pindah halaman', async ({ p
       return param === 0x9246 || param === 0x1f01 ? 'Apple GPU' : original.call(this, param)
     }
   })
-  // Jam halaman dihentikan, jadi efek tekannya bisa diperiksa sebelum 320 ms-nya lewat.
   await page.clock.install()
   await page.goto('/')
   const pocket = page.getByRole('link', { name: 'Buka Pocket' })
   await pocket.scrollIntoViewIfNeeded()
+  // Jam halaman dihentikan tepat sebelum diketuk, jadi efek tekannya bisa diperiksa sebelum
+  // 320 ms-nya lewat. install() saja tidak menghentikan jam: kalau pemeriksaannya telat (mesin
+  // sibuk), halamannya sudah keburu pindah.
+  await page.clock.pauseAt(Date.now() + 1000)
   await pocket.click()
   await expect(page.locator('.tag-button[data-pressed]')).toHaveCount(1)
   await expect(page).toHaveURL(/\/$/)

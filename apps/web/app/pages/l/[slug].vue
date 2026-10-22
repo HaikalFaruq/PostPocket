@@ -26,15 +26,11 @@ const { data: letter, error } = await useAsyncData(`surat-${slug}`, () =>
 )
 const missing = computed(() => !error.value && !letter.value)
 const shown = computed(() => (letter.value ? shownFromApi(letter.value) : null))
-// Link yang sudah mati tapi suratnya pernah disimpan di HP ini: arahkan ke salinannya di Kotak
-// surat, bukan cuma bilang suratnya hilang.
-const keptHere = ref(false)
-onMounted(async () => {
-  if (!missing.value) return
-  const saved = useSavedLetters()
-  await saved.load()
-  keptHere.value = saved.has(slug)
-})
+// Surat yang tersimpan di Kotak surat HP ini: link yang sudah mati diarahkan ke salinannya, dan
+// kartu yang ditutup lagi tetap memberi tahu suratnya sudah tersimpan.
+const savedLetters = useSavedLetters()
+const keptHere = computed(() => savedLetters.ready && savedLetters.has(slug))
+onMounted(() => void savedLetters.load())
 if (import.meta.server && (missing.value || error.value)) {
   const event = useRequestEvent()
   if (event) setResponseStatus(event, missing.value ? 404 : 503)
@@ -178,7 +174,19 @@ const formatDate = (value: string | null | undefined) =>
       >
         Ketuk kartunya untuk membuka suratmu
       </p>
-      <template v-else>
+      <p
+        v-if="!open && keptHere && !ownLetter"
+        class="mt-1 inline-flex items-center gap-1.5 text-caption text-ink-muted"
+        data-testid="kept-note"
+      >
+        <Icon name="check" :size="14" /> Tersimpan di
+        <NuxtLink
+          :to="`/kotak?surat=${letter.slug}`"
+          class="inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-2"
+          >Kotak surat</NuxtLink
+        >
+      </p>
+      <template v-else-if="open">
         <p class="mt-2 text-caption text-ink-muted">Geser untuk memutar, ketuk untuk menutup</p>
         <!-- Di dalam kartu, halaman surat hanya separuh lebar kartu; di HP tulisannya jadi kecil. -->
         <div class="mt-4 flex flex-wrap justify-center gap-2">

@@ -27,6 +27,26 @@ test('PillGroup: klik dan panah keyboard memindah pilihan', async ({ page }) => 
   )
 })
 
+test('PillChip dan Swatch kecil bisa diketuk sedikit di luar bentuknya', async ({ page }) => {
+  // Pil 30 px dengan bidang ketuk 44 px: ketukan 5 px di atas pil tetap memilihnya.
+  const pill = page
+    .getByRole('radiogroup', { name: 'Bentuk kartu', exact: true })
+    .getByRole('radio', { name: 'Persegi' })
+  // Ketukan dengan koordinat hanya kena kalau titiknya di dalam layar.
+  await pill.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  const pillBox = (await pill.boundingBox())!
+  await page.mouse.click(pillBox.x + pillBox.width / 2, pillBox.y - 5)
+  await expect(pill).toHaveAttribute('aria-checked', 'true')
+  // Swatch kertas 30 px dengan bidang ketuk sampai setengah jarak ke sebelahnya (40 px).
+  const swatch = page
+    .getByRole('radiogroup', { name: 'Kertas' })
+    .getByRole('radio', { name: 'Navy' })
+  await swatch.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  const swatchBox = (await swatch.boundingBox())!
+  await page.mouse.click(swatchBox.x + swatchBox.width / 2, swatchBox.y + swatchBox.height + 4)
+  await expect(swatch).toHaveAttribute('aria-checked', 'true')
+})
+
 test('SwatchGroup: label warna aktif ikut di judul langkah', async ({ page }) => {
   await page
     .getByRole('radiogroup', { name: 'Kertas' })

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { byId, kotak } from '@postpocket/presets'
-import { FOLDER_HEADROOM, fanSlot, hashString, openRoom, rng } from '~/utils/folder-art'
+import {
+  FAN_STACK,
+  FOLDER_HEADROOM,
+  SHEET_H,
+  SHEET_W,
+  fanOverlap,
+  fanSlot,
+  openRoom,
+  sheetJitter,
+} from '~/utils/folder-art'
 import { paintArt } from '~/utils/folder-paint'
 
 /**
@@ -76,8 +85,6 @@ const H = 272
 const HEADROOM = FOLDER_HEADROOM
 const FRONT_TOP = 74
 const FRONT_H = H - FRONT_TOP
-const SHEET_W = 272
-const SHEET_H = 184
 /** Surat yang terlihat di kipas. Sisanya ada di daftar di bawah folder. */
 const MAX_VISIBLE = 4
 
@@ -101,20 +108,41 @@ const visible = computed(() => props.files.slice(0, MAX_VISIBLE))
 const count = computed(() => props.files.length)
 const metaLine = computed(() => props.meta ?? `${count.value} surat`)
 
+// Letak tiap lembar di kipas: posisinya, plus acakan geser dan miring yang tetap per berkas.
+const fan = computed(() =>
+  visible.value.map((file, index) => ({
+    slot: fanSlot(visible.value.length - 1 - index, visible.value.length),
+    ...sheetJitter(file.id),
+  })),
+)
+
+// Jarak antarlembar di kipas yang terbuka, dalam satuan folder: `FAN_STACK`, atau lebih kalau
+// jalur lembar yang menyembul di atas lembar depannya kurang dari 44 px di layar, juga di titik
+// tersempitnya. Lembar yang miring ke arah berbeda menutup sebagian jalur itu (`fanOverlap`), dan
+// folder yang diperkecil di HP sempit butuh lebih banyak satuan untuk 44 px yang sama. Bagian
+// yang tertutup dihitung paling sedikit 8 satuan, supaya sudut lembar yang miring, di luar
+// hitungan itu, tetap cukup lebar walau acakan lembarnya kebetulan sejajar.
+const openStack = computed(() => {
+  let covered = 8
+  for (let index = 1; index < fan.value.length; index++) {
+    covered = Math.max(covered, fanOverlap(fan.value[index - 1]!, fan.value[index]!))
+  }
+  return Math.max(FAN_STACK, Math.ceil(44 / k.value + covered))
+})
+
 // Saat terbuka, kipas tiga atau empat lembar naik lebih tinggi dari HEADROOM, jadi ruangnya ikut
 // membesar (dan foldernya turun) supaya kipasnya tidak menutupi judul di atas folder.
 const room = computed(() =>
-  open.value && !props.sealed ? openRoom(visible.value.length) : HEADROOM,
+  open.value && !props.sealed ? openRoom(visible.value.length, openStack.value) : HEADROOM,
 )
 
 function sheetStyle(file: FolderFile, index: number) {
-  const jitter = rng(hashString(file.id))
-  const depth = index
+  const { slot, jx, jr } = fan.value[index]!
   return {
-    '--gf-slot': String(fanSlot(visible.value.length - 1 - index, visible.value.length)),
-    '--gf-depth': String(depth),
-    '--gf-jx': `${((jitter() - 0.5) * 10).toFixed(2)}px`,
-    '--gf-jr': `${((jitter() - 0.5) * 3.2).toFixed(2)}deg`,
+    '--gf-slot': String(slot),
+    '--gf-depth': String(index),
+    '--gf-jx': `${jx.toFixed(2)}px`,
+    '--gf-jr': `${jr.toFixed(2)}deg`,
     '--gf-paper': file.paper ?? '#ffffff',
     zIndex: String(MAX_VISIBLE - index),
   }
@@ -124,7 +152,14 @@ function sheetStyle(file: FolderFile, index: number) {
 // masih bergoyang diabaikan, supaya goyangannya tidak terpotong lalu melompat ke tengah.
 const nudging = ref(false)
 let nudgeTimer: ReturnType<typeof setTimeout> | undefined
-function toggle() {
+// Ketukan ganda (kebiasaan di HP) tidak langsung menutup lagi folder yang baru dibuka.
+let lastToggle = Number.NEGATIVE_INFINITY
+let toggledAt = { x: 0, y: 0 }
+function toggle(event: MouseEvent) {
+  const now = performance.now()
+  if (now - lastToggle < 350) return
+  lastToggle = now
+  toggledAt = { x: event.clientX, y: event.clientY }
   if (props.sealed) {
     if (nudging.value) return
     nudging.value = true
@@ -133,6 +168,19 @@ function toggle() {
     return
   }
   open.value = !open.value
+}
+/**
+ * Lembar yang diketuk dibuka, kecuali ketukan kedua dari ketukan ganda yang baru membuka folder:
+ * sampai 500 ms (batas ketuk ganda yang lazim) dan di dekat ketukan pertama, tempat lembarnya baru
+ * naik ke bawah jari. Ketukan di lembar lain langsung membuka suratnya, walau kipasnya belum
+ * selesai terbuka. Klik dari keyboard (`detail` 0) bukan ketukan ganda.
+ */
+function select(file: FolderFile, index: number, event: MouseEvent) {
+  const secondTap =
+    event.detail > 0 &&
+    performance.now() - lastToggle < 500 &&
+    Math.hypot(event.clientX - toggledAt.x, event.clientY - toggledAt.y) < 48
+  if (!secondTap) emit('select', file, index)
 }
 function endNudge(event: AnimationEvent) {
   if (event.target !== event.currentTarget) return
@@ -232,6 +280,8 @@ defineExpose({
     const sheet = root.value?.querySelector<HTMLElement>(`[data-file="${CSS.escape(id)}"]`)
     return sheet?.getBoundingClientRect() ?? null
   },
+  /** Kotak layar kaca depannya, yang ditahan di tempat saat folder menutup. */
+  glassRect: (): DOMRect | null => hit.value?.getBoundingClientRect() ?? null,
   focus: () => hit.value?.focus(),
 })
 </script>
@@ -245,7 +295,11 @@ defineExpose({
     :data-place="labelPlacement"
     :data-sealed="sealed || undefined"
     :data-nudge="nudging || undefined"
-    :style="{ width: `${width}px`, height: `${(H + room) * k}px` }"
+    :style="{
+      width: `${width}px`,
+      height: `${(H + room) * k}px`,
+      '--gf-open-stack': `${openStack}px`,
+    }"
     data-testid="glass-folder"
     @pointermove="onPointerMove"
     @pointerleave="onPointerLeave"
@@ -318,7 +372,7 @@ defineExpose({
             :style="sheetStyle(file, index)"
             :data-file="file.id"
             :aria-label="`${file.name}${file.meta ? `, ${file.meta}` : ''}${file.unread ? ', belum dibuka' : ''}`"
-            @click="emit('select', file, index)"
+            @click="select(file, index, $event)"
           >
             <img
               v-if="file.image"
@@ -337,11 +391,16 @@ defineExpose({
               <i style="width: 88%" />
               <i style="width: 42%" />
             </span>
-            <span v-if="file.name || file.meta" class="gf-sheet-head" aria-hidden="true">
+            <span
+              v-if="file.name || file.meta || file.unread"
+              class="gf-sheet-head"
+              aria-hidden="true"
+            >
+              <!-- Titik belum dibuka di baris label, bagian lembar yang menyembul di kipas. -->
+              <span v-if="file.unread" class="gf-unread" />
               <span v-if="file.name" class="gf-sheet-name">{{ file.name }}</span>
               <span v-if="file.meta" class="gf-sheet-meta">{{ file.meta }}</span>
             </span>
-            <span v-if="file.unread" class="gf-unread" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -354,7 +413,8 @@ defineExpose({
   --gf-px: 0;
   --gf-py: 0;
   --gf-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --gf-spring: cubic-bezier(0.34, 1.36, 0.5, 1);
+  /* Mendarat tanpa memantul: lembar dan kaca tidak melewati posisi akhirnya lalu kembali. */
+  --gf-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --gf-hinge: 0deg;
   --gf-lift: 42px;
   --gf-spread: 0px;
@@ -369,7 +429,12 @@ defineExpose({
   text-align: left;
   -webkit-tap-highlight-color: transparent;
   isolation: isolate;
-  transition: height 0.6s var(--gf-ease);
+  /*
+   * Ruang di atas folder (dan kacanya yang ikut turun) bergerak dengan kurva dan durasi yang sama
+   * dengan lembar di kipas. Kalau kacanya lebih cepat, lembar depan ikut turun melewati tempat
+   * akhirnya dulu, baru naik lagi.
+   */
+  transition: height 0.75s var(--gf-spring);
 }
 
 /*
@@ -400,7 +465,8 @@ defineExpose({
   --gf-lift: -96px;
   --gf-spread: 40px;
   --gf-fan: 5deg;
-  --gf-stack: 30px;
+  /* FAN_STACK di utils/folder-art.ts, yang juga menghitung ruang di atas folder (openRoom). */
+  --gf-stack: var(--gf-open-stack, 48px);
 }
 
 /* Folder yang disegel tidak condong saat disorot, karena memang belum bisa dibuka. */
@@ -419,7 +485,7 @@ defineExpose({
   width: 340px;
   height: 272px;
   transform-origin: 0 0;
-  transition: transform 0.6s var(--gf-ease);
+  transition: transform 0.75s var(--gf-spring);
 }
 
 /* Tiap ayunan pelan di awal dan akhir (ease-in-out per segmen), bukan melompat lalu diam. */
@@ -660,10 +726,7 @@ defineExpose({
 }
 
 .gf-unread {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 1;
+  flex: none;
   width: 12px;
   height: 12px;
   border-radius: 999px;
