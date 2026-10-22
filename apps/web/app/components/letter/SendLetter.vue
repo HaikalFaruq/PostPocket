@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { contentPhotoKeys, publishableContent } from '@postpocket/presets'
+import { boxRoom, letterPhotoCount, roomProblem } from '~/utils/box-room'
 import { deviceTimeZone, formatWhen } from '~/utils/box-time'
 import { LetterApiError, errorMessage, sendLetter, type SentLetter } from '~/utils/letter-api'
 import { forgetSent, rememberSent } from '~/utils/sent-letters'
@@ -126,8 +127,31 @@ async function send() {
         ? 'Kotak ini sudah dihapus pembuatnya, jadi suratnya tidak bisa dititip.'
         : titip.value && code === 'box_closed'
           ? 'Kotak ini sudah ditutup. Suratmu tetap ada di draf: tekan Batal titip untuk mengirimnya sebagai link biasa.'
-          : errorMessage(problem)
+          : titip.value && code === 'box_full'
+            ? await fullMessage(titip.value.invite)
+            : errorMessage(problem)
     state.value = 'error'
+  }
+}
+
+/**
+ * Kenapa titipan ini ditolak `box_full`: kotaknya penuh surat, atau fotonya tidak muat. Server
+ * hanya menjawab `box_full`, jadi sisa tempat kotaknya dimuat ulang untuk tahu yang mana.
+ */
+async function fullMessage(invite: string): Promise<string> {
+  const photos = letterPhotoCount(draft.content, draft.isPhotoFront && !!draft.photo)
+  try {
+    const info = await useBoxApi().invite(invite)
+    const room = boxRoom(info.limits, info.usage)
+    if (roomProblem(room, photos) === 'photos') {
+      const front = draft.isPhotoFront ? ', atau pakai gambar depan bawaan' : ''
+      return room.photos
+        ? `Foto di kotak ini cuma muat ${room.photos} lagi, sedangkan suratmu punya ${photos}. Tutup ini, kurangi fotonya${front}, lalu titip lagi.`
+        : `Foto di kotak ini sudah penuh, sedangkan suratmu punya ${photos} foto. Tutup ini, hapus fotonya${front}, lalu titip lagi.`
+    }
+    return `Kotak ini sudah penuh (${info.limits.letters} surat). Suratmu tetap ada di draf: tekan Batal titip untuk mengirimnya sebagai link biasa.`
+  } catch {
+    return errorMessage(new LetterApiError('box_full', ''))
   }
 }
 
@@ -267,7 +291,7 @@ onMounted(() => {
         <div class="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
-            class="text-caption text-ink-muted underline underline-offset-2"
+            class="-ml-1 inline-flex min-h-11 items-center px-1 text-caption text-ink-muted underline underline-offset-2"
             @click="remove"
           >
             Tarik suratku dari kotak

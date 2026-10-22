@@ -288,59 +288,79 @@ const untilOpen = computed(() =>
       </template>
 
       <template v-else>
-        <p
-          v-if="!folderOpen"
-          class="mt-6 text-body font-semibold"
-          :class="{ invisible: !interactive }"
-          data-testid="box-hint"
-        >
-          Ketuk kotaknya untuk melihat suratnya
-        </p>
-        <div v-else class="mt-6 flex w-full max-w-md flex-col items-center gap-3 animate-rise-in">
-          <button
-            type="button"
-            class="inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white hover:bg-ink/90"
-            data-testid="box-read"
-            @click="continueReading"
-          >
-            {{
-              unreadCount === letters.length
-                ? 'Mulai baca'
-                : unreadCount
-                  ? `Lanjut baca (${unreadCount} belum dibuka)`
-                  : 'Baca lagi dari awal'
-            }}
-          </button>
-          <ol
-            class="w-full divide-y divide-line-soft rounded-[16px] bg-surface text-left shadow-raised"
-            aria-label="Semua surat di kotak"
-          >
-            <li v-for="(item, index) in letters" :key="item.id">
-              <button
-                type="button"
-                class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-panel"
-                @click="openLetterAt(index)"
+        <!-- Petunjuk dan daftar surat bertukar sambil mengubah tinggi pelan-pelan bersama
+             foldernya, jadi panel Simpan semua di bawahnya tidak melompat. -->
+        <Transition name="reveal">
+          <div v-if="!folderOpen" class="reveal w-full">
+            <div>
+              <p
+                class="pt-6 text-body font-semibold"
+                :class="{ invisible: !interactive }"
+                data-testid="box-hint"
               >
-                <span
-                  class="size-2.5 shrink-0 rounded-full"
-                  :class="interactive && !read.has(item.id) ? 'bg-ink' : 'bg-line'"
-                  aria-hidden="true"
-                />
-                <span class="min-w-0 flex-1 truncate text-body font-semibold">
-                  Dari {{ item.from }}
-                </span>
-                <span class="shrink-0 text-caption text-ink-muted">
+                Ketuk kotaknya untuk melihat suratnya
+              </p>
+            </div>
+          </div>
+        </Transition>
+        <Transition name="reveal">
+          <div v-if="folderOpen" class="reveal w-full max-w-md">
+            <div>
+              <div class="flex flex-col items-center gap-3 pt-6">
+                <button
+                  type="button"
+                  class="inline-flex h-11 items-center rounded-control bg-ink px-6 text-body font-semibold text-white hover:bg-ink/90"
+                  data-testid="box-read"
+                  @click="continueReading"
+                >
                   {{
-                    interactive && !read.has(item.id) ? 'Belum dibuka' : formatDay(item.publishedAt)
+                    unreadCount === letters.length
+                      ? 'Mulai baca'
+                      : unreadCount
+                        ? `Lanjut baca (${unreadCount} belum dibuka)`
+                        : 'Baca lagi dari awal'
                   }}
-                </span>
-              </button>
-            </li>
-          </ol>
-        </div>
+                </button>
+                <ol
+                  class="w-full divide-y divide-line-soft rounded-[16px] bg-surface text-left shadow-raised"
+                  aria-label="Semua surat di kotak"
+                >
+                  <li v-for="(item, index) in letters" :key="item.id">
+                    <button
+                      type="button"
+                      class="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-panel"
+                      @click="openLetterAt(index)"
+                    >
+                      <span
+                        class="size-2.5 shrink-0 rounded-full"
+                        :class="interactive && !read.has(item.id) ? 'bg-ink' : 'bg-line'"
+                        aria-hidden="true"
+                      />
+                      <span class="min-w-0 flex-1 truncate text-body font-semibold">
+                        Dari {{ item.from }}
+                      </span>
+                      <span class="shrink-0 text-caption text-ink-muted">
+                        {{
+                          interactive && !read.has(item.id)
+                            ? 'Belum dibuka'
+                            : formatDay(item.publishedAt)
+                        }}
+                      </span>
+                    </button>
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </Transition>
 
         <ClientOnly>
           <KeepBox v-if="!own" :box="box" class="mt-6 text-left" />
+          <!-- Pengganti setinggi panelnya, supaya teks dan footer di bawahnya tidak terdorong
+               turun begitu halaman selesai dimuat. -->
+          <template #fallback>
+            <div class="mt-6 h-[222px] w-full max-w-md" aria-hidden="true" />
+          </template>
         </ClientOnly>
       </template>
 

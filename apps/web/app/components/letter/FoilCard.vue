@@ -18,6 +18,8 @@ const props = withDefaults(
     ratio?: number
     foilBorder?: boolean
     label?: string
+    /** Petunjuk panah kiri dan kanan membalik kartu. Penampil Kotak surat memakai panah untuk pindah surat. */
+    arrowHint?: boolean
   }>(),
   {
     art: undefined,
@@ -25,6 +27,7 @@ const props = withDefaults(
     ratio: 0.72,
     foilBorder: false,
     label: 'Kartu surat',
+    arrowHint: true,
   },
 )
 
@@ -117,7 +120,7 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
       :style="cardStyle"
       role="button"
       tabindex="0"
-      :aria-label="`${label}. ${open ? 'Terbuka' : 'Tertutup'}. Tekan Enter untuk ${open ? 'menutup' : 'membuka'}, panah kiri atau kanan untuk membalik.`"
+      :aria-label="`${label}. ${open ? 'Terbuka' : 'Tertutup'}. Tekan Enter untuk ${open ? 'menutup' : 'membuka'}${arrowHint ? ', panah kiri atau kanan untuk membalik' : ''}.`"
       :aria-pressed="open"
       @pointerdown="motion.onPointerDown"
       @pointermove="motion.onPointerMove"

@@ -157,9 +157,10 @@ export function errorMessage(error: unknown): string {
       return 'Koneksi terputus. Cek sinyal, lalu coba lagi.'
     case 'rate_limited': {
       const minutes = error.retryAfter ? Math.max(1, Math.ceil(error.retryAfter / 60)) : null
+      // Batasnya per jaringan, jadi teman-teman yang memakai Wi-Fi yang sama ikut terhitung.
       return minutes
-        ? `Terlalu banyak surat dari jaringan ini. Coba lagi dalam ${minutes} menit.`
-        : 'Terlalu banyak surat dari jaringan ini. Coba lagi sebentar lagi.'
+        ? `Terlalu banyak surat dari jaringan ini. Coba lagi dalam ${minutes} menit, atau kirim lewat data seluler.`
+        : 'Terlalu banyak surat dari jaringan ini. Coba lagi sebentar lagi, atau kirim lewat data seluler.'
     }
     case 'upload_missing':
     case 'upload_invalid':
@@ -176,7 +177,7 @@ export function errorMessage(error: unknown): string {
     case 'box_closed':
       return 'Kotak ini sudah ditutup, jadi tidak bisa menerima titipan lagi.'
     case 'box_full':
-      return 'Kotak ini sudah penuh: paling banyak 20 surat dan 40 foto. Kalau suratnya masih muat, kurangi fotomu.'
+      return 'Kotak ini sudah penuh, atau fotomu tidak muat lagi: satu kotak paling banyak 20 surat dan 40 foto.'
     case 'box_not_open':
       return 'Kotak ini belum bisa dibuka.'
     case 'invalid_box':

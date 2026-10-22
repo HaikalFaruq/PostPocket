@@ -93,9 +93,13 @@ async function create() {
     if (await rememberBox(box)) await navigateTo(`/kotak/${box.id}`, { replace: true })
     else unsaved.value = box
   } catch (problem) {
+    const minutes =
+      problem instanceof LetterApiError && problem.retryAfter
+        ? Math.max(1, Math.ceil(problem.retryAfter / 60))
+        : null
     error.value =
       problem instanceof LetterApiError && problem.code === 'rate_limited'
-        ? 'Terlalu banyak kotak dari jaringan ini. Coba lagi sebentar lagi.'
+        ? `Terlalu banyak kotak dari jaringan ini. Coba lagi ${minutes ? `dalam ${minutes} menit` : 'sebentar lagi'}.`
         : errorMessage(problem)
   } finally {
     busy.value = false
@@ -116,8 +120,8 @@ async function create() {
         Bikin kotak bareng
       </h1>
       <p class="mt-2 max-w-md text-pretty text-ink-muted">
-        Kumpulkan surat dan foto Booth dari teman-teman untuk satu orang. Kamu dapat dua link: satu
-        untuk teman yang mau titip, satu untuk penerimanya.
+        Kumpulkan surat dan foto Booth dari teman-teman untuk satu orang, sampai 20 surat dan 40
+        foto. Kamu dapat dua link: satu untuk teman yang mau titip, satu untuk penerimanya.
       </p>
     </header>
 

@@ -5,6 +5,7 @@ import {
   isInAppBrowser,
   isIos,
   isPrivatePath,
+  isStorageFull,
   requestPersistentStorage,
   warmPages,
   type InstallEnv,
@@ -78,6 +79,19 @@ describe('installHint', () => {
     expect(installHint(env({ userAgent: ua.iphone, dismissed: true }))).toBeNull()
     expect(installHint(env({ userAgent: ua.instagram }))).toBeNull()
     expect(installHint(env())).toBeNull()
+  })
+})
+
+describe('isStorageFull', () => {
+  it('mengenali kuota IndexedDB yang habis, juga yang dibungkus sebagai cause', () => {
+    const quota = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+    expect(isStorageFull(quota)).toBe(true)
+    expect(isStorageFull(new Error('Surat tidak bisa disimpan', { cause: quota }))).toBe(true)
+    expect(isStorageFull(new Error('Surat tidak bisa disimpan', { cause: new Error('x') }))).toBe(
+      false,
+    )
+    expect(isStorageFull(new DOMException('ditolak', 'InvalidStateError'))).toBe(false)
+    expect(isStorageFull(null)).toBe(false)
   })
 })
 

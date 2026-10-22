@@ -9,7 +9,7 @@ import {
   sharesToPhotos,
   type RemotePhoto,
 } from '~/utils/letter-photos'
-import { isInAppBrowser } from '~/utils/pwa'
+import { isInAppBrowser, isStorageFull } from '~/utils/pwa'
 import { LETTERS_FOLDER } from '~/utils/saved-letters'
 
 /**
@@ -22,6 +22,14 @@ const saved = useSavedLetters()
 
 const state = ref<'idle' | 'saving' | 'saved'>('idle')
 const message = ref('')
+// Pesannya muncul di bawah tombol, yang di HP sering ada di tepi bawah layar, jadi digulir sampai
+// terlihat.
+const messageLine = ref<HTMLElement | null>(null)
+watch(message, async (text) => {
+  if (!text) return
+  await nextTick()
+  messageLine.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+})
 const exporting = ref(false)
 // Browser bawaan aplikasi lain (Instagram, LINE, …) menyimpan datanya terpisah dari Chrome atau
 // Safari, jadi surat yang disimpan di sana tidak ketemu lagi dari browser biasa.
@@ -76,7 +84,9 @@ async function keep() {
     message.value =
       problem instanceof PhotoFetchError
         ? 'Foto suratnya gagal diunduh. Cek sinyal, lalu coba lagi.'
-        : 'Surat tidak bisa disimpan di browser ini. Coba unduh fotonya saja.'
+        : isStorageFull(problem)
+          ? 'Memori HP untuk browser ini sudah penuh, jadi suratnya belum tersimpan. Kosongkan sedikit memori HP, lalu coba lagi.'
+          : 'Surat tidak bisa disimpan di browser ini. Coba unduh fotonya saja.'
   }
 }
 
@@ -175,7 +185,7 @@ async function download() {
     <div class="mt-3 flex flex-wrap gap-2">
       <NuxtLink
         v-if="state === 'saved'"
-        to="/kotak"
+        :to="`/kotak?surat=${letter.slug}`"
         class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
         data-testid="keep-open-box"
       >
@@ -207,6 +217,13 @@ async function download() {
         <Icon name="download" :size="15" /> Unduh foto
       </button>
     </div>
-    <p v-if="message" role="status" class="mt-2 text-caption text-ink-muted">{{ message }}</p>
+    <p
+      v-if="message"
+      ref="messageLine"
+      role="status"
+      class="mt-2 scroll-mb-6 text-caption text-ink-muted"
+    >
+      {{ message }}
+    </p>
   </section>
 </template>

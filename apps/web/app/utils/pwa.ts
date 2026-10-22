@@ -45,6 +45,19 @@ export function installHint(env: InstallEnv): 'prompt' | 'ios' | null {
 }
 
 /**
+ * Penulisan ke IndexedDB ditolak karena ruang simpan browser untuk situs ini sudah habis
+ * (`QuotaExceededError`), termasuk kalau error itu dibungkus sebagai `cause`.
+ */
+export function isStorageFull(problem: unknown): boolean {
+  for (let error = problem, depth = 0; error && depth < 5; depth++) {
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') return true
+    if (error instanceof Error && /quota/i.test(error.message)) return true
+    error = (error as { cause?: unknown }).cause
+  }
+  return false
+}
+
+/**
  * Minta penyimpanan permanen supaya draf dan foto di IndexedDB tidak dihapus browser saat ruang
  * penuh atau, di Safari, setelah 7 hari tidak dibuka.
  */

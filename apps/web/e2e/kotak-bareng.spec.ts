@@ -293,12 +293,11 @@ test('titipan bisa ditarik dan dihapus, kotak yang sudah dibuka menolak titipan,
   page.once('dialog', (question) => question.accept())
   await page.getByTestId('box-open-now').click()
   await expect(page.getByTestId('box-manage-status')).toContainText('Sudah terbuka')
+  // Kotaknya dicek lagi tepat sebelum mengirim, jadi suratnya tidak sempat diunggah.
   await friend.getByRole('button', { name: 'Titip ke kotak' }).click()
-  const failed = friend.getByTestId('send-letter')
-  await expect(failed).toHaveAttribute('data-state', 'error', { timeout: 20_000 })
-  await expect(failed.getByRole('alert')).toContainText('Kotak ini sudah ditutup')
-  await expect(failed.getByRole('button', { name: 'Coba lagi' })).toHaveCount(0)
-  await failed.getByRole('button', { name: 'Tutup' }).click()
+  await expect(friend.getByTestId('letter-notice')).toContainText('Kotak ini sudah ditutup')
+  await expect(friend.getByTestId('letter-notice')).toContainText('Batal titip')
+  await expect(friend.getByTestId('send-letter')).toHaveCount(0)
   const late = await titipViaApi(request, links.invite, 'Telat', 'Telat', false)
   expect(late.status).toBe(422)
   expect(late.body.error.code).toBe('box_closed')
@@ -413,9 +412,222 @@ test('kotak yang penuh menolak titipan berikutnya', async ({ page, request }) =>
   expect(extra.body.error.code).toBe('box_full')
   await page.goto(links.invite)
   await expect(page.getByTestId('titip-room')).toHaveText(
-    'Kotak ini sudah penuh, jadi titipan baru tidak muat lagi.',
+    'Kotak ini sudah penuh (20 surat), jadi titipan baru tidak muat lagi.',
   )
   await expect(page.getByTestId('titip-write')).toHaveCount(0)
+  // Bukan jalan buntu: masih bisa menulis surat sendiri lewat link.
+  await expect(page.getByRole('link', { name: 'Tulis surat sendiri' })).toHaveAttribute(
+    'href',
+    '/letter/new',
+  )
+  // Editor yang dibuka lewat link titip lama langsung memberi tahu, sebelum suratnya ditulis.
+  await page.goto(`/letter/new?titip=${codeOf(links.invite)}`)
+  await expect(page.getByTestId('letter-notice')).toContainText('sudah penuh (20 surat)')
+  await expect(page.getByTestId('titip-banner')).toHaveCount(0)
+  // Pembuatnya juga diberi tahu kotaknya penuh.
+  await page.goto('/kotak')
+  await page.getByTestId('my-box').click()
+  await expect(page.getByTestId('box-room')).toContainText('Kotaknya sudah penuh (20 surat)')
+})
+
+/** Titipan dengan foto depan dan `photos` foto isi (paling banyak 4), lewat mock API. */
+async function titipWithPhotos(
+  request: APIRequestContext,
+  invite: string,
+  from: string,
+  photos: number,
+) {
+  const meta = { type: 'image/jpeg', width: 32, height: 24, size: jpeg.length }
+  const keys = Array.from({ length: photos }, (_, i) => `f${i + 1}`)
+  const created = await (
+    await request.post('/mock-api/letters', {
+      data: {
+        design: {
+          illustration: 'upload',
+          shape: 'portrait',
+          foilMode: 'detail',
+          foilBorder: true,
+          foilColor: 'gold',
+          paper: 'blush',
+          template: 'photo-1',
+        },
+        content: {
+          version: 1,
+          elements: keys.map((key, i) => ({
+            kind: 'photo',
+            id: `p${i + 1}`,
+            x: 0.5,
+            y: 0.2 + i * 0.15,
+            width: 0.4,
+            rotation: 0,
+            photo: key,
+            aspect: 1.25,
+          })),
+        },
+        cover: meta,
+        photos: keys.map((key) => ({ key, ...meta })),
+        og: null,
+        replyTo: null,
+        box: { invite: codeOf(invite), from },
+      },
+    })
+  ).json()
+  for (const target of [created.uploads.cover, ...keys.map((key) => created.uploads.photos[key])]) {
+    await request.put(target.signedUrl, { headers: { 'content-type': 'image/jpeg' }, data: jpeg })
+  }
+  const published = await request.post(`/mock-api/letters/${created.id}/publish`, {
+    headers: { 'x-edit-token': created.editToken },
+  })
+  expect(published.status()).toBe(200)
+}
+
+test('kotak yang fotonya penuh: teman diberi tahu sebelum menulis, surat berfoto ditahan sebelum diunggah', async ({
+  page,
+  browser,
+  request,
+}) => {
+  test.setTimeout(90_000)
+  const links = await createBox(page, 'Album angkatan', 'Bu Rina')
+  // 8 titipan × 5 foto (foto depan dan 4 foto isi) = 40 foto, suratnya baru 8 dari 20.
+  for (let i = 0; i < 8; i++) await titipWithPhotos(request, links.invite, `Murid ${i + 1}`, 4)
+  await page.reload()
+  await expect(page.getByTestId('box-room')).toContainText('Fotonya sudah penuh (40 foto)')
+  await expect(page.getByTestId('box-room')).toContainText('Masih muat 12 surat, asal tanpa foto')
+
+  const friend = await (await browser.newContext()).newPage()
+  await friend.goto(links.invite)
+  await expect(friend.getByTestId('titip-room')).toContainText(
+    'Masih muat 12 surat, tapi fotonya sudah penuh: suratmu hanya bisa masuk tanpa foto.',
+  )
+  await expect(friend.getByText('Mau pakai strip foto Booth?')).toHaveCount(0)
+  await expect(friend.getByTestId('titip-photos-note')).toContainText('dihapus 7 hari')
+
+  await friend.getByTestId('titip-write').click()
+  const banner = friend.getByTestId('titip-banner')
+  await expect(banner.getByTestId('titip-room-left')).toContainText(
+    'Foto di kotak ini sudah penuh, jadi suratmu hanya bisa masuk tanpa foto.',
+  )
+  await friend.getByTestId('titip-from').fill('Sari')
+  await friend.getByRole('textbox', { name: 'Isi surat' }).fill('Terima kasih, Bu')
+  // Foto depan dari galeri juga dihitung foto kotak.
+  await friend.getByTestId('front-upload').setInputFiles({
+    name: 'foto.jpg',
+    mimeType: 'image/jpeg',
+    buffer: jpeg,
+  })
+  const warning = banner.getByTestId('titip-room-warning')
+  await expect(warning).toContainText('Suratmu punya 1 foto (termasuk gambar depan)')
+  await friend.getByRole('button', { name: 'Titip ke kotak' }).click()
+  await expect(warning).toBeFocused()
+  await expect(friend.getByTestId('send-letter')).toHaveCount(0)
+  await friend.context().close()
+})
+
+test('Kotak surat: folder yang diketuk tetap di tempatnya saat folder di atasnya menutup', async ({
+  page,
+  request,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Di layar lebar foldernya bersebelahan, jadi tidak saling menggeser')
+  test.setTimeout(90_000)
+  // Folder kotak bareng: kotaknya dibuka lalu Simpan semua.
+  const box = await (
+    await request.post('/mock-api/boxes', {
+      data: { title: 'Ultah Rani', to: 'Rani', design: 'senja', opensAt: null },
+    })
+  ).json()
+  for (const name of ['Budi', 'Citra', 'Dewi']) {
+    await titipViaApi(request, box.inviteUrl, name, `Dari ${name}`, false)
+  }
+  await request.patch(`/mock-api/boxes/${box.id}`, {
+    headers: { 'x-edit-token': box.editToken },
+    data: { openNow: true },
+  })
+  await page.goto(`/k/${box.slug}`)
+  await page.getByTestId('keep-box-save').click()
+  await expect(page.getByTestId('keep-box')).toHaveAttribute('data-state', 'saved')
+  // Folder Surat untukmu dari surat lewat link.
+  const created = await (
+    await request.post('/mock-api/letters', {
+      data: {
+        design: {
+          illustration: 'meadow',
+          shape: 'portrait',
+          foilMode: 'design',
+          foilBorder: false,
+          foilColor: 'gold',
+          paper: 'cream',
+          template: 'photo-1',
+        },
+        content: {
+          version: 1,
+          elements: [
+            {
+              kind: 'text',
+              id: 't1',
+              x: 0.5,
+              y: 0.5,
+              width: 0.8,
+              rotation: 0,
+              text: 'Halo',
+              size: 0.07,
+              align: 'center',
+            },
+          ],
+        },
+        cover: null,
+        photos: [],
+        og: { type: 'image/jpeg', width: 1200, height: 630, size: jpeg.length },
+        replyTo: null,
+      },
+    })
+  ).json()
+  await request.put(created.uploads.og.signedUrl, {
+    headers: { 'content-type': 'image/jpeg' },
+    data: jpeg,
+  })
+  const published = await (
+    await request.post(`/mock-api/letters/${created.id}/publish`, {
+      headers: { 'x-edit-token': created.editToken },
+    })
+  ).json()
+  await page.goto(`/l/${published.slug}`)
+  await page.getByRole('button', { name: /Surat untukmu/ }).click()
+  await page.getByTestId('keep-save').click()
+  await expect(page.getByTestId('keep-letter')).toHaveAttribute('data-state', 'saved')
+
+  await page.goto('/kotak')
+  const folders = page.getByTestId('saved-folder')
+  await expect(folders).toHaveCount(2)
+  await folders.nth(0).getByTestId('folder-toggle').click()
+  await expect(folders.nth(0).getByTestId('folder-actions')).toBeVisible()
+  // Folder bawah di dekat atas layar: tanpa penahan gulir, ia terlempar ke atas layar.
+  await folders.nth(1).evaluate((el) => el.scrollIntoView({ block: 'start' }))
+  // Posisi folder bawah di setiap frame selama folder atas menutup dan folder bawah membuka.
+  const run = await page.evaluate(async () => {
+    const lower = document.querySelectorAll<HTMLElement>('[data-testid="saved-folder"]')[1]!
+    const before = lower.getBoundingClientRect().top
+    lower.querySelector<HTMLElement>('[data-testid="folder-toggle"]')!.click()
+    const tops: number[] = []
+    const start = performance.now()
+    await new Promise<void>((resolve) => {
+      const sample = () => {
+        tops.push(lower.getBoundingClientRect().top)
+        if (performance.now() - start < 1000) requestAnimationFrame(sample)
+        else resolve()
+      }
+      requestAnimationFrame(sample)
+    })
+    return { before, tops, scrollY: window.scrollY }
+  })
+  await expect(folders.nth(0).getByTestId('folder-actions')).toHaveCount(0)
+  await expect(folders.nth(1).getByTestId('folder-actions')).toBeVisible()
+  // Tidak pernah terlempar ke atas layar. Selama halamannya masih bisa digulir, folder yang
+  // diketuk diam di tempatnya; kalau sudah di paling atas, folder itu hanya naik ke tempatnya.
+  expect(Math.min(...run.tops)).toBeGreaterThanOrEqual(-1)
+  const after = run.tops.at(-1)!
+  if (run.scrollY > 0) expect(Math.abs(after - run.before)).toBeLessThan(4)
+  else expect(after).toBeLessThanOrEqual(run.before + 1)
 })
 
 test('link kotak dan link titip yang salah memberi 404 yang jelas', async ({ page }) => {
@@ -457,4 +669,46 @@ test('strip Booth yang dipakai di surat tetap dititip ke kotak', async ({ page, 
     timeout: 20_000,
   })
   await expect(page.getByTestId('titip-done')).toContainText('Kado Raka')
+})
+
+test('nama pengirim yang panjang tidak melebarkan daftar surat', async ({ page, request }) => {
+  test.setTimeout(60_000)
+  const box = await (
+    await request.post('/mock-api/boxes', {
+      data: { title: 'Perpisahan kantor', to: 'Bu Ratna', design: 'laut', opensAt: null },
+    })
+  ).json()
+  for (let i = 1; i <= 5; i++) {
+    const from = `Muhammad Rizky Ramadhan Pratama Putra ${i}`
+    expect((await titipViaApi(request, box.inviteUrl, from, 'Terima kasih', false)).status).toBe(
+      200,
+    )
+  }
+  await request.patch(`/mock-api/boxes/${box.id}`, {
+    headers: { 'x-edit-token': box.editToken },
+    data: { openNow: true },
+  })
+
+  /** Daftar surat yang terlihat tidak melewati tepi layar, dan isinya tidak terpotong ke samping. */
+  async function listFits(list: Locator) {
+    const fit = await list.evaluate((el) => ({
+      right: el.getBoundingClientRect().right,
+      viewport: window.innerWidth,
+      overflow: el.scrollWidth - el.clientWidth,
+    }))
+    expect(fit.right).toBeLessThanOrEqual(fit.viewport)
+    expect(fit.overflow).toBeLessThanOrEqual(0)
+  }
+
+  await page.goto(`/k/${box.slug}`)
+  await page.getByTestId('folder-toggle').click()
+  await expect(page.getByTestId('box-read')).toBeVisible()
+  await listFits(page.getByRole('list', { name: 'Semua surat di kotak' }))
+
+  await page.getByTestId('keep-box-save').click()
+  await expect(page.getByTestId('keep-box')).toHaveAttribute('data-state', 'saved')
+  await page.getByTestId('keep-box-open').click()
+  const folder = page.getByTestId('saved-folder')
+  await expect(folder.getByTestId('folder-toggle')).toHaveAttribute('aria-expanded', 'true')
+  await listFits(folder.getByTestId('folder-actions').locator('ol'))
 })
