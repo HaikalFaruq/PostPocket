@@ -620,16 +620,22 @@ function narrowestStrip(page: Page) {
     let narrowest = Number.POSITIVE_INFINITY
     for (const sheet of sheets.slice(1)) {
       const r = sheet.getBoundingClientRect()
+      const hits = (x: number, y: number) => sheet.contains(document.elementFromPoint(x, y))
       // Di 15% kiri dan kanan kotaknya, kolomnya memotong sisi lembar yang miring, bukan tepi
-      // atasnya.
-      for (let fx = 0.15; fx <= 0.85; fx += 0.02) {
+      // atasnya. Batas jalurnya dicari per 4 px lalu dipersempit per 1 px, supaya hit test-nya
+      // tidak memakan CPU tes lain yang berjalan bersamaan di CI.
+      for (let fx = 0.15; fx <= 0.851; fx += 0.05) {
         const x = r.left + r.width * fx
         if (x < 1 || x > innerWidth - 1) continue
         let y = Math.max(0, r.top)
-        while (y < r.bottom && !sheet.contains(document.elementFromPoint(x, y))) y++
-        const start = y
-        while (y < r.bottom && sheet.contains(document.elementFromPoint(x, y))) y++
-        narrowest = Math.min(narrowest, y - start)
+        while (y < r.bottom && !hits(x, y)) y += 4
+        if (y >= r.bottom) continue
+        let start = y
+        while (start > r.top && hits(x, start - 1)) start--
+        while (y < r.bottom && hits(x, y)) y += 4
+        let end = y
+        while (end > start && !hits(x, end - 1)) end--
+        narrowest = Math.min(narrowest, end - start)
       }
     }
     return narrowest
