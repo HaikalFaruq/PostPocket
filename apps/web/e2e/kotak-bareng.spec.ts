@@ -216,7 +216,7 @@ test('pembuat bikin kotak, dua teman menitip, penerima membaca satu per satu lal
     .click()
   await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Kangen jalan bareng!')
   await expect(shownCard(viewer).locator('.letter-page img')).toHaveAttribute('src', /mock-api/)
-  await viewer.getByRole('button', { name: 'Tutup' }).click()
+  await viewer.getByRole('button', { name: 'Tutup', exact: true }).click()
   await expect(rani.getByTestId('box-read')).toHaveText('Baca lagi dari awal')
 
   // Unduh semua foto: di Android dan komputer langsung diunduh (foto depan dan foto isi Sari).
@@ -309,6 +309,8 @@ test('titipan bisa ditarik dan dihapus, kotak yang sudah dibuka menolak titipan,
   page.once('dialog', (question) => question.accept())
   await page.getByTestId('box-delete').click()
   await expect(page).toHaveURL(/\/kotak$/)
+  // Kotak surat memberi tahu kotaknya sudah terhapus, bukan diam-diam kembali ke sana.
+  await expect(page.getByTestId('box-deleted')).toContainText('Perpisahan Dimas" sudah dihapus')
   await expect(page.getByTestId('my-box')).toHaveCount(0)
   expect((await friend.goto(links.open))?.status()).toBe(404)
   await expect(friend.getByTestId('box-missing')).toContainText('sudah tidak tersedia')

@@ -131,7 +131,7 @@ test('surat yang disimpan tetap bisa dibuka dari Kotak surat setelah link-nya ma
   await expect(viewer.locator('.foil-art')).toHaveAttribute('src', /^blob:/)
 
   // Foto suratnya juga masuk CD di TV.
-  await viewer.getByRole('button', { name: 'Tutup' }).click()
+  await viewer.getByRole('button', { name: 'Tutup', exact: true }).click()
   await expect(viewer).toBeHidden()
   const tv = folder.getByTestId('folder-tv')
   const href = await tv.getAttribute('href')
@@ -185,7 +185,7 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
   await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Surat pertama')
 
   // Lembar di belakang juga bisa dipilih dengan keyboard.
-  await viewer.getByRole('button', { name: 'Tutup' }).click()
+  await viewer.getByRole('button', { name: 'Tutup', exact: true }).click()
   await expect(viewer).toBeHidden()
   await folder.getByRole('button', { name: /Surat pertama/ }).focus()
   await page.keyboard.press('Enter')
@@ -208,7 +208,7 @@ test('surat di Kotak surat dibaca satu per satu lalu dihapus dari perangkat', as
     return { overlay: z('letter-reader-overlay'), viewer: z('letter-viewer') }
   })
   expect(layers.overlay).toBeGreaterThan(layers.viewer)
-  await reader.getByRole('button', { name: 'Tutup' }).click()
+  await reader.getByRole('button', { name: 'Tutup', exact: true }).click()
   await expect(reader).toBeHidden()
   await expect(viewer).toBeVisible()
 
@@ -313,6 +313,53 @@ test('link surat yang sudah mati mengarah ke salinannya di Kotak surat', async (
   await expect(shownCard(viewer).getByTestId('letter-page')).toContainText('Masih ada di HP')
 })
 
+test('dari link, foldernya terbuka seperti diketuk lalu suratnya tumbuh dari lembarnya', async ({
+  page,
+  request,
+}) => {
+  const [sent] = await keepLetters(page, request, ['Dari link'])
+  await page.addInitScript(() => {
+    // Seperti HP dengan GPU: animasinya tidak dilewati (di tes otomatis biasanya dilewati).
+    Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })
+    const getParameter = WebGLRenderingContext.prototype.getParameter
+    WebGLRenderingContext.prototype.getParameter = function (param: number) {
+      return param === 0x9246 || param === 0x1f01 ? 'Apple GPU' : getParameter.call(this, param)
+    }
+    // Keadaan folder yang tergambar di tiap frame (dicatat sesudah frame-nya digambar), dan
+    // keyframe awal animasi kartu di penampil.
+    const painted: string[] = []
+    const starts: string[] = []
+    Object.assign(window, { painted, starts })
+    const frame = () => {
+      setTimeout(() => {
+        const toggle = document.querySelector('[data-testid=folder-toggle]')
+        if (toggle) painted.push(toggle.getAttribute('aria-expanded') ?? '')
+      })
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
+    const animate = Element.prototype.animate
+    Element.prototype.animate = function (keyframes, options) {
+      if (Array.isArray(keyframes)) starts.push(String(keyframes[0]?.transform ?? ''))
+      return animate.call(this, keyframes, options)
+    }
+  })
+  await page.goto(`/kotak?surat=${sent!.slug}&baca=1`)
+  await expect(page.getByTestId('letter-viewer')).toBeVisible()
+  const recorded = () =>
+    page.evaluate(() => {
+      const { painted, starts } = window as unknown as { painted: string[]; starts: string[] }
+      return { painted: [...painted], starts: [...starts] }
+    })
+  await expect.poll(async () => (await recorded()).starts.length).toBeGreaterThan(0)
+  const { painted, starts } = await recorded()
+  // Foldernya tergambar tertutup dulu, baru terbuka, jadi animasi bukanya berjalan.
+  expect(painted.indexOf('false')).toBeGreaterThanOrEqual(0)
+  expect(painted.indexOf('false')).toBeLessThan(painted.indexOf('true'))
+  // Kartunya mulai dari lembarnya (digeser dan diperkecil ke lembar), bukan naik dari bawah.
+  expect(starts[0]).toMatch(/^translate\(.+\) scale\(/)
+})
+
 test('penampil: panah keyboard pindah surat, bukan membalik kartu', async ({ page, request }) => {
   for (const text of ['Surat satu', 'Surat dua', 'Surat tiga']) {
     const sent = await letterWithPhotos(request, text)
@@ -409,4 +456,258 @@ test('memori HP penuh: Simpan surat memberi tahu, bukan menyalahkan browser', as
   await expect(keep).toHaveAttribute('data-state', 'idle')
   await expect(keep.getByRole('status')).toContainText('Memori HP untuk browser ini sudah penuh')
   await expect(keep.getByRole('status')).toBeInViewport()
+})
+
+/** Simpan surat-surat ini ke Kotak surat lewat halaman penerimanya. */
+async function keepLetters(page: Page, request: APIRequestContext, texts: string[]) {
+  const sent: Sent[] = []
+  for (const text of texts) {
+    const letter = await letterWithPhotos(request, text)
+    await openLetter(page, letter.slug)
+    await page.getByTestId('keep-save').click()
+    await expect(page.getByTestId('keep-letter')).toHaveAttribute('data-state', 'saved')
+    sent.push(letter)
+  }
+  return sent
+}
+
+test('Back menutup folder yang terbuka dulu, baru meninggalkan Kotak surat', async ({
+  page,
+  request,
+}) => {
+  await keepLetters(page, request, ['Satu'])
+  await page.goto('/kotak')
+  const toggle = page.getByTestId('folder-toggle')
+  // Ketukan ganda (kebiasaan di HP) membuka folder, tidak langsung menutupnya lagi.
+  await toggle.dblclick()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await page.waitForTimeout(400)
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await page.goBack()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(page).toHaveURL(/\/kotak$/)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/l\//)
+})
+
+test('ketukan ganda yang pelan tidak membuka surat yang baru naik ke bawah jari', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000)
+  await keepLetters(page, request, ['Satu', 'Dua', 'Tiga', 'Empat'])
+  await page.goto('/kotak')
+  const toggle = page.getByTestId('folder-toggle')
+  await expect(page.getByTestId('glass-folder')).toHaveAttribute('data-entered', 'true')
+  await page.waitForTimeout(1000)
+  const glass = (await toggle.boundingBox())!
+  const point = { x: glass.x + glass.width / 2, y: glass.y + glass.height / 2 }
+  // Kedua ketukan dijalankan di halaman dengan jeda 200 ms yang pasti, bukan lewat Playwright
+  // yang jedanya bisa melar saat mesin sibuk. Kipasnya membuat kaca turun, jadi ketukan kedua di
+  // titik yang sama jatuh di lembar depan; di HP lambat kacanya belum sempat turun, dan ketukan
+  // di kaca sudah diabaikan sendiri. Ketukan keduanya dikirim ke lembar depan, supaya jalur
+  // lembar yang diuji.
+  const second = await page.evaluate(async ({ x, y }) => {
+    // Klik jari: koordinat dan hitungan ketukannya ada, tidak seperti click() dari skrip.
+    const tap = (el: Element | null | undefined, detail: number) =>
+      el?.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y, detail }))
+    tap(document.elementFromPoint(x, y), 1)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const front = document.querySelector('[data-testid=saved-folder] .gf-sheet')
+    tap(front, 2)
+    return front ? 'lembar' : null
+  }, point)
+  expect(second).toBe('lembar')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await page.waitForTimeout(400)
+  await expect(page.getByTestId('letter-viewer')).toHaveCount(0)
+})
+
+test('folder yang ditutup setelah halamannya digulir tetap di tempatnya di layar', async ({
+  page,
+  request,
+}) => {
+  await keepLetters(page, request, ['Satu', 'Dua'])
+  await page.setViewportSize({ width: 390, height: 520 })
+  // Ditutup dengan ketukan, lalu dengan Back. Tiap kali halamannya dimuat baru, karena Chrome
+  // hanya memulihkan posisi gulir sendiri (ke posisi saat foldernya dibuka) sebelum Nuxt memakai
+  // scrollRestoration "manual".
+  for (const close of ['ketuk', 'back'] as const) {
+    await page.goto('/kotak')
+    const toggle = page.getByTestId('folder-toggle')
+    await toggle.click()
+    await page.waitForTimeout(900)
+    await page.evaluate(() => window.scrollBy(0, 80))
+    const glassTop = () => toggle.evaluate((el) => Math.round(el.getBoundingClientRect().top))
+    const before = await glassTop()
+    const scrolled = await page.evaluate(() => Math.round(window.scrollY))
+    if (close === 'ketuk') await toggle.dispatchEvent('click')
+    else await page.goBack()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await page.waitForTimeout(900)
+    // Ruang kipas di atas kaca mengecil, jadi halamannya digulir naik sebanyak itu dan kacanya
+    // tidak bergeser.
+    expect(Math.abs((await glassTop()) - before)).toBeLessThanOrEqual(2)
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBeLessThan(scrolled)
+  }
+})
+
+test('ketukan di lembar lain tepat setelah folder dibuka langsung membuka suratnya', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000)
+  await keepLetters(page, request, ['Satu', 'Dua', 'Tiga', 'Empat'])
+  await page.goto('/kotak')
+  const toggle = page.getByTestId('folder-toggle')
+  await expect(page.getByTestId('glass-folder')).toHaveAttribute('data-entered', 'true')
+  const glass = (await toggle.boundingBox())!
+  const point = { x: glass.x + glass.width / 2, y: glass.y + glass.height / 2 }
+  // 200 ms setelah folder dibuka, kipasnya masih bergerak. Lembar paling belakang jauh dari
+  // ketukan pertama, jadi ketukan itu bukan ketukan ganda.
+  const distance = await page.evaluate(async ({ x, y }) => {
+    const tap = (el: Element | null, clientX: number, clientY: number) =>
+      el?.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX, clientY, detail: 1 }))
+    tap(document.elementFromPoint(x, y), x, y)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const sheets = document.querySelectorAll('[data-testid=saved-folder] .gf-sheet')
+    const back = sheets[sheets.length - 1]!
+    const rect = back.getBoundingClientRect()
+    const at = { x: rect.left + rect.width / 2, y: rect.top + 16 }
+    tap(back, at.x, at.y)
+    return Math.hypot(at.x - x, at.y - y)
+  }, point)
+  expect(distance).toBeGreaterThan(48)
+  await expect(page.getByTestId('letter-viewer').getByTestId('viewer-count')).toHaveText(
+    'Surat 4 dari 4',
+  )
+})
+
+test('kembali dari TV, folder yang tadi terbuka tampil lagi di tempat yang sama', async ({
+  page,
+  request,
+}) => {
+  await keepLetters(page, request, ['Fotonya diputar'])
+  // Layar pendek, jadi tombol TV di bawah folder yang terbuka perlu digulir dulu.
+  await page.setViewportSize({ width: 390, height: 520 })
+  await page.goto('/kotak')
+  const toggle = page.getByTestId('folder-toggle')
+  await toggle.click()
+  const tv = page.getByTestId('folder-tv')
+  // Setelah kipas dan tombol di bawahnya selesai bergerak, tombol TV ditaruh di tengah layar,
+  // jadi klik Playwright tidak menggulirnya lagi.
+  await page.waitForTimeout(900)
+  await tv.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  const onScreen = () => tv.evaluate((el) => Math.round(el.getBoundingClientRect().top))
+  const before = await onScreen()
+  await tv.click()
+  await expect(page.getByTestId('tv-slideshow')).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveURL(/\/kotak$/)
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  // Foldernya terbuka di tempat yang sama di layar, jadi tombol TV juga.
+  await expect.poll(async () => Math.abs((await onScreen()) - before)).toBeLessThanOrEqual(2)
+})
+
+/**
+ * Jalur tersempit lembar-lembar di belakang kipas yang terbuka, dalam px: bagian lembar yang
+ * bisa diketuk di atas lembar depannya, diukur per kolom dengan hit test.
+ */
+function narrowestStrip(page: Page) {
+  return page.evaluate(() => {
+    const sheets = [...document.querySelectorAll('[data-testid=saved-folder] .gf-sheet')]
+    let narrowest = Number.POSITIVE_INFINITY
+    for (const sheet of sheets.slice(1)) {
+      const r = sheet.getBoundingClientRect()
+      const hits = (x: number, y: number) => sheet.contains(document.elementFromPoint(x, y))
+      // Di 15% kiri dan kanan kotaknya, kolomnya memotong sisi lembar yang miring, bukan tepi
+      // atasnya. Batas jalurnya dicari per 4 px lalu dipersempit per 1 px, supaya hit test-nya
+      // tidak memakan CPU tes lain yang berjalan bersamaan di CI.
+      for (let fx = 0.15; fx <= 0.851; fx += 0.05) {
+        const x = r.left + r.width * fx
+        if (x < 1 || x > innerWidth - 1) continue
+        let y = Math.max(0, r.top)
+        while (y < r.bottom && !hits(x, y)) y += 4
+        if (y >= r.bottom) continue
+        let start = y
+        while (start > r.top && hits(x, start - 1)) start--
+        while (y < r.bottom && hits(x, y)) y += 4
+        let end = y
+        while (end > start && !hits(x, end - 1)) end--
+        narrowest = Math.min(narrowest, end - start)
+      }
+    }
+    return narrowest
+  })
+}
+
+test('lembar di belakang kipas bisa diketuk di bagian yang menyembul', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000)
+  await keepLetters(page, request, ['Surat A', 'Surat B', 'Surat C', 'Surat D'])
+  // Paling sedikit 44 px di titik tersempitnya, juga di HP 320 px yang foldernya diperkecil.
+  const own = page.viewportSize()!
+  for (const width of [320, own.width]) {
+    await page.setViewportSize({ width, height: Math.max(own.height, 760) })
+    await page.goto('/kotak')
+    await page.getByTestId('folder-toggle').click()
+    // Mouse di desktop jangan menyorot salah satu lembar.
+    await page.mouse.move(1, 1)
+    await page.waitForTimeout(1200)
+    expect(await narrowestStrip(page)).toBeGreaterThanOrEqual(44)
+  }
+  await page.setViewportSize(own)
+  await page.goto('/kotak')
+  await page.getByTestId('folder-toggle').click()
+  const viewer = page.getByTestId('letter-viewer')
+  // Surat untukmu urut dari yang terbaru: D di depan, A paling belakang.
+  for (const [index, name] of ['Surat C', 'Surat B', 'Surat A'].entries()) {
+    const sheet = page.getByTestId('saved-folder').getByRole('button', { name: new RegExp(name) })
+    await page.waitForTimeout(900)
+    const box = (await sheet.boundingBox())!
+    // 36 px di bawah tepi atas lembarnya: lebih dalam dari jalur 30 px yang dulu.
+    await sheet.click({ position: { x: box.width / 2, y: 36 } })
+    await expect(viewer.getByTestId('viewer-count')).toHaveText(`Surat ${index + 2} dari 4`)
+    await viewer.getByRole('button', { name: 'Tutup', exact: true }).click()
+    await expect(viewer).toBeHidden()
+  }
+})
+
+test('kartu yang ditutup lagi tetap memberi tahu suratnya sudah tersimpan', async ({
+  page,
+  request,
+}) => {
+  const [sent] = await keepLetters(page, request, ['Sudah disimpan'])
+  const card = page.getByRole('button', { name: /Surat untukmu/ })
+  await card.click()
+  await expect(card).toHaveAttribute('aria-pressed', 'false')
+  const note = page.getByTestId('kept-note')
+  await expect(note).toContainText('Tersimpan di Kotak surat')
+  await expect(note.getByRole('link', { name: 'Kotak surat' })).toHaveAttribute(
+    'href',
+    `/kotak?surat=${sent!.slug}`,
+  )
+})
+
+test('Kotak surat bisa dicapai dari editor surat, TV, dan Pocket', async ({ page }) => {
+  await page.goto('/letter/new')
+  await expect(page.getByTestId('editor-kotak')).toHaveAttribute('href', '/kotak')
+  await page.goto('/tv')
+  await expect(page.getByTestId('tv-kotak')).toHaveAttribute('href', '/kotak')
+  await page.goto('/pocket')
+  const link = page.getByTestId('pocket-kotak')
+  await expect(link).toHaveAttribute('href', '/kotak')
+  // Bidang ketuknya setinggi jari, walau tautannya di baris teks kecil.
+  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+})
+
+test('memori HP yang hampir penuh diberi tahu sebelum menyimpan gagal', async ({ page }) => {
+  await page.addInitScript(() => {
+    StorageManager.prototype.estimate = async () => ({ usage: 950, quota: 1000 })
+  })
+  await page.goto('/kotak')
+  await expect(page.getByTestId('storage-nearly-full')).toContainText('hampir penuh')
 })

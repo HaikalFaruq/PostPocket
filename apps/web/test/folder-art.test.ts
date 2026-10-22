@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   FOLDER_HEADROOM,
   createArtJob,
+  fanOverlap,
   fanSlot,
   folderSeed,
   hashString,
   openRoom,
   rng,
+  sheetJitter,
 } from '../app/utils/folder-art'
 
 function finish(width: number, height: number, seed: number, recipe = kotak.folders[0]!) {
@@ -79,7 +81,32 @@ describe('alat bantu', () => {
   it('openRoom memberi ruang untuk kipas yang terbuka, tidak pernah kurang dari tertutup', () => {
     expect(openRoom(0)).toBe(FOLDER_HEADROOM)
     expect(openRoom(1)).toBe(FOLDER_HEADROOM)
-    // Lembar paling belakang naik 96 + 30 per lapis, plus 38 untuk sorotan dan kemiringan.
-    expect([2, 3, 4].map(openRoom)).toEqual([68, 98, 128])
+    // Lembar paling belakang naik 96 + 48 per lapis, plus 38 untuk sorotan dan kemiringan.
+    expect([2, 3, 4].map((count) => openRoom(count))).toEqual([86, 134, 182])
+    // Folder kecil di HP sempit memakai jarak lebih besar, dan ruangnya ikut membesar.
+    expect(openRoom(4, 63)).toBe(227)
+  })
+
+  it('fanOverlap: lembar yang miring ke arah lain menutup sebagian jalur lembar di belakangnya', () => {
+    const still = { jx: 0, jr: 0 }
+    // Dua lembar sejajar tidak saling menutup jalurnya.
+    expect(fanOverlap({ slot: 0, ...still }, { slot: 0, ...still })).toBeCloseTo(0, 6)
+    // Kipas dua lembar, 5° dan −5°: ujung kiri tepi atas lembar depan naik 13,9 satuan ke jalur
+    // lembar di belakangnya.
+    expect(fanOverlap({ slot: 1, ...still }, { slot: -1, ...still })).toBeCloseTo(13.9, 1)
+    // Kipas empat lembar, pasangan terdepan: beda miringnya lebih kecil.
+    expect(fanOverlap({ slot: 1, ...still }, { slot: 1 / 3, ...still })).toBeCloseTo(8.4, 1)
+    // Acakan yang menambah beda miringnya menambah bagian yang tertutup.
+    const tilted = fanOverlap({ slot: 1, jx: 0, jr: 1.6 }, { slot: -1, jx: 0, jr: -1.6 })
+    expect(tilted).toBeGreaterThan(17)
+  })
+
+  it('sheetJitter tetap per berkas dan tetap kecil', () => {
+    expect(sheetJitter('surat-1')).toEqual(sheetJitter('surat-1'))
+    for (const id of ['a', 'surat-1', 'x7Kp2qLm9A', 'kotak-99']) {
+      const { jx, jr } = sheetJitter(id)
+      expect(Math.abs(jx)).toBeLessThanOrEqual(5)
+      expect(Math.abs(jr)).toBeLessThanOrEqual(1.6)
+    }
   })
 })

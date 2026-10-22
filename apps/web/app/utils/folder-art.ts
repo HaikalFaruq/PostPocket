@@ -274,12 +274,62 @@ export function fanSlot(index: number, count: number): number {
 export const FOLDER_HEADROOM = 54
 
 /**
+ * Jarak antarlembar di kipas yang terbuka (`--gf-stack` di GlassFolder). Tiap lembar di belakang
+ * menyembul setinggi ini di atas lembar di depannya, cukup untuk diketuk jari (44 px) dan untuk
+ * label nama di ujung atasnya.
+ */
+export const FAN_STACK = 48
+
+/** Lembar surat di folder kaca (`.gf-sheet`), berputar pada titik tengah bawahnya. */
+export const SHEET_W = 272
+export const SHEET_H = 184
+/** Lembar di ujung kipas yang terbuka bergeser 40 satuan dan miring 5° (`--gf-spread`, `--gf-fan`). */
+const FAN_SPREAD = 40
+const FAN_TILT = 5
+
+/** Letak lembar di kipas: `slot` dari fanSlot(), plus acakan geser (`jx`) dan miring (`jr`, derajat). */
+export interface FanSheet {
+  slot: number
+  jx: number
+  jr: number
+}
+
+/** Acakan geser dan miring tiap lembar, tetap per berkas, jadi kipasnya sama setiap dibuka. */
+export function sheetJitter(id: string): Pick<FanSheet, 'jx' | 'jr'> {
+  const jitter = rng(hashString(id))
+  return { jx: (jitter() - 0.5) * 10, jr: (jitter() - 0.5) * 3.2 }
+}
+
+/** Tepi atas lembar di kipas yang terbuka, relatif ke titik putarnya: kedua ujung dan tingginya di x. */
+function topEdge({ slot, jx, jr }: FanSheet) {
+  const tilt = ((jr + slot * FAN_TILT) * Math.PI) / 180
+  const x = jx + slot * FAN_SPREAD + SHEET_H * Math.sin(tilt)
+  const y = -SHEET_H * Math.cos(tilt)
+  const half = (SHEET_W / 2) * Math.cos(tilt)
+  return { left: x - half, right: x + half, at: (px: number) => y + Math.tan(tilt) * (px - x) }
+}
+
+/**
+ * Bagian jarak antarlapis yang tertutup lembar `front` di titik tersempit jalur lembar `back` di
+ * belakangnya, dalam satuan folder. Keduanya miring ke arah berbeda, jadi tepi atas lembar depan
+ * naik mendekati lembar belakang di salah satu ujungnya. Jalur yang bisa diketuk = jarak antarlapis
+ * dikurangi nilai ini.
+ */
+export function fanOverlap(front: FanSheet, back: FanSheet): number {
+  const f = topEdge(front)
+  const b = topEdge(back)
+  // Kedua tepi atas lurus, jadi titik tersempitnya di salah satu ujung bagian yang bertumpuk.
+  const ends = [Math.max(f.left, b.left), Math.min(f.right, b.right)]
+  return Math.max(...ends.map((x) => b.at(x) - f.at(x)))
+}
+
+/**
  * Ruang di atas folder kaca yang terbuka dengan `count` lembar di kipasnya, sesuai nilai
- * `.gf-root[data-open]` di GlassFolder: lembar paling belakang naik 96 + 30 per lapis dari
+ * `.gf-root[data-open]` di GlassFolder: lembar paling belakang naik 96 + `stack` per lapis dari
  * posisinya (96 di bawah tepi atas), lalu 18 lagi saat disorot dan sampai 20 di sudutnya yang
  * miring. Dengan ruang ini kipasnya tidak menutupi isi halaman di atas folder.
  */
-export function openRoom(count: number): number {
+export function openRoom(count: number, stack = FAN_STACK): number {
   const layers = Math.max(1, count) - 1
-  return Math.max(FOLDER_HEADROOM, 96 + 30 * layers + 18 + 20 - 96)
+  return Math.max(FOLDER_HEADROOM, 96 + stack * layers + 18 + 20 - 96)
 }

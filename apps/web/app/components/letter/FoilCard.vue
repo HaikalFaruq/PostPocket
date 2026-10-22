@@ -170,14 +170,18 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
               @error="onArtSettled"
             />
             <div class="foil-grain" />
-            <template v-if="foilMask">
-              <div class="foil-mask foil-mask--emboss" :style="maskStyle" />
-              <div class="foil-mask" :style="maskStyle">
-                <div class="foil-metal" />
-                <div class="foil-glitter" />
-                <div class="foil-glare" />
+            <!-- Mask yang baru selesai dihitung (peta foil dari foto) memudar masuk, bukan muncul
+                 dalam satu frame. Kartu yang mask-nya sudah ada sejak dipasang tidak memudar. -->
+            <Transition name="foil-in">
+              <div v-if="foilMask" class="foil-masks">
+                <div class="foil-mask foil-mask--emboss" :style="maskStyle" />
+                <div class="foil-mask" :style="maskStyle">
+                  <div class="foil-metal" />
+                  <div class="foil-glitter" />
+                  <div class="foil-glare" />
+                </div>
               </div>
-            </template>
+            </Transition>
             <div v-if="foilBorder" class="foil-border">
               <div class="foil-metal" />
               <div class="foil-glare" />
@@ -335,6 +339,19 @@ defineExpose({ turnBy: motion.turnBy, benchmark: motion.benchmark })
   -webkit-mask-size: cover;
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
+}
+
+.foil-masks {
+  position: absolute;
+  inset: 0;
+}
+
+.foil-in-enter-active {
+  transition: opacity 0.26s ease-out;
+}
+
+.foil-in-enter-from {
+  opacity: 0;
 }
 
 /* Bayangan diam di bawah foil supaya terlihat sedikit timbul. */

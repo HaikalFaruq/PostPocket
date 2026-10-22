@@ -548,15 +548,25 @@ async function startOver() {
           Ubah gambar jadi kartu bercetak foil, tulis isinya, lalu
           {{ draft.box ? 'titip ke kotak' : 'kirim lewat link' }}.
         </p>
-        <button
-          v-if="sentCount"
-          type="button"
-          class="mt-2 text-caption font-semibold underline underline-offset-2"
-          data-testid="open-sent-letters"
-          @click="showSent = true"
-        >
-          Surat terkirim ({{ sentCount }})
-        </button>
+        <!-- Surat yang dikirim dan surat yang diterima (Kotak surat) bisa dicapai dari sini. -->
+        <div class="mt-1 flex flex-wrap gap-x-4 text-caption font-semibold">
+          <button
+            v-if="sentCount"
+            type="button"
+            class="inline-flex min-h-11 items-center underline underline-offset-2"
+            data-testid="open-sent-letters"
+            @click="showSent = true"
+          >
+            Surat terkirim ({{ sentCount }})
+          </button>
+          <NuxtLink
+            to="/kotak"
+            class="inline-flex min-h-11 items-center underline underline-offset-2"
+            data-testid="editor-kotak"
+          >
+            Kotak surat
+          </NuxtLink>
+        </div>
         <div
           v-if="draft.box"
           class="mt-3 rounded-control bg-fill px-3 py-2.5 text-caption"

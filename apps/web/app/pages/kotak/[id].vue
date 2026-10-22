@@ -262,9 +262,11 @@ async function removeBox() {
   notice.value = ''
   messageAt.value = 'bottom'
   try {
+    const title = box.value.title
     await api.remove(id, local.value.editToken)
     await forgetBox(id)
-    await navigateTo('/kotak', { replace: true })
+    // Kotak surat memberi tahu kotaknya sudah terhapus, bukan diam-diam kembali ke sana.
+    await navigateTo({ path: '/kotak', query: { dihapus: title } }, { replace: true })
   } catch (problem) {
     error.value = errorMessage(problem)
   } finally {

@@ -31,6 +31,8 @@ const error = ref('')
 /** Kode error titipan yang tidak bisa berhasil kalau dikirim ulang apa adanya. */
 const FINAL_TITIP = new Set(['not_found', 'box_not_found', 'box_closed', 'box_full'])
 const final = ref(false)
+/** Kena batas kiriman per jaringan: Coba lagi baru berhasil setelah menunggu, jadi bukan tombol utama. */
+const limited = ref(false)
 const sent = ref<SentLetter | null>(null)
 const copied = ref(false)
 const dialog = ref<HTMLElement | null>(null)
@@ -73,6 +75,7 @@ async function send() {
   state.value = 'sending'
   error.value = ''
   final.value = false
+  limited.value = false
   phase.value = 'photos'
   uploaded.value = 0
   try {
@@ -122,6 +125,7 @@ async function send() {
     // ulang, jadi tidak ada Coba lagi. Draf titipan ikut terhapus kalau kotaknya dihapus
     // pembuatnya (kontrak 0.3.0).
     final.value = !!titip.value && FINAL_TITIP.has(code ?? '')
+    limited.value = code === 'rate_limited'
     error.value =
       titip.value && code === 'not_found'
         ? 'Kotak ini sudah dihapus pembuatnya, jadi suratnya tidak bisa dititip.'
@@ -282,7 +286,7 @@ onMounted(() => {
         <div class="mt-4 flex flex-wrap gap-2">
           <a
             :href="sent.url"
-            class="inline-flex h-10 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
+            class="inline-flex h-11 items-center rounded-control bg-ink px-4 text-body font-semibold text-white hover:bg-ink/90"
             data-testid="titip-box-link"
             >Lihat kotaknya</a
           >
@@ -298,7 +302,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="h-10 rounded-control px-5 text-body font-semibold inset-ring inset-ring-line"
+            class="h-11 rounded-control px-5 text-body font-semibold inset-ring inset-ring-line"
             @click="close"
           >
             Selesai
@@ -320,12 +324,12 @@ onMounted(() => {
             readonly
             aria-label="Link surat"
             data-testid="sent-url"
-            class="h-10 min-w-0 flex-1 rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
+            class="h-11 min-w-0 flex-1 rounded-control bg-panel px-3 text-body inset-ring inset-ring-line"
             @focus="($event.target as HTMLInputElement).select()"
           />
           <button
             type="button"
-            class="h-10 shrink-0 rounded-control px-4 text-body font-semibold"
+            class="h-11 shrink-0 rounded-control px-4 text-body font-semibold"
             :class="canShare ? 'inset-ring inset-ring-line' : 'bg-ink text-white'"
             @click="copy"
           >
@@ -346,7 +350,7 @@ onMounted(() => {
             :href="sent.url"
             target="_blank"
             rel="noopener"
-            class="inline-flex h-9 items-center rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
+            class="inline-flex h-11 items-center rounded-control px-3.5 text-body font-semibold inset-ring inset-ring-line"
             >Pratinjau surat</a
           >
         </div>
@@ -354,14 +358,14 @@ onMounted(() => {
         <div class="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
-            class="text-caption text-ink-muted underline underline-offset-2"
+            class="-ml-1 inline-flex min-h-11 items-center px-1 text-caption text-ink-muted underline underline-offset-2"
             @click="remove"
           >
             Hapus surat ini
           </button>
           <button
             type="button"
-            class="h-10 rounded-control px-5 text-body font-semibold inset-ring inset-ring-line"
+            class="h-11 rounded-control px-5 text-body font-semibold inset-ring inset-ring-line"
             @click="close"
           >
             Selesai
@@ -378,7 +382,7 @@ onMounted(() => {
         </p>
         <button
           type="button"
-          class="mt-6 h-10 w-full rounded-control bg-ink text-body font-semibold text-white"
+          class="mt-6 h-11 w-full rounded-control bg-ink text-body font-semibold text-white"
           @click="close"
         >
           Tutup
@@ -394,15 +398,16 @@ onMounted(() => {
           <button
             v-if="!final"
             type="button"
-            class="h-10 flex-1 rounded-control bg-ink text-body font-semibold text-white"
+            class="h-11 rounded-control text-body font-semibold"
+            :class="limited ? 'px-4 inset-ring inset-ring-line' : 'flex-1 bg-ink text-white'"
             @click="send"
           >
             Coba lagi
           </button>
           <button
             type="button"
-            class="h-10 rounded-control px-4 text-body font-semibold"
-            :class="final ? 'flex-1 bg-ink text-white' : 'inset-ring inset-ring-line'"
+            class="h-11 rounded-control px-4 text-body font-semibold"
+            :class="final || limited ? 'flex-1 bg-ink text-white' : 'inset-ring inset-ring-line'"
             @click="close"
           >
             Tutup

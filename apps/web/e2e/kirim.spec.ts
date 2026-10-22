@@ -22,3 +22,31 @@ test('uji kirim: foto dikompres, OG dirender, surat terbit, dibaca, dibuka, dan 
   await expect(page.getByTestId('photo-count')).toHaveText('1')
   await expect(page.getByTestId('deleted')).toHaveText('ya')
 })
+
+test('kena batas kiriman per jaringan: diminta menunggu, Coba lagi bukan tombol utama', async ({
+  page,
+}) => {
+  // Server menolak karena terlalu banyak surat dari jaringan ini (Retry-After 30 menit).
+  await page.route('**/mock-api/letters', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 429,
+          headers: { 'content-type': 'application/json', 'retry-after': '1800' },
+          body: JSON.stringify({ error: { code: 'rate_limited', message: 'pelan' } }),
+        })
+      : route.continue(),
+  )
+  await page.goto('/letter/new')
+  // Kartunya tampil setelah halaman hidup. Ketukan sebelum itu hilang di WebKit CI yang lambat.
+  await expect(page.locator('.foil-rotor')).toBeVisible()
+  await page.getByRole('textbox', { name: 'Isi surat' }).fill('Halo')
+  await page.getByRole('button', { name: 'Buat link untuk dikirim' }).click()
+  const sheet = page.getByTestId('send-letter')
+  // Sebelum dikirim, gambar OG-nya dirender dulu; di WebKit CI tanpa GPU itu bisa lebih dari 5 s.
+  await expect(sheet).toHaveAttribute('data-state', 'error', { timeout: 20_000 })
+  await expect(sheet.getByRole('alert')).toContainText(
+    'Coba lagi dalam 30 menit, atau kirim lewat data seluler',
+  )
+  await expect(sheet.getByRole('button', { name: 'Tutup' })).toHaveClass(/bg-ink/)
+  await expect(sheet.getByRole('button', { name: 'Coba lagi' })).not.toHaveClass(/bg-ink/)
+})

@@ -24,6 +24,11 @@ function topSheet(): Sheet | undefined {
 }
 
 function push(sheet: Sheet) {
+  // Lembar menutup di atas halaman, jadi saat entri tambahannya diambil lagi halamannya tetap di
+  // tempat. Dengan scrollRestoration "auto" (Nuxt baru memakai "manual" setelah beberapa kali
+  // pindah halaman), Chrome mengembalikan halaman ke posisi saat lembarnya dibuka, misalnya folder
+  // Kotak surat yang ditutup setelah halamannya digulir.
+  history.scrollRestoration = 'manual'
   history.pushState({ ...history.state, sheet: true }, '')
   sheet.pushed = true
   sheets.splice(sheets.indexOf(sheet), 1)
