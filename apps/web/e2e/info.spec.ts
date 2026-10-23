@@ -49,7 +49,7 @@ test('Lapor masalah membuka kanal laporan dengan halaman, versi, dan perangkat',
   await page.getByRole('contentinfo').getByTestId('feedback-link').click()
   const report = new URL((await popup).url())
   expect(report.origin + report.pathname).toBe(
-    'https://github.com/HaikalFaruq/PostPocket/issues/new',
+    'https://github.com/Wingman-Sprint/PostPocket/issues/new',
   )
   const body = report.searchParams.get('body') ?? ''
   expect(body).toContain('bisa dibaca publik')

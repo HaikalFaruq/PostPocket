@@ -14,7 +14,7 @@ Semua dibuka lewat satu link, tanpa daftar dan tanpa aplikasi.
 ### [Coba di postpocket.vercel.app](https://postpocket.vercel.app)
 
 [![Live](https://img.shields.io/badge/v1.0-live-D9B45A?style=flat-square&labelColor=18204A)](https://postpocket.vercel.app)
-[![CI](https://img.shields.io/github/actions/workflow/status/HaikalFaruq/PostPocket/web.yml?branch=main&style=flat-square&label=CI&labelColor=18204A)](https://github.com/HaikalFaruq/PostPocket/actions/workflows/web.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/Wingman-Sprint/PostPocket/web.yml?branch=main&style=flat-square&label=CI&labelColor=18204A)](https://github.com/Wingman-Sprint/PostPocket/actions/workflows/web.yml)
 [![PWA](https://img.shields.io/badge/PWA-bisa_offline-C3B1E1?style=flat-square&labelColor=18204A)](#fitur)
 [![Nuxt](https://img.shields.io/badge/Nuxt-4-00DC82?style=flat-square&logo=nuxt&logoColor=00DC82&labelColor=18204A)](https://nuxt.com)
 [![Supabase](https://img.shields.io/badge/Supabase-Edge_Functions-3ECF8E?style=flat-square&logo=supabase&logoColor=3ECF8E&labelColor=18204A)](https://supabase.com)
@@ -60,14 +60,14 @@ Foto di galeri HP jarang dibuka lagi, dan ucapan di chat cepat tenggelam. PostPo
 
 <sub>KODE → DIAGRAM · Peta sistem yang menaut ke baris kodenya</sub>
 
-<a href="https://haikalfaruq.github.io/PostPocket/arsitektur.html">
+<a href="https://wingman-sprint.github.io/PostPocket/arsitektur.html">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/gambar/arsitektur-gelap.webp" />
   <img src="docs/gambar/arsitektur-terang.webp" alt="Arsitektur PostPocket: pengirim menulis surat di PWA, PWA memanggil fungsi surat di Supabase dan mengunggah foto langsung ke Storage, lalu link-nya dibagikan lewat WhatsApp dan dibuka penerima" />
 </picture>
 </a>
 
-**[Buka diagram interaktif ↗](https://haikalfaruq.github.io/PostPocket/arsitektur.html)** · [telusuri jalur Kirim surat ↗](https://haikalfaruq.github.io/PostPocket/arsitektur.html#route=pengirim~penerima) · [sumber JSON](docs/arsitektur.archify.json)
+**[Buka diagram interaktif ↗](https://wingman-sprint.github.io/PostPocket/arsitektur.html)** · [telusuri jalur Kirim surat ↗](https://wingman-sprint.github.io/PostPocket/arsitektur.html#route=pengirim~penerima) · [sumber JSON](docs/arsitektur.archify.json)
 
 - **Kartu foil tanpa WebGL.** Kartunya CSS 3D, dan lapisan foilnya mask dari ilustrasi atau peta yang dihitung dari foto di browser ([keputusan](docs/spikes/foil-3d.md)).
 - **Server hanya untuk yang dikirim.** Pocket, TV, Booth, dan draf surat ada di IndexedDB. Server menyimpan surat yang dibuat link-nya, kotak bareng, dan cadangan Pocket yang dinyalakan pengguna.
@@ -80,7 +80,7 @@ Foto di galeri HP jarang dibuka lagi, dan ucapan di chat cepat tenggelam. PostPo
 Butuh Node.js 24 (`.nvmrc`) dan pnpm 9.
 
 ```sh
-git clone https://github.com/HaikalFaruq/PostPocket.git
+git clone https://github.com/Wingman-Sprint/PostPocket.git
 cd PostPocket
 pnpm install                                # sekalian mengaktifkan hook git
 cp apps/web/.env.example apps/web/.env      # lalu aktifkan NUXT_MOCK_API dan NUXT_PUBLIC_API_BASE
@@ -141,7 +141,7 @@ Perilaku baru wajib disertai test: logika di unit test, alur pengguna di E2E. Ta
 - **Header keamanan.** Halaman dan aset tidak bisa dibingkai situs lain, jenis berkas tidak ditebak browser, dan hanya kamera (untuk Booth) yang boleh dipakai.
 - **Batas pemakaian.** Pembuatan surat dan kotak dibatasi per jaringan, dan cadangan Pocket dibatasi per akun, supaya satu orang tidak bisa menghabiskan kuota server.
 - **Data seperlunya.** Tidak ada cookie pelacak atau analitik pihak ketiga, dan fungsi server tidak mencatat alamat IP. Hitungan surat disimpan tanpa menunjuk surat yang mana. Rinciannya ada di [halaman Privasi](https://postpocket.vercel.app/privasi).
-- **Melaporkan celah keamanan.** Pakai [private vulnerability reporting](https://github.com/HaikalFaruq/PostPocket/security/advisories/new), bukan issue publik.
+- **Melaporkan celah keamanan.** Pakai [private vulnerability reporting](https://github.com/Wingman-Sprint/PostPocket/security/advisories/new), bukan issue publik.
 
 ## Deploy
 
@@ -164,7 +164,7 @@ Langkah lengkapnya ada di [docs/frontend.md](docs/frontend.md#deploy) dan [docs/
 | [Identitas visual](docs/desain.md) | Warna, huruf, logo, splash, dan aturan desain |
 | [Aset dan lisensi](docs/assets.md) | Sumber dan lisensi setiap aset |
 | [Kontrak API](docs/api/openapi.yaml) | OpenAPI semua endpoint |
-| [Diagram arsitektur](https://haikalfaruq.github.io/PostPocket/arsitektur.html) | Peta sistem interaktif yang menaut ke baris kode, sumbernya [`docs/arsitektur.archify.json`](docs/arsitektur.archify.json) |
+| [Diagram arsitektur](https://wingman-sprint.github.io/PostPocket/arsitektur.html) | Peta sistem interaktif yang menaut ke baris kode, sumbernya [`docs/arsitektur.archify.json`](docs/arsitektur.archify.json) |
 
 ## Berkontribusi
 

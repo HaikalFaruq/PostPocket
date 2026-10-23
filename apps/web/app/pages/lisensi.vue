@@ -75,7 +75,9 @@ useSeoMeta({
     <p>
       Ilustrasi kartu, ikon, kantong Pocket, badan TV, dan tekstur kertas dibuat sendiri untuk
       PostPocket. Kode sumbernya terbuka di
-      <a href="https://github.com/HaikalFaruq/PostPocket" target="_blank" rel="noopener">GitHub</a>.
+      <a href="https://github.com/Wingman-Sprint/PostPocket" target="_blank" rel="noopener"
+        >GitHub</a
+      >.
     </p>
   </InfoPage>
 </template>
