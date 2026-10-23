@@ -3,7 +3,7 @@
 
 /** Kanal bawaan. Repo-nya publik, jadi isi awalnya memperingatkan soal data pribadi. */
 export const DEFAULT_FEEDBACK_URL =
-  'https://github.com/HaikalFaruq/PostPocket/issues/new?title=Laporan%20tester&body={pesan}'
+  'https://github.com/Wingman-Sprint/PostPocket/issues/new?title=Laporan%20tester&body={pesan}'
 
 /** Alamat halaman tanpa slug surat, supaya link surat orang tidak ikut terkirim di laporan. */
 export function safePath(path: string): string {

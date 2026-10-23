@@ -398,7 +398,7 @@
     "output": ".archify/arsitektur.html",
     "quality_profile": "showcase",
     "repository": {
-      "url": "https://github.com/HaikalFaruq/PostPocket.git",
+      "url": "https://github.com/Wingman-Sprint/PostPocket.git",
       "provider": "github",
       "link_mode": "web",
       "revision": "5e6d406e925e923af0be61f286e151b61c3ef3e3"
