@@ -14,7 +14,9 @@ permissions:
 jobs:
   check:
     name: web
-    runs-on: ubuntu-latest
+    # Dikunci ke 24.04: di ubuntu-26.04 (ubuntu-latest yang baru) tiga tes draf dan kantong di
+    # WebKit selalu habis waktu, padahal lolos di 24.04 dan di WebKit macOS (PR #85).
+    runs-on: ubuntu-24.04
     # E2E saja sekitar 15 menit, dan pemasangan browser Playwright kadang tersendat beberapa
     # menit. Dengan batas 20 menit, job yang sehat pernah terhenti di tengah E2E.
     timeout-minutes: 30
@@ -65,7 +67,7 @@ jobs:
   # moments sungguhan. Lihat docs/frontend.md bagian Sinkron Pocket.
   sinkron:
     name: sinkron
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
