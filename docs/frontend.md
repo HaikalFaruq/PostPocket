@@ -34,7 +34,7 @@ Pertama kali menjalankan E2E di mesin baru: `pnpm --filter @postpocket/web exec 
 > TypeScript dikunci di 6.0.x karena `vue-tsc` belum bisa memakai TypeScript 7 (versi native tidak punya `lib/tsc`). Naikkan bersama `vue-tsc` kalau sudah didukung.
 
 > [!NOTE]
-> `pnpm.overrides` di `package.json` root memaksa versi yang sudah ditambal untuk dua alat dev: `simple-git` 4 (dipakai Nuxt DevTools) dan `esbuild` 0.28 (dipakai `fontless` dari `@nuxt/fonts`). simple-git 4 tidak punya export default, jadi `patches/@nuxt__devtools@3.4.2.patch` mengganti import-nya di DevTools. Kalau `pnpm install` menolak karena patch tidak terpakai setelah Nuxt naik versi: hapus patch dan override `simple-git` kalau DevTools versi baru sudah tidak memakai simple-git 3, atau buat ulang patch-nya dengan `pnpm patch @nuxt/devtools@<versi>`. Override `esbuild` boleh dihapus begitu `fontless` memakai esbuild 0.28.1 ke atas.
+> `pnpm.overrides` di `package.json` root memaksa `esbuild` 0.28 yang sudah ditambal untuk `fontless` dari `@nuxt/fonts`, alat dev. Override ini boleh dihapus begitu `fontless` memakai esbuild 0.28.1 ke atas. Override `simple-git` dan patch DevTools sudah dihapus sejak Nuxt 4.6.2, karena DevTools 3.4.3 ke atas tidak lagi memakai simple-git.
 
 ## Struktur
 
